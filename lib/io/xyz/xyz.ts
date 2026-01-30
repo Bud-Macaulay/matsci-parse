@@ -1,4 +1,5 @@
-import { CrystalStructure, Site, CartesianCoords } from "../crystal";
+import { CrystalStructure } from "../crystal";
+import { CartesianCoords, Site } from "../common";
 
 /**
  * Convert a CrystalStructure to an (extended) XYZ string

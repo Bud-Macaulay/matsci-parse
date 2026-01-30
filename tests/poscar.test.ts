@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import { CrystalStructure, Site } from "../lib/io/crystal";
+import { CrystalStructure } from "../lib/io/crystal";
 import { poscarToStructure, structureToPoscar } from "../lib/io/vasp/poscar";
 import { vectorsNearlyEqual } from "./helpers";
 

@@ -1,4 +1,5 @@
-import { CrystalStructure, Site, CartesianCoords } from "../crystal";
+import { CrystalStructure } from "../crystal";
+import { CartesianCoords, Site } from "../common";
 
 /* 
 derived from VASP documentation: www.vasp.at/wiki/POSCAR

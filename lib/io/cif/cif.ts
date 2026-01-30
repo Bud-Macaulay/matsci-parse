@@ -1,4 +1,5 @@
-import { CrystalStructure } from "../crystal.js";
+import { CrystalStructure } from "../crystal";
+import { CartesianCoords, Site } from "../common";
 
 /* 
 derived from vasp documentation:
