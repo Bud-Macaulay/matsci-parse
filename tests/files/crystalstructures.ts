@@ -28,43 +28,12 @@ export const diamond = new CrystalStructure({
   ],
 });
 
-export const fccCu = new CrystalStructure({
+export const singleAtom = new CrystalStructure({
   lattice: [
-    [3.61, 0, 0],
-    [0, 3.61, 0],
-    [0, 0, 3.61],
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
   ],
-  species: ["Cu"],
-  sites: [
-    { speciesIndex: 0, cart: [0, 0, 0] },
-    { speciesIndex: 0, cart: [1.805, 1.805, 0] },
-    { speciesIndex: 0, cart: [1.805, 0, 1.805] },
-    { speciesIndex: 0, cart: [0, 1.805, 1.805] },
-  ],
-});
-
-export const bccFe = new CrystalStructure({
-  lattice: [
-    [2.87, 0, 0],
-    [0, 2.87, 0],
-    [0, 0, 2.87],
-  ],
-  species: ["Fe"],
-  sites: [
-    { speciesIndex: 0, cart: [0, 0, 0] },
-    { speciesIndex: 0, cart: [1.435, 1.435, 1.435] },
-  ],
-});
-
-export const hcpMg = new CrystalStructure({
-  lattice: [
-    [3.21, 0, 0],
-    [-1.605, 2.78, 0],
-    [0, 0, 5.21],
-  ],
-  species: ["Mg"],
-  sites: [
-    { speciesIndex: 0, cart: [0, 0, 0] },
-    { speciesIndex: 0, cart: [1.605, 0.9267, 2.605] },
-  ],
+  species: ["He"],
+  sites: [{ speciesIndex: 0, cart: [0, 0, 0] }],
 });
