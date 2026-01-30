@@ -91,7 +91,6 @@ export function poscarToStructure(poscarString: string): CrystalStructure {
     species = counts.map((_, idx) => `X${idx + 1}`);
   }
 
-  // selective dynamics optional
   let selectiveDynamics = false;
   if (lines[i]?.toLowerCase().startsWith("s")) {
     selectiveDynamics = true;

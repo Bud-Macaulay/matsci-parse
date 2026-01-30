@@ -1,7 +1,11 @@
 import { xyzToStructure, structureToXyz } from "../lib/io/xyz/xyz";
 import { vectorsNearlyEqual } from "./helpers";
 import { rockSalt, diamond, singleAtom } from "./files/crystalstructures";
-import { classicXyz, extendedXyz } from "./files/xyzStrings";
+import {
+  classicXyz,
+  extendedXyz,
+  extendedXyzSelective,
+} from "./files/xyzStrings";
 
 describe("XYZ parsing and round-trip", () => {
   test("structure -> xyz string (rockSalt)", () => {
@@ -48,5 +52,23 @@ describe("XYZ parsing and round-trip", () => {
     expect(parsed.numSites).toBe(singleAtom.numSites);
     expect(parsed.sites[0].speciesIndex).toBe(singleAtom.sites[0].speciesIndex);
     vectorsNearlyEqual(parsed.sites[0].cart, singleAtom.sites[0].cart);
+  });
+
+  test("round-trip extended XYZ preserves selective dynamics", () => {
+    const structure = xyzToStructure(extendedXyzSelective);
+    const xyz = structureToXyz(structure);
+    const parsed = xyzToStructure(xyz);
+
+    console.log(xyz);
+
+    expect(parsed.numSites).toBe(2);
+
+    for (let i = 0; i < 2; i++) {
+      expect(parsed.sites[i].props.selectiveDynamics).toEqual(
+        structure.sites[i].props.selectiveDynamics,
+      );
+
+      vectorsNearlyEqual(parsed.sites[i].cart, structure.sites[i].cart);
+    }
   });
 });
