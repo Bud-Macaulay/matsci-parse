@@ -2,7 +2,8 @@
   "name": "matsci-parse",
   "version": "0.0.0",
   "type": "module",
-  "module": "dist/main.ts",
+  "main": "dist/main.js",
+  "module": "dist/main.js",
   "files": [
     "dist"
   ],
