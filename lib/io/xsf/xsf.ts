@@ -1,5 +1,9 @@
 import { CrystalStructure, Site, CartesianCoords } from "../crystal";
 
+/* 
+derived from XCrySDen documentation: www.xcrysden.org/doc/XSF.html
+*/
+
 export function structureToXsf(structure: CrystalStructure): string {
   const lines: string[] = [];
 
