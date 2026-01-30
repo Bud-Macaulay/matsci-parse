@@ -76,14 +76,20 @@ export class CrystalStructure {
   }
 
   private _validateSites(
-    sites: (Site | { speciesIndex: number; cart: CartesianCoords })[],
+    sites: (
+      | Site
+      | {
+          speciesIndex: number;
+          cart: CartesianCoords;
+          props?: Record<string, unknown>;
+        }
+    )[],
   ): Site[] {
     if (!Array.isArray(sites)) throw new Error("Sites must be an array");
 
     return sites.map((s) => {
       if (s instanceof Site) return s;
 
-      // plain object → Site instance
       if (
         typeof s === "object" &&
         typeof s.speciesIndex === "number" &&
@@ -91,7 +97,11 @@ export class CrystalStructure {
         s.cart.length === 3
       ) {
         this._validateSpeciesIndex(s.speciesIndex);
-        return new Site(s.speciesIndex, s.cart as CartesianCoords);
+        return new Site(
+          s.speciesIndex,
+          s.cart as CartesianCoords,
+          s.props ?? {},
+        );
       }
 
       throw new Error(

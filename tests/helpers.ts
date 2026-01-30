@@ -1,5 +1,3 @@
-import assert from "assert";
-
 export function nearlyEqual(a: number, b: number, tol = 1e-8): boolean {
   return Math.abs(a - b) < tol;
 }

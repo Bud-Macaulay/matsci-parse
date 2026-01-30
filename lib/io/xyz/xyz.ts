@@ -10,7 +10,6 @@ export function structureToXyz(structure: CrystalStructure): string {
   lines.push(String(n));
 
   if (structure.lattice) {
-    // write extended XYZ header
     const lat = structure.lattice;
     const latticeFlat = [
       lat[0][0],
@@ -38,9 +37,6 @@ export function structureToXyz(structure: CrystalStructure): string {
   return lines.join("\n");
 }
 
-/**
- * Convert an XYZ string (possibly extended XYZ) into a CrystalStructure
- */
 export function xyzToStructure(xyzString: string): CrystalStructure {
   const lines: string[] = xyzString
     .trim()
@@ -56,7 +52,6 @@ export function xyzToStructure(xyzString: string): CrystalStructure {
   const comment = lines[i++];
   const info: Record<string, string> = {};
 
-  // parse key=value pairs
   const kvRegex = /(\w+)=(".*?"|\S+)/g;
   for (const match of comment.matchAll(kvRegex)) {
     let value = match[2];
@@ -64,13 +59,11 @@ export function xyzToStructure(xyzString: string): CrystalStructure {
     info[match[1]] = value;
   }
 
-  // lattice (mandatory for extended XYZ)
   let lattice: CartesianCoords[];
   if (info.Lattice) {
     const v = info.Lattice.split(/\s+/).map(Number);
     if (v.length !== 9) throw new Error("Invalid Lattice in extended XYZ");
 
-    // Fortran column-major → row-major
     lattice = [
       [v[0], v[3], v[6]],
       [v[1], v[4], v[7]],
@@ -80,7 +73,6 @@ export function xyzToStructure(xyzString: string): CrystalStructure {
     throw new Error("Lattice must be present in extended XYZ format");
   }
 
-  // properties parsing
   let speciesOffset = 0;
   let posOffset = 1;
   if (info.Properties) {
