@@ -1,4 +1,3 @@
-// example POSCAR test strings
 export const simplePoscar = `
 NaCl
 1.0
@@ -26,4 +25,18 @@ Direct
 0.0 0.5 0.5 O
 0.5 0.5 0.0 O
 0.5 0.0 0.5 O
+`;
+
+export const selectiveDynamicsPoscar = `
+Example selective dynamics POSCAR
+1.0
+5.6402 0.0000 0.0000
+0.0000 5.6402 0.0000
+0.0000 0.0000 5.6402
+Na Cl
+1 1
+Selective Dynamics
+Direct
+0.0000 0.0000 0.0000 T T F
+0.5000 0.5000 0.5000 F F F
 `;

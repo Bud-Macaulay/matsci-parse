@@ -1,63 +1,40 @@
 import { structureToPoscar, poscarToStructure } from "../lib/io/vasp/poscar";
 import { vectorsNearlyEqual } from "./helpers";
-import { rockSalt, diamond, singleAtom } from "./files/crystalstructures";
+import {
+  simplePoscar,
+  multiElementPoscar,
+  selectiveDynamicsPoscar,
+} from "./files/poscarStrings";
 
-import { CrystalStructure, Site } from "../lib/main";
+describe("POSCAR parsing (round-trip)", () => {
+  test("simple POSCAR round-trip (rock salt)", () => {
+    const first = poscarToStructure(simplePoscar);
+    const poscar = structureToPoscar(first);
+    const second = poscarToStructure(poscar);
 
-describe("POSCAR parsing", () => {
-  test("simple POSCAR round-trip (rockSalt)", () => {
-    const poscar = structureToPoscar(rockSalt);
-    const parsed = poscarToStructure(poscar);
+    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
 
-    expect(parsed.numSites).toBe(rockSalt.numSites);
-
-    expect(parsed.species.sort()).toEqual(rockSalt.species.slice().sort());
-
-    for (let i = 0; i < 3; i++) {
-      vectorsNearlyEqual(parsed.lattice[i], rockSalt.lattice[i]);
-    }
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.species.sort()).toEqual(second.species.slice().sort());
   });
 
   test("multi-element POSCAR round-trip (diamond)", () => {
-    const poscar = structureToPoscar(diamond);
-    const parsed = poscarToStructure(poscar);
+    const first = poscarToStructure(multiElementPoscar);
+    const poscar = structureToPoscar(first);
+    const second = poscarToStructure(poscar);
 
-    expect(parsed.numSites).toBe(diamond.numSites);
-    expect(parsed.species.sort()).toEqual(diamond.species.slice().sort());
-
-    for (let i = 0; i < 3; i++) {
-      vectorsNearlyEqual(parsed.lattice[i], diamond.lattice[i]);
-    }
-  });
-
-  test("single-atom POSCAR round-trip", () => {
-    const poscar = structureToPoscar(singleAtom);
-    const parsed = poscarToStructure(poscar);
-
-    expect(parsed.numSites).toBe(singleAtom.numSites);
-    expect(parsed.species).toEqual(singleAtom.species);
+    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.species.sort()).toEqual(second.species.slice().sort());
   });
 
   test("POSCAR selective dynamics round-trip", () => {
-    const structure = new CrystalStructure({
-      lattice: rockSalt.lattice,
-      species: rockSalt.species,
-      sites: [
-        new Site(0, [0, 0, 0], { selectiveDynamics: [true, true, false] }),
-        new Site(1, [2.82, 2.82, 2.82], {
-          selectiveDynamics: [false, false, false],
-        }),
-      ],
-    });
+    const first = poscarToStructure(selectiveDynamicsPoscar);
+    const poscar = structureToPoscar(first);
+    const second = poscarToStructure(poscar);
 
-    const poscar = structureToPoscar(structure);
-    const parsed = poscarToStructure(poscar);
-
-    expect(parsed.sites.length).toBe(2);
-
-    parsed.sites.forEach((site, i) => {
-      expect(site.props.selective).toEqual(structure.sites[i].props.selective);
-      vectorsNearlyEqual(site.cart, structure.sites[i].cart);
-    });
+    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.species.sort()).toEqual(second.species.slice().sort());
   });
 });

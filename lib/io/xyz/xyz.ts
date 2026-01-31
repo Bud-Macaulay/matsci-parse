@@ -1,5 +1,6 @@
 import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site, hasSelectiveDynamics } from "../common";
+import { stringToLines } from "../utils";
 
 /**
  * Convert a CrystalStructure to an (extended) XYZ string
@@ -55,11 +56,7 @@ export function structureToXyz(structure: CrystalStructure): string {
 }
 
 export function xyzToStructure(xyzString: string): CrystalStructure {
-  const lines: string[] = xyzString
-    .trim()
-    .split(/\r?\n/)
-    .map((l: string) => l.trim())
-    .filter((l: string) => l.length > 0);
+  const lines = stringToLines(xyzString);
 
   let i = 0;
   const natoms = parseInt(lines[i++], 10);

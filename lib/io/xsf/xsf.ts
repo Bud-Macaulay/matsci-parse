@@ -1,10 +1,10 @@
 import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site } from "../common";
+import { stringToLines } from "../utils";
 
 /* 
 derived from XCrySDen documentation: www.xcrysden.org/doc/XSF.html
 */
-
 export function structureToXsf(structure: CrystalStructure): string {
   const lines: string[] = [];
 
@@ -31,11 +31,7 @@ export function structureToXsf(structure: CrystalStructure): string {
 }
 
 export function xsfToStructure(xsfString: string): CrystalStructure {
-  const lines = xsfString
-    .trim()
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+  const lines = stringToLines(xsfString);
 
   const lattice: CartesianCoords[] = [];
   const species: string[] = [];

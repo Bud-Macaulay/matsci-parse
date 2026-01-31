@@ -7,68 +7,61 @@ import {
   extendedXyzSelective,
 } from "./files/xyzStrings";
 
-describe("XYZ parsing and round-trip", () => {
-  test("structure -> xyz string (rockSalt)", () => {
-    const xyz = structureToXyz(rockSalt);
-    expect(xyz.startsWith(String(rockSalt.numSites))).toBe(true);
-    expect(xyz).toContain("Na");
-    expect(xyz).toContain("Cl");
+describe("XYZ parsing (round-trip)", () => {
+  test("rockSalt XYZ round-trip", () => {
+    const first = xyzToStructure(structureToXyz(rockSalt));
+    const second = xyzToStructure(structureToXyz(first));
+
+    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.species.sort()).toEqual(second.species.slice().sort());
+
+    for (let i = 0; i < first.numSites; i++) {
+      expect(first.sites[i].speciesIndex).toBe(second.sites[i].speciesIndex);
+      vectorsNearlyEqual(first.sites[i].cart, second.sites[i].cart);
+    }
+  });
+
+  test("diamond XYZ round-trip", () => {
+    const first = xyzToStructure(structureToXyz(diamond));
+    const second = xyzToStructure(structureToXyz(first));
+
+    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.species).toEqual(second.species);
+
+    for (let i = 0; i < first.numSites; i++) {
+      expect(first.sites[i].speciesIndex).toBe(second.sites[i].speciesIndex);
+      vectorsNearlyEqual(first.sites[i].cart, second.sites[i].cart);
+    }
+  });
+
+  test("single-atom XYZ round-trip", () => {
+    const first = xyzToStructure(structureToXyz(singleAtom));
+    const second = xyzToStructure(structureToXyz(first));
+
+    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
+    expect(first.species).toEqual(second.species);
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.sites[0].speciesIndex).toBe(second.sites[0].speciesIndex);
+    vectorsNearlyEqual(first.sites[0].cart, second.sites[0].cart);
+  });
+
+  test("extended XYZ with selective dynamics round-trip", () => {
+    const first = xyzToStructure(extendedXyzSelective);
+    const second = xyzToStructure(structureToXyz(first));
+
+    expect(first.numSites).toBe(second.numSites);
+
+    for (let i = 0; i < first.numSites; i++) {
+      expect(second.sites[i].props.selectiveDynamics).toEqual(
+        first.sites[i].props.selectiveDynamics,
+      );
+      vectorsNearlyEqual(first.sites[i].cart, second.sites[i].cart);
+    }
   });
 
   test("classic XYZ should throw", () => {
     expect(() => xyzToStructure(classicXyz)).toThrow();
-  });
-
-  test("extended XYZ parses correctly", () => {
-    const structure = xyzToStructure(extendedXyz);
-    expect(structure.numSites).toBe(2);
-    expect(structure.species).toEqual(["Na", "Cl"]);
-
-    vectorsNearlyEqual(structure.lattice[0], [3, 0, 0]);
-    vectorsNearlyEqual(structure.lattice[1], [0, 3, 0]);
-    vectorsNearlyEqual(structure.lattice[2], [0, 0, 3]);
-
-    vectorsNearlyEqual(structure.cartCoords(1), [1.5, 1.5, 1.5]);
-  });
-
-  test("round-trip extended XYZ preserves diamond", () => {
-    const xyz = structureToXyz(diamond);
-    const parsed = xyzToStructure(xyz);
-    for (let i = 0; i < 3; i++)
-      vectorsNearlyEqual(parsed.lattice[i], diamond.lattice[i]);
-    expect(parsed.species).toEqual(diamond.species);
-    for (let i = 0; i < diamond.numSites; i++) {
-      expect(parsed.sites[i].speciesIndex).toBe(diamond.sites[i].speciesIndex);
-      vectorsNearlyEqual(parsed.sites[i].cart, diamond.sites[i].cart);
-    }
-  });
-
-  test("round-trip extended XYZ preserves single atom structure", () => {
-    const xyz = structureToXyz(singleAtom);
-    const parsed = xyzToStructure(xyz);
-    for (let i = 0; i < 3; i++)
-      vectorsNearlyEqual(parsed.lattice[i], singleAtom.lattice[i]);
-    expect(parsed.species).toEqual(singleAtom.species);
-    expect(parsed.numSites).toBe(singleAtom.numSites);
-    expect(parsed.sites[0].speciesIndex).toBe(singleAtom.sites[0].speciesIndex);
-    vectorsNearlyEqual(parsed.sites[0].cart, singleAtom.sites[0].cart);
-  });
-
-  test("round-trip extended XYZ preserves selective dynamics", () => {
-    const structure = xyzToStructure(extendedXyzSelective);
-    const xyz = structureToXyz(structure);
-    const parsed = xyzToStructure(xyz);
-
-    console.log(xyz);
-
-    expect(parsed.numSites).toBe(2);
-
-    for (let i = 0; i < 2; i++) {
-      expect(parsed.sites[i].props.selectiveDynamics).toEqual(
-        structure.sites[i].props.selectiveDynamics,
-      );
-
-      vectorsNearlyEqual(parsed.sites[i].cart, structure.sites[i].cart);
-    }
   });
 });

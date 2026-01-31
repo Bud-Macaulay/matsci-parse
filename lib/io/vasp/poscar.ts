@@ -2,6 +2,7 @@ import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site } from "../common";
 
 import { hasSelectiveDynamics } from "../common";
+import { stringToLines } from "../utils";
 
 /* 
 derived from VASP documentation: www.vasp.at/wiki/POSCAR
@@ -58,12 +59,7 @@ export function structureToPoscar(structure: CrystalStructure): string {
 }
 
 export function poscarToStructure(poscarString: string): CrystalStructure {
-  const lines = poscarString
-    .trim()
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-
+  const lines = stringToLines(poscarString);
   let i = 0;
 
   i++; // skip comment line
