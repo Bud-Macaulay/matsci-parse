@@ -58,15 +58,15 @@ export function structureToPoscar(structure: CrystalStructure): string {
   return lines.join("\n");
 }
 
-export function poscarToStructure(poscarString: string): CrystalStructure {
-  const lines = stringToLines(poscarString);
+export function parsePoscar(lines: string[]): {
+  structure: CrystalStructure;
+  linesConsumed: number;
+} {
   let i = 0;
 
-  i++; // skip comment line
-
+  i++; // comment
   const scale = parseFloat(lines[i++]);
 
-  // lattice
   const lattice: CartesianCoords[] = [];
   for (let j = 0; j < 3; j++) {
     lattice.push(
@@ -76,7 +76,6 @@ export function poscarToStructure(poscarString: string): CrystalStructure {
     );
   }
 
-  // species line or skip
   let speciesLine = lines[i].trim();
   let species: string[] | undefined;
   if (/^[A-Za-z]/.test(speciesLine)) {
@@ -84,10 +83,8 @@ export function poscarToStructure(poscarString: string): CrystalStructure {
     i++;
   }
 
-  // counts
   const counts: number[] = lines[i++].split(/\s+/).map(Number);
 
-  // if species was missing, create placeholders
   if (!species) {
     species = counts.map((_, idx) => `X${idx + 1}`);
   }
@@ -98,18 +95,17 @@ export function poscarToStructure(poscarString: string): CrystalStructure {
     i++;
   }
 
-  // coordinate type
   const coordType = lines[i++].toLowerCase();
   const isDirect = coordType.startsWith("d");
 
   const sites: Site[] = [];
+
   species.forEach((_, speciesIndex) => {
     for (let n = 0; n < counts[speciesIndex]; n++) {
       const parts = lines[i++].split(/\s+/).map(Number);
-      let cart: CartesianCoords;
 
+      let cart: CartesianCoords;
       if (isDirect) {
-        // fractional → cartesian
         cart = [
           parts[0] * lattice[0][0] +
             parts[1] * lattice[1][0] +
@@ -125,26 +121,24 @@ export function poscarToStructure(poscarString: string): CrystalStructure {
         cart = parts.slice(0, 3) as CartesianCoords;
       }
 
-      let props: Record<string, unknown> = {};
+      const props: Record<string, unknown> = {};
 
       if (selectiveDynamics) {
-        const flags = lines[i - 1]
-          .split(/\s+/)
-          .slice(3, 6)
-          .map((x) => x.toUpperCase() === "T");
-
-        if (flags.length === 3) {
-          props.selectiveDynamics = flags;
-        }
+        const flags = parts.slice(3, 6).map((x) => x === 1);
+        if (flags.length === 3) props.selectiveDynamics = flags;
       }
 
       sites.push(new Site(speciesIndex, cart, props));
     }
   });
 
-  return new CrystalStructure({
-    lattice,
-    species,
-    sites,
-  });
+  return {
+    structure: new CrystalStructure({ lattice, species, sites }),
+    linesConsumed: i,
+  };
+}
+
+export function poscarToStructure(poscarString: string): CrystalStructure {
+  const lines = stringToLines(poscarString);
+  return parsePoscar(lines).structure;
 }

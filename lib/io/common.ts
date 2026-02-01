@@ -4,6 +4,8 @@ export type CartesianCoords = [number, number, number];
 
 export type SiteProperties = Record<string, unknown>;
 
+export type GridShape = [number, number, number];
+
 export class Site {
   speciesIndex: number;
   cart: CartesianCoords;
