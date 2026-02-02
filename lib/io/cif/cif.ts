@@ -2,8 +2,6 @@ import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site } from "../common";
 import { stringToLines } from "../utils";
 
-import spglib from "@spglib/moyo-wasm";
-
 import { cellLengthsAnglesToLattice, fractionalToCartesian } from "../math";
 
 function dot(a: CartesianCoords, b: CartesianCoords): number {
@@ -53,9 +51,9 @@ function cartesianToFractional(
   ];
 
   return [
-    inv[0][0] * cart[0] + inv[0][1] * cart[1] + inv[0][2] * cart[2],
-    inv[1][0] * cart[0] + inv[1][1] * cart[1] + inv[1][2] * cart[2],
-    inv[2][0] * cart[0] + inv[2][1] * cart[1] + inv[2][2] * cart[2],
+    cart[0] * inv[0][0] + cart[1] * inv[1][0] + cart[2] * inv[2][0],
+    cart[0] * inv[0][1] + cart[1] * inv[1][1] + cart[2] * inv[2][1],
+    cart[0] * inv[0][2] + cart[1] * inv[1][2] + cart[2] * inv[2][2],
   ];
 }
 
@@ -70,7 +68,7 @@ export function structureToCif(structure: CrystalStructure): string {
   const beta = radToDeg(Math.acos(dot(aVec, cVec) / (a * c)));
   const gamma = radToDeg(Math.acos(dot(aVec, bVec) / (a * b)));
 
-  let cif = `generated_by_matsci-parse
+  let cif = `data_made_with_matsci-parse
     _symmetry_space_group_name_H-M   'P 1'
     _symmetry_Int_Tables_number    1
 
