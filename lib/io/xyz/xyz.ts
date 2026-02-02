@@ -5,7 +5,10 @@ import { stringToLines } from "../utils";
 /**
  * Convert a CrystalStructure to an (extended) XYZ string
  */
-export function structureToXyz(structure: CrystalStructure): string {
+export function structureToXyz(
+  structure: CrystalStructure,
+  precision: number = 6,
+): string {
   const lines: string[] = [];
   const n = structure.sites.length;
   lines.push(String(n));
@@ -39,7 +42,7 @@ export function structureToXyz(structure: CrystalStructure): string {
     const el = structure.species[site.speciesIndex];
     const [x, y, z] = site.cart;
 
-    let line = `${el} ${x.toFixed(10)} ${y.toFixed(10)} ${z.toFixed(10)}`;
+    let line = `${el} ${x.toFixed(precision)} ${y.toFixed(precision)} ${z.toFixed(precision)}`;
 
     if (useSelective) {
       const flags = Array.isArray(site.props?.selectiveDynamics)

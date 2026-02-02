@@ -7,7 +7,10 @@ import { stringToLines } from "../utils";
 /* 
 derived from VASP documentation: www.vasp.at/wiki/POSCAR
 */
-export function structureToPoscar(structure: CrystalStructure): string {
+export function structureToPoscar(
+  structure: CrystalStructure,
+  precision: number = 6,
+): string {
   const lines: string[] = [];
 
   const useSelective = hasSelectiveDynamics(structure);
@@ -17,7 +20,7 @@ export function structureToPoscar(structure: CrystalStructure): string {
 
   // lattice
   structure.lattice.forEach((v) => {
-    lines.push(v.map((x) => x.toFixed(10)).join(" "));
+    lines.push(v.map((x) => x.toFixed(precision)).join(" "));
   });
 
   // --- compute unique species and counts ---
@@ -42,7 +45,7 @@ export function structureToPoscar(structure: CrystalStructure): string {
     structure.sites
       .filter((s) => structure.species[s.speciesIndex] === el)
       .forEach((s) => {
-        const coords = s.cart.map((x) => x.toFixed(10)).join(" ");
+        const coords = s.cart.map((x) => x.toFixed(precision)).join(" ");
         if (useSelective) {
           const flags = Array.isArray(s.props?.selectiveDynamics)
             ? s.props.selectiveDynamics

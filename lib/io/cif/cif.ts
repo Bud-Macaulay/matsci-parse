@@ -57,7 +57,10 @@ function cartesianToFractional(
   ];
 }
 
-export function structureToCif(structure: CrystalStructure): string {
+export function structureToCif(
+  structure: CrystalStructure,
+  precision: number = 6,
+): string {
   const [aVec, bVec, cVec] = structure.lattice;
 
   const a = norm(aVec);
@@ -72,12 +75,12 @@ export function structureToCif(structure: CrystalStructure): string {
     _symmetry_space_group_name_H-M   'P 1'
     _symmetry_Int_Tables_number    1
 
-    _cell_length_a   ${a.toFixed(6)}
-    _cell_length_b   ${b.toFixed(6)}
-    _cell_length_c   ${c.toFixed(6)}
-    _cell_angle_alpha   ${alpha.toFixed(6)}
-    _cell_angle_beta    ${beta.toFixed(6)}
-    _cell_angle_gamma   ${gamma.toFixed(6)}
+    _cell_length_a   ${a.toFixed(precision)}
+    _cell_length_b   ${b.toFixed(precision)}
+    _cell_length_c   ${c.toFixed(precision)}
+    _cell_angle_alpha   ${alpha.toFixed(precision)}
+    _cell_angle_beta    ${beta.toFixed(precision)}
+    _cell_angle_gamma   ${gamma.toFixed(precision)}
 
     loop_
     _atom_site_label
@@ -91,9 +94,9 @@ export function structureToCif(structure: CrystalStructure): string {
     const el = structure.species[site.speciesIndex];
     const f = cartesianToFractional(site.cart, structure.lattice);
 
-    cif += `${el}${i + 1} ${el} ${f[0].toFixed(6)} ${f[1].toFixed(
+    cif += `${el}${i + 1} ${el} ${f[0].toFixed(precision)} ${f[1].toFixed(
       6,
-    )} ${f[2].toFixed(6)}\n`;
+    )} ${f[2].toFixed(precision)}\n`;
   });
 
   return cif;

@@ -5,7 +5,10 @@ import { stringToLines } from "../utils";
 /* 
 derived from XCrySDen documentation: www.xcrysden.org/doc/XSF.html
 */
-export function structureToXsf(structure: CrystalStructure): string {
+export function structureToXsf(
+  structure: CrystalStructure,
+  precision: number = 6,
+): string {
   const lines: string[] = [];
 
   lines.push("CRYSTAL");
@@ -13,7 +16,7 @@ export function structureToXsf(structure: CrystalStructure): string {
 
   // lattice vectors
   structure.lattice.forEach((v: CartesianCoords) => {
-    lines.push(v.map((x) => x.toFixed(10)).join(" "));
+    lines.push(v.map((x) => x.toFixed(precision)).join(" "));
   });
 
   lines.push("PRIMCOORD");
@@ -24,7 +27,9 @@ export function structureToXsf(structure: CrystalStructure): string {
   // atomic positions
   structure.sites.forEach((s: Site) => {
     const element = structure.species[s.speciesIndex];
-    lines.push(`${element} ${s.cart.map((x) => x.toFixed(10)).join(" ")}`);
+    lines.push(
+      `${element} ${s.cart.map((x) => x.toFixed(precision)).join(" ")}`,
+    );
   });
 
   return lines.join("\n");
