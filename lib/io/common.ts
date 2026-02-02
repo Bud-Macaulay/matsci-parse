@@ -2,6 +2,8 @@ import { CrystalStructure } from "./crystal";
 
 export type CartesianCoords = [number, number, number];
 
+export type FractionalCoords = [number, number, number];
+
 export type SiteProperties = Record<string, unknown>;
 
 export type GridShape = [number, number, number];

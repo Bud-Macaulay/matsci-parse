@@ -1,4 +1,4 @@
-import { CartesianCoords } from "./common";
+import { CartesianCoords, FractionalCoords } from "./common";
 
 // --- Helpers ---
 export function degToRad(d: number) {
@@ -34,7 +34,7 @@ export function cellLengthsAnglesToLattice(
 }
 
 export function fractionalToCartesian(
-  fract: CartesianCoords,
+  fract: FractionalCoords,
   lattice: CartesianCoords[],
 ): CartesianCoords {
   const [a, b, c] = lattice;
