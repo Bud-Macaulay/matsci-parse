@@ -5,6 +5,15 @@ export function degToRad(d: number) {
   return (d * Math.PI) / 180;
 }
 
+export function multiplyMatrixVector(
+  matrix: number[][],
+  vec: number[],
+): number[] {
+  return matrix.map(
+    (row) => row[0] * vec[0] + row[1] * vec[1] + row[2] * vec[2],
+  );
+}
+
 export function cellLengthsAnglesToLattice(
   a: number,
   b: number,

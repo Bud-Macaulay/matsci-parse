@@ -1,6 +1,6 @@
-import { cifToStructure, structureToCif } from "../lib/io/cif/cif";
-import { vectorsNearlyEqual } from "./helpers";
-import { rockSaltCif, diamondCif, singleAtomCif } from "./files/cifStrings";
+import { cifToStructure, structureToCif } from "../../lib/io/cif/cif";
+import { vectorsNearlyEqual } from "../helpers";
+import { rockSaltCif, diamondCif, singleAtomCif } from "../files/cifStrings";
 
 describe("CIF parsing", () => {
   test("simple CIF round-trip (rock salt)", () => {

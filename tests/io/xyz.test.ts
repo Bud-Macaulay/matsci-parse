@@ -1,11 +1,11 @@
-import { xyzToStructure, structureToXyz } from "../lib/io/xyz/xyz";
-import { vectorsNearlyEqual } from "./helpers";
-import { rockSalt, diamond, singleAtom } from "./files/crystalstructures";
+import { xyzToStructure, structureToXyz } from "../../lib/io/xyz/xyz";
+import { vectorsNearlyEqual } from "../helpers";
+import { rockSalt, diamond, singleAtom } from "../files/crystalstructures";
 import {
   classicXyz,
   extendedXyz,
   extendedXyzSelective,
-} from "./files/xyzStrings";
+} from "../files/xyzStrings";
 
 describe("XYZ parsing (round-trip)", () => {
   test("rockSalt XYZ round-trip", () => {

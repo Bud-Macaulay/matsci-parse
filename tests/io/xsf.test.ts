@@ -1,6 +1,6 @@
-import { xsfToStructure, structureToXsf } from "../lib/io/xsf/xsf";
-import { vectorsNearlyEqual } from "./helpers";
-import { simpleXsf, singleAtomXsf } from "./files/xsfStrings";
+import { xsfToStructure, structureToXsf } from "../../lib/io/xsf/xsf";
+import { vectorsNearlyEqual } from "../helpers";
+import { simpleXsf, singleAtomXsf } from "../files/xsfStrings";
 
 describe("XSF parsing (round-trip)", () => {
   test("simple XSF round-trip (NaCl)", () => {

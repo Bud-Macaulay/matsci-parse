@@ -1,10 +1,10 @@
-import { structureToPoscar, poscarToStructure } from "../lib/io/vasp/poscar";
-import { vectorsNearlyEqual } from "./helpers";
+import { structureToPoscar, poscarToStructure } from "../../lib/io/vasp/poscar";
+import { vectorsNearlyEqual } from "../helpers";
 import {
   simplePoscar,
   multiElementPoscar,
   selectiveDynamicsPoscar,
-} from "./files/poscarStrings";
+} from "../files/poscarStrings";
 
 describe("POSCAR parsing (round-trip)", () => {
   test("simple POSCAR round-trip (rock salt)", () => {
