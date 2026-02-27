@@ -1,6 +1,11 @@
 import { cifToStructure, structureToCif } from "../../lib/io/cif/cif";
 import { vectorsNearlyEqual } from "../helpers";
-import { rockSaltCif, diamondCif, singleAtomCif } from "../files/cifStrings";
+import {
+  rockSaltCif,
+  diamondCif,
+  singleAtomCif,
+  multiLoopCif,
+} from "../files/cifStrings";
 
 describe("CIF parsing", () => {
   test("simple CIF round-trip (rock salt)", () => {
@@ -32,6 +37,19 @@ describe("CIF parsing", () => {
 
   test("single atom CIF round-trip", () => {
     const first = cifToStructure(singleAtomCif);
+    const cif = structureToCif(first);
+    const second = cifToStructure(cif);
+
+    first.lattice.forEach((v, i) => {
+      vectorsNearlyEqual(first.lattice[i], second.lattice[i]);
+    });
+
+    expect(first.numSites).toBe(second.numSites);
+    expect(first.species[0]).toBe(second.species[0]);
+  });
+
+  test("multi-loop CIF round-trip", () => {
+    const first = cifToStructure(multiLoopCif);
     const cif = structureToCif(first);
     const second = cifToStructure(cif);
 

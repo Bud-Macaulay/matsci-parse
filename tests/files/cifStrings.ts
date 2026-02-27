@@ -58,3 +58,41 @@ loop_
   _atom_site_fract_z
 Si1 Si 0 0 0
 `;
+
+export const multiLoopCif = `
+##########################################################################
+#               Crystallographic Information Format file
+#               Produced by PyCifRW module
+#
+#  This is a CIF file.  CIF has been adopted by the International
+#  Union of Crystallography as the standard for data archiving and
+#  transmission.
+#
+#  For information on this file format, follow the CIF links at
+#  http://www.iucr.org
+##########################################################################
+
+data_0
+
+loop_
+  _atom_site_label
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_type_symbol
+         Fe1       6.341503861687785e-38         0.0       0.0       Fe        
+         Co1       0.7500000000090271  0.7500000000090271  0.750000000008991   Co       
+         Co2       0.2500000000090452  0.2500000000090091  0.250000000009009   Co       
+         Si1       0.5       0.5       0.5       Si 
+_cell_angle_alpha                       60.00000000000001
+_cell_angle_beta                        60.00000000000001
+_cell_angle_gamma                       60.00000000000001
+_cell_length_a                          3.924418394577536
+_cell_length_b                          3.924418394577536
+_cell_length_c                          3.924418394577536
+loop_
+  _symmetry_equiv_pos_as_xyz
+         'x, y, z' 
+_symmetry_int_tables_number             1
+_symmetry_space_group_name_H-M          'P 1'
+`;
