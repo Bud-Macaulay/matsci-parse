@@ -1,5 +1,5 @@
+import "../../tests/helpers/structureMatchers";
 import { structureToPoscar, poscarToStructure } from "../../lib/io/vasp/poscar";
-import { vectorsNearlyEqual } from "../helpers";
 import {
   simplePoscar,
   multiElementPoscar,
@@ -12,10 +12,7 @@ describe("POSCAR parsing (round-trip)", () => {
     const poscar = structureToPoscar(first);
     const second = poscarToStructure(poscar);
 
-    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
-
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species.sort()).toEqual(second.species.slice().sort());
+    expect(first).toStructureNearlyEqual(second);
   });
 
   test("multi-element POSCAR round-trip (diamond)", () => {
@@ -23,9 +20,7 @@ describe("POSCAR parsing (round-trip)", () => {
     const poscar = structureToPoscar(first);
     const second = poscarToStructure(poscar);
 
-    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species.sort()).toEqual(second.species.slice().sort());
+    expect(first).toStructureNearlyEqual(second);
   });
 
   test("POSCAR selective dynamics round-trip", () => {
@@ -33,8 +28,6 @@ describe("POSCAR parsing (round-trip)", () => {
     const poscar = structureToPoscar(first);
     const second = poscarToStructure(poscar);
 
-    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species.sort()).toEqual(second.species.slice().sort());
+    expect(first).toStructureNearlyEqual(second);
   });
 });

@@ -1,5 +1,5 @@
+import "../../tests/helpers/structureMatchers"; // load the matcher globally
 import { xsfToStructure, structureToXsf } from "../../lib/io/xsf/xsf";
-import { vectorsNearlyEqual } from "../helpers";
 import { simpleXsf, singleAtomXsf } from "../files/xsfStrings";
 
 describe("XSF parsing (round-trip)", () => {
@@ -8,11 +8,7 @@ describe("XSF parsing (round-trip)", () => {
     const xsf = structureToXsf(first);
     const second = xsfToStructure(xsf);
 
-    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
-
-    expect(first.numSites).toBe(second.numSites);
-
-    expect(first.species.sort()).toEqual(second.species.slice().sort());
+    expect(first).toStructureNearlyEqual(second);
   });
 
   test("single-atom XSF round-trip", () => {
@@ -20,8 +16,6 @@ describe("XSF parsing (round-trip)", () => {
     const xsf = structureToXsf(first);
     const second = xsfToStructure(xsf);
 
-    first.lattice.forEach((v, i) => vectorsNearlyEqual(v, second.lattice[i]));
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species).toEqual(second.species);
+    expect(first).toStructureNearlyEqual(second);
   });
 });

@@ -105,7 +105,7 @@ export function structureToCif(
 export function cifToStructure(cifString: string): CrystalStructure {
   const lines = stringToLines(cifString);
 
-  // --- Parse unit cell parameters ---
+  // --- Unit cell parameters ---
   let a = 0,
     b = 0,
     c = 0;
@@ -113,14 +113,19 @@ export function cifToStructure(cifString: string): CrystalStructure {
     beta = 0,
     gamma = 0;
 
-  const species: string[] = [];
-  const sites: Site[] = [];
+  // --- Atom loop storage ---
+  let atomHeaders: string[] = [];
+  const atomRows: string[][] = [];
 
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i].trim();
+  let inLoop = false;
+  let currentHeaders: string[] = [];
+  let collectingAtomLoop = false;
 
-    // Parse cell parameters
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    // --- Unit cell parameters ---
     if (line.startsWith("_cell_length_a")) a = parseFloat(line.split(/\s+/)[1]);
     else if (line.startsWith("_cell_length_b"))
       b = parseFloat(line.split(/\s+/)[1]);
@@ -132,64 +137,73 @@ export function cifToStructure(cifString: string): CrystalStructure {
       beta = parseFloat(line.split(/\s+/)[1]);
     else if (line.startsWith("_cell_angle_gamma"))
       gamma = parseFloat(line.split(/\s+/)[1]);
-    // --- Detect loop of atom sites ---
+    // --- Start of new loop ---
     else if (line.startsWith("loop_")) {
-      i++;
-      const loopHeaders: string[] = [];
-      // Collect headers
-      while (i < lines.length && lines[i].trim().startsWith("_")) {
-        loopHeaders.push(lines[i].trim());
-        i++;
-      }
-
-      // Only handle _atom_site_ loops
-      if (loopHeaders.some((h) => h.includes("_atom_site_"))) {
-        const idxX = loopHeaders.findIndex((h) => h.includes("fract_x"));
-        const idxY = loopHeaders.findIndex((h) => h.includes("fract_y"));
-        const idxZ = loopHeaders.findIndex((h) => h.includes("fract_z"));
-        const idxType = loopHeaders.findIndex((h) => h.includes("type_symbol"));
-
-        if (idxX < 0 || idxY < 0 || idxZ < 0 || idxType < 0) {
-          throw new Error("CIF missing required _atom_site columns");
-        }
-
-        // Read rows until blank line or next loop_/_
-        while (
-          i < lines.length &&
-          lines[i].trim() &&
-          !lines[i].trim().startsWith("_") &&
-          !lines[i].trim().startsWith("loop_")
-        ) {
-          const row = lines[i].trim().split(/\s+/);
-          const fract: CartesianCoords = [
-            parseFloat(row[idxX]),
-            parseFloat(row[idxY]),
-            parseFloat(row[idxZ]),
-          ];
-
-          const cart = fractionalToCartesian(
-            fract,
-            cellLengthsAnglesToLattice(a, b, c, alpha, beta, gamma),
-          );
-
-          let speciesIndex = species.indexOf(row[idxType]);
-          if (speciesIndex === -1) {
-            speciesIndex = species.length;
-            species.push(row[idxType]);
-          }
-
-          sites.push(new Site(speciesIndex, cart));
-
-          i++;
-        }
-
-        continue; // skip i++ at end of while
-      }
+      inLoop = true;
+      currentHeaders = [];
+      collectingAtomLoop = false;
+      continue;
     }
 
-    i++;
+    // --- Loop headers ---
+    if (inLoop && line.startsWith("_")) {
+      currentHeaders.push(line);
+
+      if (line.includes("_atom_site_")) {
+        collectingAtomLoop = true;
+      }
+
+      continue;
+    }
+
+    // --- Loop rows ---
+    if (inLoop && !line.startsWith("_")) {
+      if (collectingAtomLoop) {
+        // First time we confirm atom loop → lock headers
+        if (atomHeaders.length === 0) {
+          atomHeaders = [...currentHeaders];
+        }
+        atomRows.push(line.split(/\s+/));
+      }
+      continue;
+    }
+  }
+
+  if (atomHeaders.length === 0) {
+    throw new Error("No _atom_site loop found in CIF");
   }
 
   const lattice = cellLengthsAnglesToLattice(a, b, c, alpha, beta, gamma);
+
+  const species: string[] = [];
+  const sites: Site[] = [];
+
+  const idxX = atomHeaders.findIndex((h) => h.includes("fract_x"));
+  const idxY = atomHeaders.findIndex((h) => h.includes("fract_y"));
+  const idxZ = atomHeaders.findIndex((h) => h.includes("fract_z"));
+  const idxType = atomHeaders.findIndex((h) => h.includes("type_symbol"));
+
+  if (idxX < 0 || idxY < 0 || idxZ < 0 || idxType < 0) {
+    throw new Error("CIF missing required _atom_site columns");
+  }
+
+  for (const row of atomRows) {
+    const fract: CartesianCoords = [
+      parseFloat(row[idxX]),
+      parseFloat(row[idxY]),
+      parseFloat(row[idxZ]),
+    ];
+
+    const cart = fractionalToCartesian(fract, lattice);
+
+    let speciesIndex = species.indexOf(row[idxType]);
+    if (speciesIndex === -1) {
+      speciesIndex = species.length;
+      species.push(row[idxType]);
+    }
+
+    sites.push(new Site(speciesIndex, cart));
+  }
+
   return new CrystalStructure({ lattice, species, sites });
 }

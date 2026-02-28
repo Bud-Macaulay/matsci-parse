@@ -1,5 +1,5 @@
+import "../../tests/helpers/structureMatchers";
 import { cifToStructure, structureToCif } from "../../lib/io/cif/cif";
-import { vectorsNearlyEqual } from "../helpers";
 import {
   rockSaltCif,
   diamondCif,
@@ -13,12 +13,7 @@ describe("CIF parsing", () => {
     const cif = structureToCif(first);
     const second = cifToStructure(cif);
 
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species.sort()).toEqual(second.species.slice().sort());
-
-    first.lattice.forEach((v, i) => {
-      vectorsNearlyEqual(first.lattice[i], second.lattice[i]);
-    });
+    expect(first).toStructureNearlyEqual(second);
   });
 
   test("diamond CIF round-trip", () => {
@@ -26,13 +21,7 @@ describe("CIF parsing", () => {
     const cif = structureToCif(first);
     const second = cifToStructure(cif);
 
-    first.lattice.forEach((v, i) => {
-      vectorsNearlyEqual(first.lattice[i], second.lattice[i]);
-    });
-
-    expect(first.numSites).toBe(second.numSites);
-
-    expect(first.species.sort()).toEqual(second.species.slice().sort());
+    expect(first).toStructureNearlyEqual(second);
   });
 
   test("single atom CIF round-trip", () => {
@@ -40,12 +29,7 @@ describe("CIF parsing", () => {
     const cif = structureToCif(first);
     const second = cifToStructure(cif);
 
-    first.lattice.forEach((v, i) => {
-      vectorsNearlyEqual(first.lattice[i], second.lattice[i]);
-    });
-
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species[0]).toBe(second.species[0]);
+    expect(first).toStructureNearlyEqual(second);
   });
 
   test("multi-loop CIF round-trip", () => {
@@ -53,11 +37,6 @@ describe("CIF parsing", () => {
     const cif = structureToCif(first);
     const second = cifToStructure(cif);
 
-    first.lattice.forEach((v, i) => {
-      vectorsNearlyEqual(first.lattice[i], second.lattice[i]);
-    });
-
-    expect(first.numSites).toBe(second.numSites);
-    expect(first.species[0]).toBe(second.species[0]);
+    expect(first).toStructureNearlyEqual(second);
   });
 });
