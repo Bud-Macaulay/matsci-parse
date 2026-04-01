@@ -5,6 +5,7 @@ import { Site } from "../common";
 import { PeriodicTable } from "../../AtomicData";
 
 import { stringToLines } from "../utils";
+import { LengthUnitSystem, LengthUnits } from "../../units/units";
 
 const BOHR_TO_ANGSTROM = 0.529177;
 const ANGSTROM_TO_BOHR = 1.8897268;
@@ -88,63 +89,53 @@ export function volumetricToCube(
   return lines.join("\n");
 }
 
-function parseCube(lines: string[]): {
+export function parseCube(
+  lines: string[],
+  unitsOrigin: LengthUnits = "bohr",
+  unitsPosition: LengthUnits = "bohr",
+  unitsCell: LengthUnits = "bohr",
+): {
   structure: CrystalStructure;
   volumetricData: VolumetricData;
   linesConsumed: number;
 } {
   let i = 0;
 
-  // 1. Skip first two non-empty comment lines
+  // 1. Skip first two comment lines
   i += 2;
 
+  // 2. Parse number of atoms and origin
   const atomsOriginLine = lines[i].split(/\s+/);
   const nAtoms = parseInt(atomsOriginLine[0]);
-  const originX = parseFloat(atomsOriginLine[1]);
-  const originY = parseFloat(atomsOriginLine[2]);
-  const originZ = parseFloat(atomsOriginLine[3]);
-
-  let origin: CartesianCoords = [originX, originY, originZ];
-
+  let origin: CartesianCoords = [
+    parseFloat(atomsOriginLine[1]),
+    parseFloat(atomsOriginLine[2]),
+    parseFloat(atomsOriginLine[3]),
+  ];
   i++;
 
-  const voxelOne = lines[i].split(/\s+/);
-  const isBohr = parseInt(voxelOne[0], 10) > 0;
+  // 3. Parse voxel/grid vectors
+  const voxelOne = lines[i++].split(/\s+/);
+  const voxelTwo = lines[i++].split(/\s+/);
+  const voxelThree = lines[i++].split(/\s+/);
 
   let latVectors: CartesianCoords[] = [
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
+    [parseFloat(voxelOne[1]), parseFloat(voxelOne[2]), parseFloat(voxelOne[3])],
+    [parseFloat(voxelTwo[1]), parseFloat(voxelTwo[2]), parseFloat(voxelTwo[3])],
+    [
+      parseFloat(voxelThree[1]),
+      parseFloat(voxelThree[2]),
+      parseFloat(voxelThree[3]),
+    ],
   ];
 
-  latVectors[0][0] = parseFloat(voxelOne[1]);
-  latVectors[0][1] = parseFloat(voxelOne[2]);
-  latVectors[0][2] = parseFloat(voxelOne[3]);
+  const shape: GridShape = [
+    parseInt(voxelOne[0], 10),
+    parseInt(voxelTwo[0], 10),
+    parseInt(voxelThree[0], 10),
+  ];
 
-  i++;
-
-  const voxelTwo = lines[i].split(/\s+/);
-  latVectors[1][1] = parseFloat(voxelTwo[2]);
-  latVectors[1][0] = parseFloat(voxelTwo[1]);
-  latVectors[1][2] = parseFloat(voxelTwo[3]);
-
-  i++;
-
-  const voxelThree = lines[i].split(/\s+/);
-
-  latVectors[2][0] = parseFloat(voxelThree[1]);
-  latVectors[2][1] = parseFloat(voxelThree[2]);
-  latVectors[2][2] = parseFloat(voxelThree[3]);
-
-  const shape: GridShape = [0, 0, 0];
-
-  shape[0] = parseInt(voxelOne[0], 10);
-  shape[1] = parseInt(voxelTwo[0], 10);
-  shape[2] = parseInt(voxelThree[0], 10);
-
-  i++;
-
-  // 4. Atom parsing
+  // 4. Parse atoms
   const species: string[] = [];
   const speciesIndexMap = new Map<string, number>();
   const sites: Site[] = [];
@@ -155,7 +146,7 @@ function parseCube(lines: string[]): {
 
     const atomicNumber = parseInt(parts[0], 10);
     const charge = parseFloat(parts[1]);
-    let position: CartesianCoords = [
+    const position: CartesianCoords = [
       parseFloat(parts[2]),
       parseFloat(parts[3]),
       parseFloat(parts[4]),
@@ -175,25 +166,31 @@ function parseCube(lines: string[]): {
     sites.push(new Site(speciesIndex, position, { charge }));
   }
 
-  // if bohr we convert here
-  if (isBohr) {
-    sites.forEach((site) => {
-      site.cart = site.cart.map((x) => x * BOHR_TO_ANGSTROM) as CartesianCoords;
-    });
-  }
+  // 5. Convert all positions Angstrom
+  origin = LengthUnitSystem.convertArray(
+    origin,
+    unitsOrigin,
+    "angstrom",
+  ) as CartesianCoords;
 
-  if (isBohr) {
-    for (let j = 0; j < 3; j++) {
-      for (let k = 0; k < 3; k++) {
-        latVectors[j][k] *= BOHR_TO_ANGSTROM;
-      }
-    }
-  }
+  latVectors = latVectors.map(
+    (vec) =>
+      LengthUnitSystem.convertArray(
+        vec,
+        unitsCell,
+        "angstrom",
+      ) as CartesianCoords,
+  );
 
-  if (isBohr) {
-    origin = origin.map((x) => x * BOHR_TO_ANGSTROM) as CartesianCoords;
-  }
+  sites.forEach((site) => {
+    site.cart = LengthUnitSystem.convertArray(
+      site.cart,
+      unitsPosition,
+      "angstrom",
+    ) as CartesianCoords;
+  });
 
+  // 6. Build lattice scaled by shape
   const lattice: CartesianCoords[] = latVectors.map(
     (vec, i) => vec.map((v) => v * shape[i]) as CartesianCoords,
   );
@@ -220,11 +217,13 @@ function parseCube(lines: string[]): {
     }
   }
 
+  console.log("numVals", nValues);
+
   if (count !== nValues) {
     throw new Error(`Cube file truncated: expected ${nValues}, got ${count}`);
   }
 
-  // 6. Build VolumetricData
+  // 8. Build VolumetricData
   const volumetricData = new VolumetricData({
     origin,
     basis: latVectors as [CartesianCoords, CartesianCoords, CartesianCoords],

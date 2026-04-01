@@ -14,4 +14,5 @@ export {
   volumetricToCube,
   cubeToVolumetric,
   cubeToStructure,
+  parseCube
 } from "./io/gaussian/cube";

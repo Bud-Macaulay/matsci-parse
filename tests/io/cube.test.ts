@@ -17,10 +17,10 @@ describe("CUBE parsing (round-trip)", () => {
     // Convert back to cube string
     const cubeStr = volumetricToCube(firstStructure, firstVolumetric);
 
-    // Write to a file for inspection
-    const debugPath = join(__dirname, "debug_cube.cube");
-    writeFileSync(debugPath, cubeStr);
-    console.log(`Cube file written for inspection: ${debugPath}`);
+    // // Write to a file for inspection
+    // const debugPath = join(__dirname, "debug_cube.cube");
+    // writeFileSync(debugPath, cubeStr);
+    // console.log(`Cube file written for inspection: ${debugPath}`);
 
     // Re-parse the written cube string
     const secondStructure = cubeToStructure(cubeStr);
