@@ -111,7 +111,7 @@ export class VolumetricData {
     return this.values[this.index(i, j, k, c)];
   }
 
-  set(i: number, j: number, k: number, c: number, value: number) {
+  set(i: number, j: number, k: number, value: number, c = 0) {
     this.values[this.index(i, j, k, c)] = value;
     this.invalidate();
   }

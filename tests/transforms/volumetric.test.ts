@@ -24,7 +24,7 @@ describe("VolumetricData", () => {
 
   test("basic get, set, and index", () => {
     expect(volData.get(0, 0, 0)).toBe(1);
-    volData.set(0, 0, 0, 0, 10);
+    volData.set(0, 0, 0, 10);
     expect(volData.get(0, 0, 0)).toBe(10);
 
     const idx = volData.index(1, 1, 1);
@@ -43,7 +43,7 @@ describe("VolumetricData", () => {
     expect(volData.mean()).toBeCloseTo(4.5);
 
     // mutate a value → cache invalidated
-    volData.set(0, 0, 0, 0, 20);
+    volData.set(0, 0, 0, 20);
     expect(volData.min()).toBe(2);
     expect(volData.max()).toBe(20);
     expect(volData.mean()).toBeCloseTo((20 + 2 + 3 + 4 + 5 + 6 + 7 + 8) / 8);
@@ -107,5 +107,64 @@ describe("VolumetricData", () => {
           values: new Float32Array([]),
         }),
     ).toThrow("Invalid values length");
+  });
+
+  test("stats cache vs manual invalidate", () => {
+    volData.min();
+    volData.values[0] = 999;
+
+    expect(volData.min()).toBe(1);
+
+    volData.invalidate();
+    expect(volData.min()).toBe(2);
+  });
+
+  test("normalize with constant field (NaN edge case)", () => {
+    const constant = new VolumetricData({
+      origin,
+      basis,
+      shape: [2, 1, 1],
+      values: new Float32Array([5, 5]),
+    });
+
+    constant.normalize();
+
+    expect(Number.isNaN(constant.get(0, 0, 0))).toBe(true);
+    expect(Number.isNaN(constant.get(1, 0, 0))).toBe(true);
+  });
+
+  test("computeStats with negative values", () => {
+    const data = new VolumetricData({
+      origin,
+      basis,
+      shape: [3, 1, 1],
+      values: new Float32Array([-2, 0, 5]),
+    });
+
+    expect(data.min()).toBe(-2);
+    expect(data.max()).toBe(5);
+    expect(data.mean()).toBeCloseTo(1);
+  });
+
+  test("set invalidates cached stats", () => {
+    volData.max();
+
+    volData.set(0, 0, 0, 100);
+
+    expect(volData.max()).toBe(100);
+  });
+
+  test("index handles components correctly", () => {
+    const data = new VolumetricData({
+      origin,
+      basis,
+      shape: [1, 1, 1],
+      values: new Float32Array([1, 2, 3]),
+      components: 3,
+    });
+
+    expect(data.index(0, 0, 0, 0)).toBe(0);
+    expect(data.index(0, 0, 0, 1)).toBe(1);
+    expect(data.index(0, 0, 0, 2)).toBe(2);
   });
 });

@@ -5,6 +5,12 @@ const config: Config.InitialOptions = {
   testEnvironment: "node",
   moduleFileExtensions: ["ts", "js"],
   testMatch: ["**/tests/**/*.test.ts"],
+
+  // --- coverage settings ---
+  collectCoverage: true,
+  coverageDirectory: "coverage",
+  collectCoverageFrom: ["lib/**/*.{ts,js}", "!lib/**/*.d.ts", "!src/webapp/**"],
+  coverageReporters: ["text", "lcov"],
 };
 
 export default config;
