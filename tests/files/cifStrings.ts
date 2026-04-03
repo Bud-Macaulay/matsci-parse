@@ -1,5 +1,3 @@
-// files/cifStrings.ts
-
 export const rockSaltCif = `
 data_NaCl
 _symmetry_space_group_name_H-M   'F m -3 m'
