@@ -9,10 +9,12 @@ export { structureToXyz, xyzToStructure } from "./io/xyz/xyz";
 export { structureToCif, cifToStructure } from "./io/cif/cif";
 export { pwToStructure } from "./io/qe/pw";
 
+export { cartesianToFractional, fractionalToCartesian } from "./io/math";
+
 // cube and volumetricData
 export {
   volumetricToCube,
   cubeToVolumetric,
   cubeToStructure,
-  parseCube
+  parseCube,
 } from "./io/gaussian/cube";

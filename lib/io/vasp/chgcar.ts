@@ -15,6 +15,11 @@ function cellVolume(lattice: CartesianCoords[]): number {
 /**
 returns structure and charge,
 https://www.vasp.at/wiki/CHGCAR
+
+NOTE: Vasps chgcar file format is fairly complex.
+This parsers implementation likely only handles single spin channels
+
+TODO: implement other channels.
  */
 export function chgcarToVolumetric(text: string): {
   structure: CrystalStructure;
@@ -25,6 +30,8 @@ export function chgcarToVolumetric(text: string): {
   const { structure, linesConsumed } = parsePoscar(lines);
 
   let cursor = linesConsumed;
+
+  while (lines[cursor] === "") cursor++;
 
   const [nx, ny, nz] = lines[cursor].split(/\s+/).map((v) => parseInt(v, 10));
 
@@ -53,11 +60,9 @@ export function chgcarToVolumetric(text: string): {
     throw new Error(`CHGCAR grid truncated: expected ${nValues}, got ${count}`);
   }
 
-  // normalise
   const volume = cellVolume(structure.lattice);
-  const norm = 1.0 / (nValues * volume);
   for (let i = 0; i < values.length; i++) {
-    values[i] *= norm;
+    values[i] /= volume;
   }
 
   const charge = new VolumetricData({
@@ -67,6 +72,9 @@ export function chgcarToVolumetric(text: string): {
     values,
     units: "e/Å^3",
   });
+  
+  const dv = volume / nValues;
+  const totalCharge = values.reduce((sum, v) => sum + v, 0) * dv;
 
   return { structure, charge };
 }

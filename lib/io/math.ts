@@ -53,3 +53,53 @@ export function fractionalToCartesian(
     fract[0] * a[2] + fract[1] * b[2] + fract[2] * c[2],
   ];
 }
+
+function invertMatrix(m: number[][]): number[][] {
+  const [[a, b, c], [d, e, f], [g, h, i]] = m;
+
+  const A = e * i - f * h;
+  const B = -(d * i - f * g);
+  const C = d * h - e * g;
+
+  const D = -(b * i - c * h);
+  const E = a * i - c * g;
+  const F = -(a * h - b * g);
+
+  const G = b * f - c * e;
+  const H = -(a * f - c * d);
+  const I = a * e - b * d;
+
+  const det = a * A + b * B + c * C;
+
+  if (Math.abs(det) < 1e-12) {
+    throw new Error("Matrix is singular and cannot be inverted");
+  }
+
+  const invDet = 1 / det;
+
+  return [
+    [A * invDet, D * invDet, G * invDet],
+    [B * invDet, E * invDet, H * invDet],
+    [C * invDet, F * invDet, I * invDet],
+  ];
+}
+
+export function cartesianToFractional(
+  cart: CartesianCoords,
+  lattice: CartesianCoords[],
+): FractionalCoords {
+  const [a, b, c] = lattice;
+
+  // lattice matrix (columns = lattice vectors)
+  const latticeMatrix = [
+    [a[0], b[0], c[0]],
+    [a[1], b[1], c[1]],
+    [a[2], b[2], c[2]],
+  ];
+
+  const inv = invertMatrix(latticeMatrix);
+
+  const res = multiplyMatrixVector(inv, cart);
+
+  return res as FractionalCoords;
+}

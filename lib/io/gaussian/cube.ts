@@ -217,8 +217,6 @@ export function parseCube(
     }
   }
 
-  console.log("numVals", nValues);
-
   if (count !== nValues) {
     throw new Error(`Cube file truncated: expected ${nValues}, got ${count}`);
   }
