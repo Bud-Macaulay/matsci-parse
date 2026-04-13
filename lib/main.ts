@@ -21,4 +21,4 @@ export {
   parseCube,
 } from "./io/gaussian/cube";
 
-export { analyzeCrystal } from "./symmetry/getSymmetry"
+export { analyzeCrystal, symToCrystal } from "./symmetry/getSymmetry"
