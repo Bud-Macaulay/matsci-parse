@@ -1,13 +1,12 @@
 import { chgcarToVolumetric } from "../../lib/io/vasp/chgcar";
+import { chgcarNoSpin, minimalCHGCAR } from "../files/chgcarStrings";
 
 import { VolumetricData } from "../../lib/main";
 import { CrystalStructure } from "../../lib/main";
 
-import { chgcarNoSpin } from "../files/chgcarStrings";
-
 describe("chgcarToVolumetric", () => {
   test("parses minimal CHGCAR correctly", () => {
-    const { structure, charge } = chgcarToVolumetric(minimalCHGCAR);
+    const { structure, charge } = chgcarToVolumetric(chgcarNoSpin);
 
     // structure checks
     expect(structure).toBeInstanceOf(CrystalStructure);
