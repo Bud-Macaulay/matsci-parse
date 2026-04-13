@@ -1,6 +1,8 @@
 import { Site, CartesianCoords } from "./common";
 import { multiplyMatrixVector } from "./math";
 
+import { analyzeCrystal, symToCrystal } from "../symmetry/getSymmetry";
+
 /**
  * Properties required to construct a CrystalStructure.
  */
@@ -236,6 +238,25 @@ export class CrystalStructure {
       sites: newSites,
     });
   }
+
+  // NOTE: The following methods are not bundled to ensure
+  // tree-shakability of the CrystalStructure class
+
+  // async getConventionalStandardCrystal(tolerance = 1e-4) {
+  //   const symmetryInformation = await analyzeCrystal(this, tolerance);
+
+  //   const { primitive, conventional } = symToCrystal(symmetryInformation);
+
+  //   return conventional;
+  // }
+
+  // async getPrimitiveStandardCrystal(tolerance = 1e-4) {
+  //   const symmetryInformation = await analyzeCrystal(this, tolerance);
+
+  //   const { primitive } = symToCrystal(symmetryInformation);
+
+  //   return primitive;
+  // }
 
   // ---------- Internal validation ----------
 

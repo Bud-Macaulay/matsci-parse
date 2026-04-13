@@ -92,7 +92,24 @@ function prepareCrystal(structure: CrystalStructure) {
 }
 
 /**
- * Analyze a crystal structure using moyo-wasm
+ * Runs symmetry analysis on a crystal structure using the moyo-wasm backend.
+ *
+ * This function:
+ * 1. Ensures the WASM module is initialized
+ * 2. Converts the internal `CrystalStructure` into a serialized format
+ * 3. Sends it to the WASM symmetry engine
+ * 4. Returns the raw symmetry dataset produced by the backend
+ *
+ * The output dataset typically includes standardized cells, symmetry operations,
+ * and derived structural representations (e.g. primitive and conventional cells).
+ *
+ * @param structure - Input crystal structure to analyze
+ * @param tolerance - Numerical tolerance used for symmetry detection (default: 1e-4)
+ * @param setting - Symmetry convention setting passed to backend (default: "Standard")
+ *
+ * @returns Promise resolving to the raw symmetry dataset from moyo-wasm
+ *
+ * @throws May throw if WASM initialization fails or input structure is invalid
  */
 export async function analyzeCrystal(
   structure: CrystalStructure,
@@ -104,6 +121,31 @@ export async function analyzeCrystal(
   return analyze_cell(JSON.stringify(cell), tolerance, setting);
 }
 
+/**
+ * Converts a moyo-wasm symmetry dataset into usable CrystalStructure objects.
+ *
+ * This function reconstructs crystal structures from standardized cells
+ * returned by the symmetry engine. It produces both:
+ *
+ * - Primitive standardized structure
+ * - Conventional standardized structure
+ *
+ * The conversion process:
+ * 1. Extracts lattice basis vectors from the dataset
+ * 2. Maps atomic numbers to chemical symbols
+ * 3. Builds a unique species list
+ * 4. Converts fractional positions to Cartesian coordinates
+ * 5. Reconstructs a full `CrystalStructure` instance
+ *
+ * @param dataset - Symmetry dataset returned by `analyzeCrystal`
+ *
+ * @returns Object containing:
+ *  - `primitive`: primitive standardized crystal structure
+ *  - `conventional`: conventional standardized crystal structure
+ *
+ * @throws If atomic numbers cannot be mapped to known chemical symbols
+ *         or if dataset structure is invalid
+ */
 export function symToCrystal(dataset: MoyoDataset) {
   function build(cell: any): CrystalStructure {
     const { lattice, positions, numbers } = cell;
