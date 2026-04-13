@@ -44,13 +44,32 @@ export function cellLengthsAnglesToLattice(
 
 export function fractionalToCartesian(
   fract: FractionalCoords,
-  lattice: CartesianCoords[],
+  lattice: CartesianCoords[] | number[],
 ): CartesianCoords {
-  const [a, b, c] = lattice;
+  const lat = normalizeLattice(lattice);
+  const [a, b, c] = lat;
+
   return [
     fract[0] * a[0] + fract[1] * b[0] + fract[2] * c[0],
     fract[0] * a[1] + fract[1] * b[1] + fract[2] * c[1],
     fract[0] * a[2] + fract[1] * b[2] + fract[2] * c[2],
+  ];
+}
+
+function normalizeLattice(
+  lattice: CartesianCoords[] | number[],
+): CartesianCoords[] {
+  // already 3x3
+  if (Array.isArray(lattice[0])) {
+    return lattice as CartesianCoords[];
+  }
+
+  // flat 9
+  const m = lattice as number[];
+  return [
+    [m[0], m[1], m[2]],
+    [m[3], m[4], m[5]],
+    [m[6], m[7], m[8]],
   ];
 }
 
@@ -86,9 +105,10 @@ function invertMatrix(m: number[][]): number[][] {
 
 export function cartesianToFractional(
   cart: CartesianCoords,
-  lattice: CartesianCoords[],
+  lattice: CartesianCoords[] | number[],
 ): FractionalCoords {
-  const [a, b, c] = lattice;
+  const lat = normalizeLattice(lattice);
+  const [a, b, c] = lat;
 
   // lattice matrix (columns = lattice vectors)
   const latticeMatrix = [

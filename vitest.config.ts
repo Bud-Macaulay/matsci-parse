@@ -4,7 +4,6 @@ export default defineConfig({
   test: {
     environment: "node",
 
-    // --- coverage settings (equivalent to Jest) ---
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
@@ -16,5 +15,11 @@ export default defineConfig({
 
     include: ["**/tests/**/*.test.ts"],
     globals: true,
+  },
+  resolve: {
+    alias: {
+      // Mock the ?url import in tests
+      "moyo-wasm/moyo_wasm_bg.wasm?url": "moyo-wasm/moyo_wasm_bg.wasm",
+    },
   },
 });
