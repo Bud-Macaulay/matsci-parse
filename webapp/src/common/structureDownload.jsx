@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 
-import { CrystalStructure } from "matsci-parse";
 import {
   structureToXyz,
   structureToPoscar,
@@ -15,8 +14,6 @@ const defaultFormats = [
   { format: "xsf", label: "XSF" },
   { format: "poscar", label: "VASP" },
 ];
-
-import "./structure-download.css";
 
 export function DownloadIcon({ size = 14, className = "" }) {
   return (
@@ -52,7 +49,7 @@ function downloadFile(content, filename) {
   URL.revokeObjectURL(url);
 }
 
-// === React Component ===
+// === Component ===
 export default function StructureDownload({ structure, download_formats }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
@@ -84,7 +81,7 @@ export default function StructureDownload({ structure, download_formats }) {
     setOpen(false);
   };
 
-  // === outside click handler ===
+  // outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -100,20 +97,28 @@ export default function StructureDownload({ structure, download_formats }) {
   }, []);
 
   return (
-    <div className="structure-download-wrapper" ref={containerRef}>
-      <div
+    <div className="relative inline-block" ref={containerRef}>
+      {/* Button */}
+      <button
         onClick={() => setOpen((prev) => !prev)}
-        className="structure-download-btn"
+        className="flex items-center justify-center px-2.5 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
         title="Download"
       >
         <DownloadIcon />
-      </div>
+      </button>
+
+      {/* Dropdown */}
       {open && (
-        <div className="structure-download-dropdown">
-          <ul>
+        <div className="absolute right-0 mt-1 w-28 bg-white border rounded-md shadow-md z-50">
+          <ul className="py-1">
             {downloadFormats.map(({ format, label }) => (
               <li key={format}>
-                <button onClick={() => handleDownload(format)}>{label}</button>
+                <button
+                  onClick={() => handleDownload(format)}
+                  className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 transition"
+                >
+                  {label}
+                </button>
               </li>
             ))}
           </ul>
