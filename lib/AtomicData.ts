@@ -126,3 +126,11 @@ export const PeriodicTable: Record<number, ElementInfo> = {
   117: { atomicNumber: 117, symbol: "Ts", name: "Tennessine", mass: 294 },
   118: { atomicNumber: 118, symbol: "Og", name: "Oganesson", mass: 294 },
 };
+
+export const elementBySymbol = Object.values(PeriodicTable).reduce(
+  (acc, el) => {
+    acc[el.symbol] = el;
+    return acc;
+  },
+  {} as Record<string, ElementInfo>,
+);
