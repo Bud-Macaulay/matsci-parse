@@ -46,9 +46,11 @@ export function parsePw(lines: string[]): {
     const line = lines[i].trim();
     if (!line || line.startsWith("&")) continue;
 
-    if (/^ATOMIC_POSITIONS/i.test(line)) {
+    if (/^\s*ATOMIC_POSITIONS/i.test(line)) {
       inAtomicBlock = true;
-      const match = line.match(/^ATOMIC_POSITIONS\s+(\w+)/i);
+      const match = line.match(
+        /^ATOMIC_POSITIONS\s*(?:\{|\()?(\w+)(?:\}|\))?/i,
+      );
       atomUnits = match ? match[1].toLowerCase() : "angstrom";
       continue;
     }
