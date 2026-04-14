@@ -1,6 +1,6 @@
 import "../../tests/helpers/structureMatchers";
-import { aiidaToCrystal } from "../../lib/io/aiida/StructureData";
-import { crystalToAiida } from "../../lib/io/aiida/StructureData";
+import { aiidaToStructure } from "../../lib/io/aiida/StructureData";
+import { structureToAiida } from "../../lib/io/aiida/StructureData";
 
 import { CrystalStructure } from "../../lib/main";
 import { Site } from "../../lib/main";
@@ -9,15 +9,15 @@ import { aiidaObjects } from "../files/aiidaObjects";
 
 describe("roundtrip tests", () => {
   test.each(aiidaObjects)("$name", ({ data }) => {
-    const crystal = aiidaToCrystal(data);
-    const back = crystalToAiida(crystal);
-    const second = aiidaToCrystal(back);
+    const crystal = aiidaToStructure(data);
+    const back = structureToAiida(crystal);
+    const second = aiidaToStructure(back);
 
     expect(crystal).toStructureNearlyEqual(second);
   });
 
   test.each(aiidaObjects)("preserves species consistency", ({ data }) => {
-    const crystal = aiidaToCrystal(data);
+    const crystal = aiidaToStructure(data);
 
     expect(crystal.species.length).toBe(
       new Set(data.kinds.map((k: any) => k.name)).size,
@@ -27,12 +27,12 @@ describe("roundtrip tests", () => {
 
 describe("validation and throws", () => {
   test("throws if cell is missing", () => {
-    expect(() => aiidaToCrystal({ sites: [], kinds: [] } as any)).toThrow();
+    expect(() => aiidaToStructure({ sites: [], kinds: [] } as any)).toThrow();
   });
 
   test("throws if cell is malformed", () => {
     expect(() =>
-      aiidaToCrystal({
+      aiidaToStructure({
         cell: [
           [1, 0],
           [0, 1],
@@ -45,7 +45,7 @@ describe("validation and throws", () => {
 
   test("throws if sites missing", () => {
     expect(() =>
-      aiidaToCrystal({
+      aiidaToStructure({
         cell: [
           [1, 0, 0],
           [0, 1, 0],
@@ -58,7 +58,7 @@ describe("validation and throws", () => {
 
   test("throws if unknown kind_name", () => {
     expect(() =>
-      aiidaToCrystal({
+      aiidaToStructure({
         cell: [
           [1, 0, 0],
           [0, 1, 0],
@@ -87,26 +87,26 @@ describe("validation and throws", () => {
     const bad = { ...validBase };
     delete (bad as any).kinds;
 
-    expect(() => aiidaToCrystal(bad)).toThrow();
+    expect(() => aiidaToStructure(bad)).toThrow();
   });
 
   test("throws if kinds is not array", () => {
     const bad = { ...validBase, kinds: null };
 
-    expect(() => aiidaToCrystal(bad)).toThrow();
+    expect(() => aiidaToStructure(bad)).toThrow();
   });
 
   test("throws if cell is malformed", () => {
     const bad = { ...validBase, cell: [[1, 0]] };
 
-    expect(() => aiidaToCrystal(bad)).toThrow();
+    expect(() => aiidaToStructure(bad)).toThrow();
   });
 
   test("throws if sites missing", () => {
     const bad = { ...validBase };
     delete (bad as any).sites;
 
-    expect(() => aiidaToCrystal(bad)).toThrow();
+    expect(() => aiidaToStructure(bad)).toThrow();
   });
 
   test("throws if unknown kind_name", () => {
@@ -115,7 +115,7 @@ describe("validation and throws", () => {
       sites: [{ kind_name: "Cl", position: [0, 0, 0] }],
     };
 
-    expect(() => aiidaToCrystal(bad)).toThrow();
+    expect(() => aiidaToStructure(bad)).toThrow();
   });
 
   test("throws if unknown element symbol exists", () => {
@@ -129,7 +129,7 @@ describe("validation and throws", () => {
       sites: [new Site(0, [0, 0, 0])],
     });
 
-    expect(() => crystalToAiida(crystal)).toThrow();
+    expect(() => structureToAiida(crystal)).toThrow();
   });
 
   test("throws on invalid speciesIndex", () => {
@@ -143,6 +143,6 @@ describe("validation and throws", () => {
       sites: [new Site(5, [0, 0, 0])], // invalid index
     });
 
-    expect(() => crystalToAiida(crystal)).toThrow();
+    expect(() => structureToAiida(crystal)).toThrow();
   });
 });

@@ -11,6 +11,8 @@ export { structureToXyz, xyzToStructure } from "./io/xyz/xyz";
 export { structureToCif, cifToStructure } from "./io/cif/cif";
 export { pwToStructure } from "./io/qe/pw";
 
+export { structureToAiida, aiidaToStructure} from "./io/aiida/StructureData"
+
 export { cartesianToFractional, fractionalToCartesian } from "./io/math";
 
 // cube and volumetricData

@@ -2,7 +2,7 @@ import { CrystalStructure } from "../crystal";
 import { Site, CartesianCoords } from "../common";
 import { elementBySymbol } from "../../AtomicData";
 
-export function aiidaToCrystal(aiida: any): CrystalStructure {
+export function aiidaToStructure(aiida: any): CrystalStructure {
   if (!Array.isArray(aiida?.cell) || aiida.cell.length !== 3) {
     throw new Error("Invalid AIIDA: cell must be 3x3 matrix");
   }
@@ -42,7 +42,7 @@ export function aiidaToCrystal(aiida: any): CrystalStructure {
   });
 }
 
-export function crystalToAiida(crystal: CrystalStructure) {
+export function structureToAiida(crystal: CrystalStructure) {
   const { lattice, species, sites } = crystal;
 
   // ---- 1. Rebuild kinds ----
