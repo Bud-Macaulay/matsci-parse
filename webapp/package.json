@@ -10,7 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "matsci-parse": "file:../matsci-parse-0.5.2.tgz",
+    "@tanstack/react-hotkeys": "^0.9.1",
+    "matsci-parse": "file:../matsci-parse-0.5.3.tgz",
     "mc-react-structure-visualizer": "^0.8.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
