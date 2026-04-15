@@ -120,12 +120,12 @@ export default function App() {
       />
 
       <main className="flex-1 flex flex-col h-full bg-gray-50">
-        <div className="flex border-b bg-white overflow-x-auto">
+        <div className="flex border-b bg-gray-200 overflow-x-auto h-[58px]">
           {tabs.map((tab) => (
             <div
               key={tab.id}
               className={`flex items-center border-r hover:bg-gray-50 ${
-                tab.id === activeTabId ? "bg-gray-200" : ""
+                tab.id === activeTabId ? "bg-blue-200" : ""
               }`}
             >
               <button
@@ -140,7 +140,7 @@ export default function App() {
                   e.stopPropagation();
                   closeTab(tab.id);
                 }}
-                className="px-2 text-gray-400 hover:text-red-500"
+                className="px-2 mr-1 text-gray-400 hover:text-red-500 hover:bg-red-300 rounded-md"
                 title="Close tab"
               >
                 ×

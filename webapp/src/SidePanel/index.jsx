@@ -88,8 +88,8 @@ export default function SidePanel({
   };
 
   return (
-    <aside className="w-80 border-r bg-gray-50 flex flex-col h-full">
-      <div className="py-4 px-2 text-center border-b bg-gray-200">
+    <aside className="w-80 border-r bg-gray-50 flex flex-col ">
+      <div className="py-4 px-2 text-center border-b bg-gray-200 h-[58px]">
         <h2 className="text-sm font-semibold text-gray-800">
           Saved Structures
         </h2>
