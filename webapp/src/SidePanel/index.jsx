@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { loadSavedStructures, saveSavedStructures } from "../storage/storage";
-
-import { structureToCif } from "matsci-parse";
 
 import { parseFileText } from "../common/formats";
 
