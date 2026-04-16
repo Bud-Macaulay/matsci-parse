@@ -1,8 +1,9 @@
 import { CrystalStructure } from "../../lib/io/crystal";
 import { Site, CartesianCoords } from "../../lib/io/common";
 import { vectorsNearlyEqual } from "../helpers/structureMatchers";
+import { applyLatticeTransformation } from "../../lib/io/math";
 
-describe("CrystalStructure.applyLatticeTransformation", () => {
+describe("applyLatticeTransformation", () => {
   const lattice: CartesianCoords[] = [
     [1, 0, 0],
     [0, 1, 0],
@@ -14,14 +15,12 @@ describe("CrystalStructure.applyLatticeTransformation", () => {
   const cs = new CrystalStructure({ lattice, species, sites });
 
   test("uniform scaling", () => {
-    const supercell = cs.applyLatticeTransformation(2);
+    const supercell = applyLatticeTransformation(cs, 2);
 
-    // lattice vectors doubled
     supercell.lattice.forEach((v, i) => {
       vectorsNearlyEqual(v, lattice[i].map((x) => x * 2) as CartesianCoords);
     });
 
-    // sites scaled accordingly
     supercell.sites.forEach((site, i) => {
       vectorsNearlyEqual(
         site.cart,
@@ -31,7 +30,7 @@ describe("CrystalStructure.applyLatticeTransformation", () => {
   });
 
   test("diagonal scaling", () => {
-    const supercell = cs.applyLatticeTransformation([2, 3, 4]);
+    const supercell = applyLatticeTransformation(cs, [2, 3, 4]);
 
     const expectedLattice = [
       [2, 0, 0],
@@ -44,7 +43,7 @@ describe("CrystalStructure.applyLatticeTransformation", () => {
 
     const expectedSites = [
       [0, 0, 0],
-      [1, 1.5, 2], // original [0.5,0.5,0.5] scaled
+      [1, 1.5, 2],
     ];
     supercell.sites.forEach((site, i) => {
       vectorsNearlyEqual(site.cart, expectedSites[i] as CartesianCoords);
@@ -57,7 +56,7 @@ describe("CrystalStructure.applyLatticeTransformation", () => {
       [0, 1, 1],
       [1, 0, 1],
     ];
-    const supercell = cs.applyLatticeTransformation(matrix);
+    const supercell = applyLatticeTransformation(cs, matrix);
 
     const expectedLattice = lattice.map(
       (vec) =>
@@ -103,7 +102,8 @@ describe("CrystalStructure.applyLatticeTransformation", () => {
       sites: [new Site(0, [0.1, 0.2, 0.3]), new Site(1, [0.4, 0.5, 0.6])],
     });
 
-    const supercell = cs.applyLatticeTransformation([-1, 2, -0.5]);
+    const supercell = applyLatticeTransformation(cs, [-1, 2, -0.5]);
+
     const expectedLattice: CartesianCoords[] = [
       [-1, 0, 0],
       [0, 2, 0],

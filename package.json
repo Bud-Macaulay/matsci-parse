@@ -32,6 +32,7 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
-    "@spglib/moyo-wasm": "^0.7.9"
+    "@spglib/moyo-wasm": "^0.7.9",
+    "convex-hull": "^1.0.3"
   }
 }

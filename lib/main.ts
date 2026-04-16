@@ -11,9 +11,15 @@ export { structureToXyz, xyzToStructure } from "./io/xyz/xyz";
 export { structureToCif, cifToStructure } from "./io/cif/cif";
 export { pwToStructure } from "./io/qe/pw";
 
-export { structureToAiida, aiidaToStructure} from "./io/aiida/StructureData"
+export { structureToAiida, aiidaToStructure } from "./io/aiida/StructureData";
 
-export { cartesianToFractional, fractionalToCartesian } from "./io/math";
+export {
+  cartesianToFractional,
+  fractionalToCartesian,
+  getReciprocalLattice,
+  applyLatticeTransformation,
+  makeSupercell,
+} from "./io/math";
 
 // cube and volumetricData
 export {
@@ -23,4 +29,4 @@ export {
   parseCube,
 } from "./io/gaussian/cube";
 
-export { analyzeCrystal, symToCrystal } from "./symmetry/getSymmetry"
+export { analyzeCrystal, symToCrystal } from "./symmetry/getSymmetry";

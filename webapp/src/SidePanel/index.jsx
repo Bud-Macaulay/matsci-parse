@@ -12,23 +12,29 @@ export default function SidePanel({
   onLoadStructure,
 }) {
   const [error, setError] = useState("");
+  const [flashId, setFlashId] = useState(null);
 
   const [savedList, setSavedList] = useState(() => loadSavedStructures());
 
   const saveCurrent = () => {
     if (!structure) return;
 
-    const updated = [
-      ...savedList,
-      {
-        id: crypto.randomUUID(),
-        name: `Structure ${savedList.length + 1}`,
-        cif: structureToCif(structure),
-      },
-    ];
+    const newItem = {
+      id: crypto.randomUUID(),
+      name: `Structure ${savedList.length + 1}`,
+      cif: structureToCif(structure),
+    };
+
+    const updated = [...savedList, newItem];
 
     saveSavedStructures(updated);
     setSavedList(updated);
+
+    setFlashId(newItem.id);
+
+    setTimeout(() => {
+      setFlashId(null);
+    }, 2500);
   };
 
   const deleteSaved = (id) => {
@@ -135,7 +141,7 @@ export default function SidePanel({
           {savedList.map((item) => (
             <div
               key={item.id}
-              className="p-2 rounded-md border bg-white hover:shadow-sm transition"
+              className={`p-2 rounded-md border bg-white hover:shadow-sm transition ${flashId === item.id ? "duration-800 animate-pulse ring-2  ring-blue-700" : ""}`}
             >
               <input
                 value={item.name}
@@ -143,17 +149,17 @@ export default function SidePanel({
                 className="w-full text-sm px-2 py-1 border rounded-md"
               />
 
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 text-xs">
                 <button
                   onClick={() => loadStructure(item.cif, item.name)}
-                  className="flex-1 text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  className="buttonSimple gray flex-1"
                 >
                   Load
                 </button>
 
                 <button
                   onClick={() => deleteSaved(item.id)}
-                  className="flex-1 text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"
+                  className="buttonSimple red flex-1"
                 >
                   Delete
                 </button>

@@ -69,7 +69,7 @@ export default function App() {
 
               <button
                 onClick={() => actions.closeTab(tab.id)}
-                className="px-2 mr-1 text-gray-400 hover:text-red-500 hover:bg-red-300 rounded-md"
+                className="buttonSimple redNoBg mr-2 text-lg"
               >
                 ×
               </button>

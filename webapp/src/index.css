@@ -1,1 +1,59 @@
 @import "tailwindcss";
+
+.table-nice {
+  @apply w-full text-xs border-separate border-spacing-0;
+}
+
+.table-nice thead {
+  @apply sticky top-0 bg-gray-100 text-gray-700 text-[12px];
+}
+
+.table-nice th {
+  @apply px-2 py-1 text-left border-b font-medium;
+}
+
+.table-nice td {
+  @apply px-2 py-1 text-left border-b;
+}
+
+.table-nice tbody tr:hover {
+  @apply bg-gray-50;
+}
+
+.buttonSimple {
+  @apply px-2 py-1 rounded;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+}
+
+.buttonSimple:hover {
+  background-color: var(--btn-bg-hover);
+  cursor: pointer;
+}
+
+.buttonSimple.red {
+  --btn-bg: theme(colors.red.50);
+  --btn-text: theme(colors.red.600);
+  --btn-bg-hover: theme(colors.red.100);
+}
+
+.buttonSimple.redNoBg {
+  --btn-text: theme(colors.red.600);
+  --btn-bg-hover: theme(colors.red.100);
+}
+
+.buttonSimple.blue {
+  --btn-bg: theme(colors.blue.50);
+  --btn-text: theme(colors.blue.600);
+  --btn-bg-hover: theme(colors.blue.100);
+}
+
+.buttonSimple.gray {
+  --btn-bg: theme(colors.gray.200);
+  --btn-text: theme(colors.gray.900);
+  --btn-bg-hover: theme(colors.gray.300);
+}

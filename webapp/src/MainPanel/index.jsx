@@ -1,18 +1,40 @@
-import { useEffect, useState } from "react";
-import { cifToStructure, structureToCif } from "matsci-parse";
+import {
+  cifToStructure,
+  structureToCif,
+  getReciprocalLattice,
+} from "matsci-parse";
 import StructureVisualizer from "mc-react-structure-visualizer";
+
+import BaseTable from "../common/BaseTable";
 import StructureDownload from "../common/structureDownload";
+
+import SymmetrySubpanel from "./SymmetrySubPanel";
+import TransformLatticePanel from "./TransformLatticePanel";
 
 export default function MainPanel({ tab, updateTab }) {
   if (!tab) return null;
 
-  const { structure, undoStack } = tab;
+  const { structure, undoStack = [], redoStack = [] } = tab;
+
+  const reciprocalLattice = structure
+    ? getReciprocalLattice(structure.lattice)
+    : null;
+
   const cifText = structure ? structureToCif(structure) : "";
 
-  const pushUndo = () => {
+  const pushUndo = (meta = {}) => {
     updateTab((t) => ({
       ...t,
-      undoStack: [...t.undoStack, structureToCif(t.structure)],
+      undoStack: [
+        ...t.undoStack,
+        {
+          structure: t.structure,
+          cif: structureToCif(t.structure),
+          timestamp: Date.now(),
+          ...meta,
+        },
+      ],
+      redoStack: [],
     }));
   };
 
@@ -24,7 +46,10 @@ export default function MainPanel({ tab, updateTab }) {
   };
 
   const replaceSite = (idx, newSpecies) => {
-    pushUndo();
+    pushUndo({
+      action: "replace-site",
+      label: `Replaced atom ${idx} with ${newSpecies}`,
+    });
 
     const copy = cifToStructure(structureToCif(structure));
     copy.replaceSite(idx, newSpecies);
@@ -33,8 +58,10 @@ export default function MainPanel({ tab, updateTab }) {
   };
 
   const removeSite = (idx) => {
-    pushUndo();
-
+    pushUndo({
+      action: "replace-site",
+      label: `Removed atom ${idx}`,
+    });
     const copy = cifToStructure(structureToCif(structure));
     copy.removeSite(idx);
 
@@ -42,50 +69,105 @@ export default function MainPanel({ tab, updateTab }) {
   };
 
   const undo = () => {
-    if (!undoStack.length) return;
+    updateTab((t) => {
+      if (!t.undoStack.length) return t;
 
-    const last = undoStack.at(-1);
+      const last = t.undoStack[t.undoStack.length - 1];
 
-    updateTab((t) => ({
-      ...t,
-      undoStack: t.undoStack.slice(0, -1),
-      structure: cifToStructure(last),
-    }));
+      return {
+        ...t,
+        undoStack: t.undoStack.slice(0, -1),
+        redoStack: [
+          ...t.redoStack,
+          {
+            cif: structureToCif(t.structure),
+            label: last.label,
+            timestamp: Date.now(),
+          },
+        ],
+        structure: cifToStructure(last.cif),
+      };
+    });
+  };
+
+  const redo = () => {
+    updateTab((t) => {
+      if (!t.redoStack.length) return t;
+
+      const last = t.redoStack[t.redoStack.length - 1];
+
+      return {
+        ...t,
+        redoStack: t.redoStack.slice(0, -1),
+        undoStack: [
+          ...t.undoStack,
+          {
+            cif: structureToCif(t.structure),
+            label: last.label,
+            timestamp: Date.now(),
+          },
+        ],
+        structure: cifToStructure(last.cif),
+      };
+    });
   };
 
   if (!structure) return null;
 
-  console.log("loaded Structure", structure);
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Controls */}
-      <div className="px-6 pt-1.5 flex gap-2">
-        <button
-          onClick={undo}
-          disabled={!undoStack.length}
-          className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40"
-        >
-          Undo
-        </button>
+      <div className="px-6 py-2 flex items-center justify-between gap-3 border-b">
+        {" "}
+        {/* LEFT: undo/redo */}
+        <div className="flex gap-2">
+          <button
+            onClick={undo}
+            disabled={!undoStack.length}
+            className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40"
+          >
+            Undo
+          </button>
+
+          <button
+            onClick={redo}
+            disabled={!redoStack || !redoStack.length}
+            className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40"
+          >
+            Redo
+          </button>
+        </div>
+        {/* RIGHT: history bar */}
+        <div className="flex items-center gap-1 text-[11px] text-gray-600 overflow-x-auto max-w-[85%]">
+          HISTORY:
+          {undoStack.slice(-6).map((h, i) => (
+            <div
+              key={h.timestamp || i}
+              className="px-2 py-2 bg-gray-50 border-r whitespace-nowrap"
+              title={h.label || h.action}
+            >
+              {h.label || h.action || "edit"}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Split view */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* LEFT COLUMN (atoms + lattice) */}
-        <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-3">
+        <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4">
           {/* ATOMS TABLE (max 2/3) */}
-          <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[66.9%]">
+          <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[40%]">
             <div className="overflow-y-auto">
-              <table className="w-full text-sm border-separate border-spacing-0">
-                <thead className="sticky top-0 bg-gray-100 text-gray-700 text-[12px]">
+              <table className="table-nice">
+                <thead>
                   <tr>
-                    <th className="px-2 py-1 text-left border-b">#</th>
-                    <th className="px-2 py-1 text-left border-b">Species</th>
-                    <th className="px-2 py-1 text-left border-b">X</th>
-                    <th className="px-2 py-1 text-left border-b">Y</th>
-                    <th className="px-2 py-1 text-left border-b">Z</th>
-                    <th className="px-2 py-1 text-left border-b">Actions</th>
+                    <th>#</th>
+                    <th>Species</th>
+                    <th>X</th>
+                    <th>Y</th>
+                    <th>Z</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
 
@@ -112,14 +194,14 @@ export default function MainPanel({ tab, updateTab }) {
                               const newSp = prompt("New species:");
                               if (newSp) replaceSite(idx, newSp);
                             }}
-                            className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                            className="buttonSimple gray"
                           >
                             Replace
                           </button>
 
                           <button
                             onClick={() => removeSite(idx)}
-                            className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"
+                            className="buttonSimple red"
                           >
                             Remove
                           </button>
@@ -132,35 +214,51 @@ export default function MainPanel({ tab, updateTab }) {
             </div>
           </div>
 
-          {/* LATTICE (fills remaining space) */}
-          <div className="bg-white rounded-md border border-b-0 overflow-hidden">
-            <div className="px-3 py-2 border-b bg-gray-50">
-              <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                Lattice
-              </h3>
-            </div>
+          {/* LATTICE */}
+          <BaseTable title="Lattice">
+            {structure.lattice.map((vec, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-4 py-1 border-b font-mono">
+                  {vec[0].toFixed(3)}
+                </td>
+                <td className="px-2 py-1 border-b font-mono">
+                  {vec[1].toFixed(3)}
+                </td>
+                <td className="px-2 py-1 border-b font-mono">
+                  {vec[2].toFixed(3)}
+                </td>
+              </tr>
+            ))}
+          </BaseTable>
 
-            <div className="overflow-y-auto max-h-[150px]">
-              <table className="w-full text-xs border-separate border-spacing-0">
-                <thead className="bg-gray-100 text-gray-600"></thead>
-                <tbody>
-                  {structure.lattice.map((vec, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-4 py-1 border-b font-mono">
-                        {vec[0].toFixed(3)}
-                      </td>
-                      <td className="px-2 py-1 border-b font-mono">
-                        {vec[1].toFixed(3)}
-                      </td>
-                      <td className="px-2 py-1 border-b font-mono">
-                        {vec[2].toFixed(3)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* RECIP LATTICE */}
+          <BaseTable title="Reciprocal Lattice">
+            {reciprocalLattice?.map((vec, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-4 py-1 border-b font-mono">
+                  {vec[0].toFixed(5)}
+                </td>
+                <td className="px-2 py-1 border-b font-mono">
+                  {vec[1].toFixed(5)}
+                </td>
+                <td className="px-2 py-1 border-b font-mono">
+                  {vec[2].toFixed(5)}
+                </td>
+              </tr>
+            ))}
+          </BaseTable>
+
+          <SymmetrySubpanel
+            structure={structure}
+            setStructure={setStructure}
+            pushUndo={pushUndo}
+          />
+
+          <TransformLatticePanel
+            structure={structure}
+            setStructure={setStructure}
+            pushUndo={pushUndo}
+          />
         </div>
 
         {/* RIGHT: VISUALIZER */}
