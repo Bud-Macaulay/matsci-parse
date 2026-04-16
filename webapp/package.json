@@ -12,7 +12,7 @@
   "dependencies": {
     "@tanstack/react-hotkeys": "^0.9.1",
     "@tanstack/react-store": "^0.10.0",
-    "matsci-parse": "file:../matsci-parse-0.5.3.tgz",
+    "matsci-parse": "file:../matsci-parse-0.6.0.tgz",
     "mc-react-structure-visualizer": "^0.8.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

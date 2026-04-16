@@ -157,7 +157,7 @@ export default function MainPanel({ tab, updateTab }) {
         {/* LEFT COLUMN (atoms + lattice) */}
         <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4">
           {/* ATOMS TABLE (max 2/3) */}
-          <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[40%]">
+          <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[25%]">
             <div className="overflow-y-auto">
               <table className="table-nice">
                 <thead>
