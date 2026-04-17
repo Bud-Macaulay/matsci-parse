@@ -268,7 +268,7 @@ export default function MainPanel({ tab, updateTab }) {
           </div>
 
           <StructureVisualizer
-            key={cifText}
+            // key={cifText} dont pass cifText, to avoid regen.
             cifText={cifText}
             initSupercell={[1, 1, 1]}
           />
