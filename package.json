@@ -33,6 +33,6 @@
   },
   "dependencies": {
     "@spglib/moyo-wasm": "^0.7.9",
-    "convex-hull": "^1.0.3"
+    "voro3d": "^0.0.7"
   }
 }
