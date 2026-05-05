@@ -122,21 +122,15 @@ function findBoundingBox(points: number[]): {
  * @param crystal - CrystalStructure instance
  * @returns The Voronoi cell containing the origin (the Brillouin zone)
  */
-export async function computeBrillouinZone(crystal: any): Promise<VoronoiCell> {
-  // Step 1: Calculate reciprocal lattice
+export async function computeBrillouinZone(crystal: any) {
   const reciprocalLattice = getReciprocalLattice(crystal.lattice);
-  console.log("Reciprocal lattice vectors:", reciprocalLattice);
 
   const { points, originIndex } = generateReciprocalLatticePoints(
     reciprocalLattice,
     3,
   );
 
-  console.log(originIndex);
-  console.log(`Generated ${points.length / 3} reciprocal lattice points`);
-
   const bounds = findBoundingBox(points);
-  console.log("Bounding box:", bounds);
 
   const container = await Voro3D.create(
     bounds.xMin,
@@ -152,13 +146,46 @@ export async function computeBrillouinZone(crystal: any): Promise<VoronoiCell> {
 
   const cells = container.computeCells(points, true);
 
-  const originCell = cells.find((cell) => cell.particleID === originIndex);
+  const cell = cells.find((c) => c.particleID === originIndex);
 
-  console.log(originCell);
-
-  if (!originCell) {
-    throw new Error("Could not find Voronoi cell containing the origin");
+  if (!cell) {
+    throw new Error("Could not find central Voronoi cell");
   }
 
-  return originCell;
+  // -----------------------------
+  // SeekPath-style transformation
+  // -----------------------------
+
+  const tri_verts: number[][] = [];
+
+  for (let i = 0; i < cell.vertices.length; i += 3) {
+    tri_verts.push([
+      cell.vertices[i],
+      cell.vertices[i + 1],
+      cell.vertices[i + 2],
+    ]);
+  }
+  const tris: number[][] = [];
+  const faces: number[][][] = [];
+
+  for (const face of cell.faces) {
+    const faceVerts = face.map((idx: number) => tri_verts[idx]);
+
+    faces.push(faceVerts);
+
+    // triangulate polygon face (fan method)
+    for (let i = 1; i < face.length - 1; i++) {
+      tris.push([face[0], face[i], face[i + 1]]);
+    }
+  }
+
+  return {
+    particle: [cell.x, cell.y, cell.z],
+    vertices: tri_verts,
+    faces,
+    tris,
+    tri_verts,
+    neighbors: cell.neighbors,
+    particleID: cell.particleID,
+  };
 }
