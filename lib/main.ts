@@ -19,6 +19,8 @@ export {
   getReciprocalLattice,
   applyLatticeTransformation,
   makeSupercell,
+  cellParamsToLattice,
+  latticeToCellParams,
 } from "./math/matrix";
 
 // cube and volumetricData
