@@ -2,19 +2,15 @@ import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site } from "../common";
 import { stringToLines } from "../utils";
 
-import { cellParamsToLattice, fractionalToCartesian } from "../../math/matrix";
+import {
+  cellParamsToLattice,
+  fractionalToCartesian,
+  latticeToCellParams,
+} from "../../math/matrix";
 
-function dot(a: CartesianCoords, b: CartesianCoords): number {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
+import { dot, norm } from "../../math/matrix";
 
-function norm(v: CartesianCoords): number {
-  return Math.sqrt(dot(v, v));
-}
-
-function radToDeg(r: number): number {
-  return (r * 180) / Math.PI;
-}
+import { AngleUnitSystem } from "../../units/angle";
 
 function cartesianToFractional(
   cart: CartesianCoords,
@@ -63,13 +59,9 @@ export function structureToCif(
 ): string {
   const [aVec, bVec, cVec] = structure.lattice;
 
-  const a = norm(aVec);
-  const b = norm(bVec);
-  const c = norm(cVec);
-
-  const alpha = radToDeg(Math.acos(dot(bVec, cVec) / (b * c)));
-  const beta = radToDeg(Math.acos(dot(aVec, cVec) / (a * c)));
-  const gamma = radToDeg(Math.acos(dot(aVec, bVec) / (a * b)));
+  const { a, b, c, alpha, beta, gamma } = latticeToCellParams(
+    structure.lattice,
+  );
 
   let cif = `data_made_with_matsci-parse
     _symmetry_space_group_name_H-M   'P 1'

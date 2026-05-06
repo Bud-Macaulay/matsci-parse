@@ -1,6 +1,4 @@
 import {
-  degToRad,
-  radToDeg,
   cross,
   dot,
   scale,
@@ -19,11 +17,6 @@ import { CrystalStructure } from "../../lib/io/crystal";
 import { Site } from "../../lib/io/common";
 
 describe("basic math utilities", () => {
-  test("degToRad / radToDeg roundtrip", () => {
-    expect(radToDeg(degToRad(180))).toBeCloseTo(180);
-    expect(degToRad(180)).toBeCloseTo(Math.PI);
-  });
-
   test("dot product", () => {
     expect(dot([1, 2, 3], [4, 5, 6])).toBe(32);
   });
@@ -196,5 +189,57 @@ describe("supercell generation", () => {
     });
 
     expect(() => makeSupercell(structure, [0, 1, 1] as any)).toThrow();
+  });
+});
+
+describe("invertMatrix error cases", () => {
+  test("throws on singular matrix", () => {
+    const singularLattice = [
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 0, 0], // collinear → zero determinant
+    ];
+
+    expect(() => cartesianToFractional([1, 1, 1], singularLattice)).toThrow(
+      "Matrix is singular and cannot be inverted",
+    );
+  });
+});
+
+describe("reciprocal lattice errors", () => {
+  test("throws on zero volume lattice", () => {
+    const degenerate = [
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 0, 0], // all collinear → volume = 0
+    ];
+
+    expect(() => getReciprocalLattice(degenerate)).toThrow(
+      "Invalid lattice: zero volume",
+    );
+  });
+});
+
+describe("applyLatticeTransformation errors", () => {
+  const base = new CrystalStructure({
+    lattice: [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ],
+    species: [],
+    sites: [],
+  });
+
+  test("throws on invalid scale type", () => {
+    expect(() => applyLatticeTransformation(base, "bad" as any)).toThrow(
+      "Scale must be a number, a 3-element array, or a 3x3 matrix",
+    );
+  });
+
+  test("throws on malformed array", () => {
+    expect(() => applyLatticeTransformation(base, [1, 2] as any)).toThrow(
+      "Scale must be a number, a 3-element array, or a 3x3 matrix",
+    );
   });
 });

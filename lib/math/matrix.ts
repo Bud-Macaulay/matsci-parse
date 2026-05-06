@@ -1,5 +1,9 @@
 import { CartesianCoords, FractionalCoords, Site } from "../io/common";
 import { CrystalStructure } from "./../io/crystal";
+import { AngleUnitSystem } from "../units/angle";
+
+// TODO: Currently there are some CrystalStructure transformations here.
+// These should probably be moved out into crystal/transformations
 
 export interface CellParameters {
   a: number;
@@ -8,20 +12,6 @@ export interface CellParameters {
   alpha: number;
   beta: number;
   gamma: number;
-}
-
-/**
- * Converts an angle in degrees to radians.
- */
-export function degToRad(d: number) {
-  return (d * Math.PI) / 180;
-}
-
-/**
- * Converts an angle in radians to degrees.
- */
-export function radToDeg(r: number) {
-  return (r * 180) / Math.PI;
 }
 
 /**
@@ -47,12 +37,43 @@ export function dot(u: CartesianCoords, v: CartesianCoords): number {
 }
 
 /**
+ * Computes the Euclidean norm (magnitude) of a 3D vector.
+ *
+ * Equivalent to:
+ *   |v| = sqrt(v · v)
+ *
+ * @param v - 3D Cartesian vector
+ * @returns The vector magnitude (length) as a scalar
+ */
+export function norm(v: CartesianCoords): number {
+  return Math.sqrt(dot(v, v));
+}
+
+/**
  * Scales a 3D vector by a scalar factor.
  *
  * @returns Scaled vector s * v.
  */
 export function scale(v: CartesianCoords, s: number): CartesianCoords {
   return [v[0] * s, v[1] * s, v[2] * s];
+}
+
+/**
+ * Computes the angle between two 3D vectors.
+ *
+ * Uses the dot product identity:
+ * cos(θ) = (u · v) / (|u||v|)
+ *
+ * @param u First vector
+ * @param v Second vector
+ * @returns Angle in radians
+ */
+export function angleBetween(u: CartesianCoords, v: CartesianCoords): number {
+  const clamp = (x: number) => Math.max(-1, Math.min(1, x));
+
+  const cosTheta = clamp(dot(u, v) / (norm(u) * norm(v)));
+
+  return Math.acos(cosTheta);
 }
 
 /**
@@ -81,11 +102,9 @@ export function multiplyMatrixVector(
 export function cellParamsToLattice(params: CellParameters): CartesianCoords[] {
   const { a, b, c, alpha, beta, gamma } = params;
 
-  const degToRad = (d: number) => (d * Math.PI) / 180;
-
-  const radAlpha = degToRad(alpha);
-  const radBeta = degToRad(beta);
-  const radGamma = degToRad(gamma);
+  const radAlpha = AngleUnitSystem.convert(alpha, "deg", "rad");
+  const radBeta = AngleUnitSystem.convert(beta, "deg", "rad");
+  const radGamma = AngleUnitSystem.convert(gamma, "deg", "rad");
 
   const vX: CartesianCoords = [a, 0, 0];
 
@@ -118,21 +137,13 @@ export function latticeToCellParams(
 ): CellParameters {
   const [aVec, bVec, cVec] = lattice;
 
-  const dot = (u: number[], v: number[]) =>
-    u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-
-  const norm = (v: number[]) => Math.sqrt(dot(v, v));
-  const radToDeg = (r: number) => (r * 180) / Math.PI;
-
-  const clamp = (x: number) => Math.max(-1, Math.min(1, x));
-
   const a = norm(aVec);
   const b = norm(bVec);
   const c = norm(cVec);
 
-  const alpha = radToDeg(Math.acos(clamp(dot(bVec, cVec) / (b * c))));
-  const beta = radToDeg(Math.acos(clamp(dot(aVec, cVec) / (a * c))));
-  const gamma = radToDeg(Math.acos(clamp(dot(aVec, bVec) / (a * b))));
+  const alpha = AngleUnitSystem.convert(angleBetween(bVec, cVec), "rad", "deg");
+  const beta = AngleUnitSystem.convert(angleBetween(aVec, cVec), "rad", "deg");
+  const gamma = AngleUnitSystem.convert(angleBetween(aVec, bVec), "rad", "deg");
 
   return {
     a,
@@ -284,6 +295,22 @@ export function getReciprocalLattice(
   ];
 }
 
+/**
+ * Applies a linear transformation to a crystal structure.
+ *
+ * The transformation can be specified in three forms:
+ * - scalar → isotropic scaling
+ * - [sx, sy, sz] → anisotropic diagonal scaling
+ * - 3x3 matrix → full linear transformation
+ *
+ * The transformation is applied to:
+ * - lattice vectors
+ * - atomic Cartesian coordinates
+ *
+ * @param structure - Input crystal structure
+ * @param scale - Scaling factor or transformation matrix
+ * @returns New transformed CrystalStructure (immutable)
+ */
 export function applyLatticeTransformation(
   structure: CrystalStructure,
   scale: number | [number, number, number] | number[][],
@@ -334,6 +361,22 @@ export function applyLatticeTransformation(
   });
 }
 
+/**
+ * Generates a supercell by repeating a crystal structure along lattice vectors.
+ *
+ * The structure is expanded by integer factors (nx, ny, nz), producing:
+ * - scaled lattice vectors
+ * - replicated atomic sites translated by lattice shifts
+ *
+ * Each atom is copied into every unit-cell translation defined by:
+ * r = i·a + j·b + k·c
+ *
+ * @param structure - Input crystal structure
+ * @param dims - Supercell repetition factors [nx, ny, nz]
+ * @returns Expanded CrystalStructure containing all replicated sites
+ *
+ * @throws If any dimension is not a positive integer
+ */
 export function makeSupercell(
   structure: CrystalStructure,
   dims: [number, number, number],
