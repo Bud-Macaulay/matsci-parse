@@ -5,7 +5,7 @@ import { Site } from "../common";
 import { PeriodicTable } from "../../AtomicData";
 
 import { stringToLines } from "../utils";
-import { LengthUnitSystem, LengthUnits } from "../../units/units";
+import { LengthUnitSystem, LengthUnits } from "../../units/index";
 
 const BOHR_TO_ANGSTROM = 0.529177;
 const ANGSTROM_TO_BOHR = 1.8897268;
