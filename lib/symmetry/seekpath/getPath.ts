@@ -3,7 +3,7 @@ import { CrystalStructure } from "../../main";
 
 import { latticeToCellParams, normalizeLattice } from "../../math/matrix";
 
-import spgData from "../spgData.json";
+import spgData from "../operations/spgData.json";
 
 export interface SeekPathResult {
   point_coords: Record<string, number[]>;

@@ -50,6 +50,29 @@ export function norm(v: CartesianCoords): number {
 }
 
 /**
+ * Computes the Gram matrix of three 3D lattice vectors.
+ *
+ * The Gram matrix is defined as:
+ *   G_ij = v_i · v_j
+ *
+ * It fully encodes lengths and angles of a lattice basis.
+ *
+ * @param L 3x3 Matrix
+ * @returns 3x3 Gram matrix in row-major form
+ */
+export function gramMatrix(L: CartesianCoords[]): number[][] {
+  const a = L[0];
+  const b = L[1];
+  const c = L[2];
+
+  return [
+    [dot(a, a), dot(a, b), dot(a, c)],
+    [dot(b, a), dot(b, b), dot(b, c)],
+    [dot(c, a), dot(c, b), dot(c, c)],
+  ];
+}
+
+/**
  * Scales a 3D vector by a scalar factor.
  *
  * @returns Scaled vector s * v.
