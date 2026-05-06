@@ -2,7 +2,7 @@ import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site } from "../common";
 import { stringToLines } from "../utils";
 
-import { cellParamsToLattice, fractionalToCartesian } from "../math";
+import { cellParamsToLattice, fractionalToCartesian } from "../../math/matrix";
 
 function dot(a: CartesianCoords, b: CartesianCoords): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

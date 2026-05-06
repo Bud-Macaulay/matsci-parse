@@ -1,5 +1,5 @@
 import { Site, CartesianCoords } from "./common";
-import { multiplyMatrixVector } from "./math";
+import { multiplyMatrixVector } from "../math/matrix";
 
 import { analyzeCrystal, symToCrystal } from "../symmetry/getSymmetry";
 

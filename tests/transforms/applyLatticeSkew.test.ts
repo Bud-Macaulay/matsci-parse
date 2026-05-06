@@ -1,7 +1,7 @@
 import { CrystalStructure } from "../../lib/io/crystal";
 import { Site, CartesianCoords } from "../../lib/io/common";
 import { vectorsNearlyEqual } from "../helpers/structureMatchers";
-import { applyLatticeTransformation } from "../../lib/io/math";
+import { applyLatticeTransformation } from "../../lib/math/matrix";
 
 describe("applyLatticeTransformation", () => {
   const lattice: CartesianCoords[] = [

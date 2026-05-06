@@ -1,5 +1,5 @@
-import { CartesianCoords, FractionalCoords, Site } from "./common";
-import { CrystalStructure } from "./crystal";
+import { CartesianCoords, FractionalCoords, Site } from "../io/common";
+import { CrystalStructure } from "./../io/crystal";
 
 export interface CellParameters {
   a: number;

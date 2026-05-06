@@ -1,6 +1,6 @@
 import init, { analyze_cell, type MoyoDataset } from "@spglib/moyo-wasm";
 import { CrystalStructure } from "../io/crystal";
-import { cartesianToFractional, fractionalToCartesian } from "../io/math";
+import { cartesianToFractional, fractionalToCartesian } from "../math/matrix";
 import { PeriodicTable } from "../AtomicData";
 
 /**

@@ -1,7 +1,7 @@
 import { analyzeCrystal } from "../getSymmetry";
 import { CrystalStructure } from "../../main";
 
-import { latticeToCellParams, normalizeLattice } from "../../io/math";
+import { latticeToCellParams, normalizeLattice } from "../../math/matrix";
 
 import spgData from "../spgData.json";
 

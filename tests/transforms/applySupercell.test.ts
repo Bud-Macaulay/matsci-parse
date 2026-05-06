@@ -1,7 +1,7 @@
 import { CrystalStructure } from "../../lib/io/crystal";
 import { Site, CartesianCoords } from "../../lib/io/common";
 import { vectorsNearlyEqual } from "../helpers/structureMatchers";
-import { makeSupercell } from "../../lib/io/math";
+import { makeSupercell } from "../../lib/math/matrix";
 
 describe("makeSupercell", () => {
   const lattice: CartesianCoords[] = [

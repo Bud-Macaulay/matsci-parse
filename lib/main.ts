@@ -19,7 +19,7 @@ export {
   getReciprocalLattice,
   applyLatticeTransformation,
   makeSupercell,
-} from "./io/math";
+} from "./math/matrix";
 
 // cube and volumetricData
 export {
