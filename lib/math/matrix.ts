@@ -87,10 +87,10 @@ export function angleBetween(u: CartesianCoords, v: CartesianCoords): number {
 export function multiplyMatrixVector(
   matrix: number[][],
   vec: number[],
-): number[] {
+): CartesianCoords {
   return matrix.map(
     (row) => row[0] * vec[0] + row[1] * vec[1] + row[2] * vec[2],
-  );
+  ) as CartesianCoords;
 }
 
 /**
@@ -394,7 +394,7 @@ export function makeSupercell(
     [a[0] * nx, a[1] * nx, a[2] * nx],
     [b[0] * ny, b[1] * ny, b[2] * ny],
     [c[0] * nz, c[1] * nz, c[2] * nz],
-  ];
+  ] as CartesianCoords[];
 
   const newSites = [];
 
