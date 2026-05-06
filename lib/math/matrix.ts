@@ -82,6 +82,71 @@ export function scale(v: CartesianCoords, s: number): CartesianCoords {
 }
 
 /**
+ * Extracts a column from a matrix.
+ *
+ * Returns the i-th column of a row-major matrix as a vector.
+ *
+ * @typeParam T - Matrix type extending number[][]
+ * @param M - Input matrix
+ * @param i - Column index
+ * @returns Column vector M[:, i]
+ */
+export const getColumn = <T extends number[][]>(M: T, i: number): number[] =>
+  M.map((row) => row[i]);
+
+/**
+ * Sets a column of a matrix in-place.
+ *
+ * Replaces the i-th column of matrix M with vector v.
+ *
+ * @typeParam T - Matrix type extending number[][]
+ * @param M - Target matrix (modified in-place)
+ * @param i - Column index to overwrite
+ * @param v - Replacement column vector
+ */
+export const setColumn = <T extends number[][]>(
+  M: T,
+  i: number,
+  v: number[],
+): void => {
+  for (let r = 0; r < M.length; r++) {
+    M[r][i] = v[r];
+  }
+};
+
+/**
+ * Extracts a row from a matrix.
+ *
+ * Returns the i-th row as a vector (shallow copy).
+ *
+ * @typeParam T - Matrix type extending number[][]
+ * @param M - Input matrix
+ * @param i - Row index
+ * @returns Row vector M[i, :]
+ */
+export const getRow = <T extends number[][]>(M: T, i: number): number[] => [
+  ...M[i],
+];
+
+/**
+ * Sets a row of a matrix in-place.
+ *
+ * Replaces the i-th row of matrix M with vector v.
+ *
+ * @typeParam T - Matrix type extending number[][]
+ * @param M - Target matrix (modified in-place)
+ * @param i - Row index to overwrite
+ * @param v - Replacement row vector
+ */
+export const setRow = <T extends number[][]>(
+  M: T,
+  i: number,
+  v: number[],
+): void => {
+  M[i] = [...v];
+};
+
+/**
  * Computes the angle between two 3D vectors.
  *
  * Uses the dot product identity:
