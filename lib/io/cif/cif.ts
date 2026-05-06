@@ -2,7 +2,7 @@ import { CrystalStructure } from "../crystal";
 import { CartesianCoords, Site } from "../common";
 import { stringToLines } from "../utils";
 
-import { cellLengthsAnglesToLattice, fractionalToCartesian } from "../math";
+import { cellParamsToLattice, fractionalToCartesian } from "../math";
 
 function dot(a: CartesianCoords, b: CartesianCoords): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -173,7 +173,8 @@ export function cifToStructure(cifString: string): CrystalStructure {
     throw new Error("No _atom_site loop found in CIF");
   }
 
-  const lattice = cellLengthsAnglesToLattice(a, b, c, alpha, beta, gamma);
+  const cellParams = { a, b, c, alpha, beta, gamma };
+  const lattice = cellParamsToLattice(cellParams);
 
   const species: string[] = [];
   const sites: Site[] = [];

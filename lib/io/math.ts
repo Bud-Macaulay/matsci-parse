@@ -1,6 +1,15 @@
 import { CartesianCoords, FractionalCoords, Site } from "./common";
 import { CrystalStructure } from "./crystal";
 
+export interface CellParameters {
+  a: number;
+  b: number;
+  c: number;
+  alpha: number;
+  beta: number;
+  gamma: number;
+}
+
 /**
  * Converts an angle in degrees to radians.
  */
@@ -64,21 +73,16 @@ export function multiplyMatrixVector(
 }
 
 /**
- * Converts lattice parameters (a, b, c, alpha, beta, gamma)
- * into Cartesian lattice vectors.
+ * Convert lattice parameters to Cartesian lattice vectors.
  *
- * Angles are provided in degrees.
- *
- * @returns 3x3 lattice vectors in Cartesian coordinates.
+ * Angles are in degrees. Uses standard convention:
+ * a along x, b in xy-plane, c general.
  */
-export function cellLengthsAnglesToLattice(
-  a: number,
-  b: number,
-  c: number,
-  alpha: number,
-  beta: number,
-  gamma: number,
-): CartesianCoords[] {
+export function cellParamsToLattice(params: CellParameters): CartesianCoords[] {
+  const { a, b, c, alpha, beta, gamma } = params;
+
+  const degToRad = (d: number) => (d * Math.PI) / 180;
+
   const radAlpha = degToRad(alpha);
   const radBeta = degToRad(beta);
   const radGamma = degToRad(gamma);
@@ -101,6 +105,43 @@ export function cellLengthsAnglesToLattice(
   const vZ: CartesianCoords = [cx, cy, cz];
 
   return [vX, vY, vZ];
+}
+
+/**
+ * Convert Cartesian lattice vectors to lattice parameters.
+ *
+ * α = ∠(b, c), β = ∠(a, c), γ = ∠(a, b)
+ * Angles returned in degrees.
+ */
+export function latticeToCellParams(
+  lattice: CartesianCoords[],
+): CellParameters {
+  const [aVec, bVec, cVec] = lattice;
+
+  const dot = (u: number[], v: number[]) =>
+    u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+
+  const norm = (v: number[]) => Math.sqrt(dot(v, v));
+  const radToDeg = (r: number) => (r * 180) / Math.PI;
+
+  const clamp = (x: number) => Math.max(-1, Math.min(1, x));
+
+  const a = norm(aVec);
+  const b = norm(bVec);
+  const c = norm(cVec);
+
+  const alpha = radToDeg(Math.acos(clamp(dot(bVec, cVec) / (b * c))));
+  const beta = radToDeg(Math.acos(clamp(dot(aVec, cVec) / (a * c))));
+  const gamma = radToDeg(Math.acos(clamp(dot(aVec, bVec) / (a * b))));
+
+  return {
+    a,
+    b,
+    c,
+    alpha,
+    beta,
+    gamma,
+  };
 }
 
 /**
@@ -134,7 +175,7 @@ export function fractionalToCartesian(
  *
  * @returns 3x3 lattice vectors
  */
-function normalizeLattice(
+export function normalizeLattice(
   lattice: CartesianCoords[] | number[],
 ): CartesianCoords[] {
   if (Array.isArray(lattice[0])) {
