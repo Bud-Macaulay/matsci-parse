@@ -1,7 +1,3 @@
-Here’s a clean README-style summary based strictly on your actual structure (no assumptions added).
-
----
-
 # matsci-parse
 
 A TypeScript-based library and web toolset for parsing, transforming, and analyzing atomistic materials science data, including crystal structures, symmetry data, and common simulation file formats.

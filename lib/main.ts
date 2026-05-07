@@ -1,5 +1,3 @@
-import { analyzeCrystal } from "./symmetry/getSymmetry";
-
 export { CrystalStructure } from "./io/crystal";
 export { Site } from "./io/common";
 export { VolumetricData } from "./io/volumetric";
