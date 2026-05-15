@@ -20,9 +20,9 @@ describe("test BrillouinZone", () => {
 
     const bz = await computeBrillouinZone(cs);
 
-    console.log("faces", bz.faces);
-    console.log("tri_verts", bz.tri_verts);
-    console.log("tris", bz.tris);
+    // console.log("faces", bz.faces);
+    // console.log("tri_verts", bz.tri_verts);
+    // console.log("tris", bz.tris);
   });
 
   // test("Correct Voronoi for a scaled cube", async () => {

@@ -9,7 +9,11 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "declaration": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["lib/*"]
+    }
   },
   "include": ["lib", "tests"]
 }

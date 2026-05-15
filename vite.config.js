@@ -2,10 +2,14 @@ import { resolve } from "path";
 import { defineConfig } from "vite";
 
 import packageJson from "./package.json";
+import path from "path";
 
 export default defineConfig({
   resolve: {
     extensions: [".ts", ".js"],
+    alias: {
+      "@": path.resolve(__dirname, "lib"),
+    },
   },
   esbuild: {
     loader: "ts",
