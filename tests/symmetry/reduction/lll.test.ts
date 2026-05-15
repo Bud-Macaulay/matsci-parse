@@ -10,6 +10,8 @@ const norm = (v: number[]) => Math.hypot(...v);
 const dot = (a: number[], b: number[]) =>
   a.reduce((s, v, i) => s + v * b[i], 0);
 
+const getCols = (m: number[][]) => m[0].map((_, i) => m.map((row) => row[i]));
+
 describe("LLL correctness (strong checks)", () => {
   test("Lovász condition holds on output", () => {
     const A = [
@@ -22,13 +24,16 @@ describe("LLL correctness (strong checks)", () => {
 
     const delta = 0.75;
 
-    const b = lll_matrix.map((_, i) => lll_matrix.map((r) => r[i])); // columns
+    const b = getCols(lll_matrix);
 
     for (let k = 1; k < 3; k++) {
-      const mu = dot(b[k], b[k - 1]) / dot(b[k - 1], b[k - 1]);
+      const denom = dot(b[k - 1], b[k - 1]);
+      expect(denom).toBeGreaterThan(1e-12);
+
+      const mu = dot(b[k], b[k - 1]) / denom;
 
       const lhs = dot(b[k], b[k]);
-      const rhs = (delta - mu * mu) * dot(b[k - 1], b[k - 1]);
+      const rhs = (delta - mu * mu) * denom;
 
       expect(lhs + 1e-9).toBeGreaterThanOrEqual(rhs);
     }
@@ -43,15 +48,18 @@ describe("LLL correctness (strong checks)", () => {
 
     const { lll_matrix } = lll(A);
 
-    const cols = lll_matrix.map((_, i) => lll_matrix.map((r) => r[i]));
+    const colsReduced = getCols(lll_matrix);
+    const colsOriginal = getCols(A);
 
-    const cos = (a: number[], b: number[]) =>
-      Math.abs(dot(a, b)) / (norm(a) * norm(b));
+    const cos = (a: number[], b: number[]) => {
+      const na = norm(a);
+      const nb = norm(b);
+      if (na < 1e-12 || nb < 1e-12) return 0;
+      return Math.abs(dot(a, b)) / (na * nb);
+    };
 
-    const original = A.map((_, i) => A.map((r) => r[i]));
-
-    const before = cos(original[0], original[1]);
-    const after = cos(cols[0], cols[1]);
+    const before = cos(colsOriginal[0], colsOriginal[1]);
+    const after = cos(colsReduced[0], colsReduced[1]);
 
     expect(after).toBeLessThan(before);
   });

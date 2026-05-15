@@ -14,6 +14,8 @@ export interface CellParameters {
   gamma: number;
 }
 
+export type Matrix = number[][];
+
 /**
  * Computes the cross product of two 3D vectors.
  *
@@ -50,6 +52,17 @@ export function norm(v: CartesianCoords): number {
 }
 
 /**
+ * Transposes a matrix by swapping its rows and columns.
+ */
+export function transpose<T>(matrix: T[][]): T[][] {
+  if (matrix.length === 0) {
+    return [];
+  }
+
+  return matrix[0].map((_, colIndex) => matrix.map((row) => row[colIndex]));
+}
+
+/**
  * Computes the Gram matrix of three 3D lattice vectors.
  *
  * The Gram matrix is defined as:
@@ -79,6 +92,39 @@ export function gramMatrix(L: CartesianCoords[]): number[][] {
  */
 export function scale(v: CartesianCoords, s: number): CartesianCoords {
   return [v[0] * s, v[1] * s, v[2] * s];
+}
+
+export function cloneMatrix(M: Matrix): Matrix {
+  const res: Matrix = new Array(M.length);
+  for (let i = 0; i < M.length; i++) {
+    res[i] = [...M[i]];
+  }
+  return res;
+}
+
+export function identity(n: number): Matrix {
+  const I: Matrix = new Array(n);
+  for (let i = 0; i < n; i++) {
+    I[i] = new Array(n).fill(0);
+    I[i][i] = 1;
+  }
+  return I;
+}
+
+export function zeroMatrix(rows: number, cols: number): Matrix {
+  const M: Matrix = new Array(rows);
+  for (let i = 0; i < rows; i++) {
+    M[i] = new Array(cols).fill(0);
+  }
+  return M;
+}
+
+export function subtract(a: number[], b: number[]): number[] {
+  const res: number[] = new Array(a.length);
+  for (let i = 0; i < a.length; i++) {
+    res[i] = a[i] - b[i];
+  }
+  return res;
 }
 
 /**

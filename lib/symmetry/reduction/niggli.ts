@@ -249,7 +249,7 @@ export function niggli(matrix: CartesianCoords[], tol = 1e-5) {
   const beta = (Math.acos(clamp(N / (2 * a * c + EPS))) * 180) / Math.PI;
   const gamma = (Math.acos(clamp(Y / (2 * a * b + EPS))) * 180) / Math.PI;
 
-  const reduced = {
+  const reducedParams = {
     a,
     b,
     c,
@@ -258,8 +258,10 @@ export function niggli(matrix: CartesianCoords[], tol = 1e-5) {
     gamma,
   };
 
+  const reducedLattice = cellParamsToLattice(reducedParams);
+
   return {
-    lattice: reduced,
+    lattice: reducedLattice,
     transformationMatrix: M,
   };
 }
