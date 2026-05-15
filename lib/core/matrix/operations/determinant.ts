@@ -1,0 +1,45 @@
+import { Matrix, createMatrix, index } from "../matrix";
+
+function minor(matrix: Matrix, skipRow: number, skipCol: number): Matrix {
+  const out = createMatrix(matrix.rows - 1, matrix.cols - 1);
+
+  let ptr = 0;
+
+  for (let row = 0; row < matrix.rows; row++) {
+    if (row === skipRow) continue;
+
+    for (let col = 0; col < matrix.cols; col++) {
+      if (col === skipCol) continue;
+
+      out.data[ptr++] = matrix.data[index(matrix.cols, row, col)];
+    }
+  }
+
+  return out;
+}
+
+export function determinant(matrix: Matrix): number {
+  if (matrix.rows !== matrix.cols) {
+    throw new Error("Determinant requires a square matrix");
+  }
+
+  const n = matrix.rows;
+
+  if (n === 1) {
+    return matrix.data[0];
+  }
+
+  if (n === 2) {
+    return matrix.data[0] * matrix.data[3] - matrix.data[1] * matrix.data[2];
+  }
+
+  let det = 0;
+
+  for (let col = 0; col < n; col++) {
+    const sign = col % 2 === 0 ? 1 : -1;
+
+    det += sign * matrix.data[col] * determinant(minor(matrix, 0, col));
+  }
+
+  return det;
+}
