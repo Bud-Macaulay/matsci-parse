@@ -77,11 +77,9 @@ export function luInverse(m: Matrix): Matrix {
     const rowI = i * n;
     for (let j = 0; j < i; j++) {
       const factor = data[rowI + j];
-      if (factor !== 0) {
-        const rowJ = j * n;
-        for (let k = 0; k < n; k++) {
-          invData[rowI + k] -= factor * invData[rowJ + k];
-        }
+      const rowJ = j * n;
+      for (let k = 0; k < n; k++) {
+        invData[rowI + k] -= factor * invData[rowJ + k];
       }
     }
   }
@@ -103,11 +101,9 @@ export function luInverse(m: Matrix): Matrix {
     // Eliminate from rows above
     for (let j = 0; j < i; j++) {
       const factor = data[j * n + i];
-      if (factor !== 0) {
-        const rowJ = j * n;
-        for (let k = 0; k < n; k++) {
-          invData[rowJ + k] -= factor * invData[rowI + k];
-        }
+      const rowJ = j * n;
+      for (let k = 0; k < n; k++) {
+        invData[rowJ + k] -= factor * invData[rowI + k];
       }
     }
   }
