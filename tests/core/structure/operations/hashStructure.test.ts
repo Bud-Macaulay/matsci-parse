@@ -9,20 +9,14 @@ describe("hashStructure", () => {
     const a = {
       lattice,
       sites: [
-        {
-          species: { symbol: "A" },
-          frac: new Float64Array([0.1, 0.2, 0.3]),
-        },
+        { species: { symbol: "A" }, frac: new Float64Array([0.1, 0.2, 0.3]) },
       ],
     };
 
     const b = {
       lattice,
       sites: [
-        {
-          species: { symbol: "A" },
-          frac: new Float64Array([1.1, 1.2, 1.3]),
-        },
+        { species: { symbol: "A" }, frac: new Float64Array([1.1, 1.2, 1.3]) },
       ],
     };
 
@@ -33,20 +27,14 @@ describe("hashStructure", () => {
     const a = {
       lattice,
       sites: [
-        {
-          species: { symbol: "A" },
-          frac: new Float64Array([0.1, 0.2, 0.3]),
-        },
+        { species: { symbol: "A" }, frac: new Float64Array([0.1, 0.2, 0.3]) },
       ],
     };
 
     const b = {
       lattice,
       sites: [
-        {
-          species: { symbol: "A" },
-          frac: new Float64Array([0.1, 0.2, 0.31]),
-        },
+        { species: { symbol: "A" }, frac: new Float64Array([0.1, 0.2, 0.31]) },
       ],
     };
 
