@@ -115,8 +115,6 @@ describe("Niggli reduction", () => {
 
     const out = niggli(collinear);
 
-    console.log(out)
-
     for (const row of out.lattice) {
       for (const v of row) {
         expect(Number.isFinite(v)).toBe(true);
