@@ -1,13 +1,20 @@
-import { Matrix } from "../../matrix";
+import { Vector } from "../../vector";
 import { norm } from "./norm";
-import { scale } from "../scale";
 
-export function normalize(v: Matrix): Matrix {
+const EPS = 1e-12;
+
+export function normalize(v: Vector): Vector {
   const n = norm(v);
 
-  if (n === 0) {
+  if (n < EPS) {
     throw new Error("Cannot normalize zero vector");
   }
 
-  return scale(v, 1 / n);
+  const out = new Float64Array(v.length);
+
+  for (let i = 0; i < v.length; i++) {
+    out[i] = v[i] / n;
+  }
+
+  return out;
 }

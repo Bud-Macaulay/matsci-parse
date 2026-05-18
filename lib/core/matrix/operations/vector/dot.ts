@@ -1,17 +1,14 @@
-import { Matrix } from "../../matrix";
+import { Vector } from "../../vector";
 
-export function dot(a: Matrix, b: Matrix): number {
-  const aLen = a.data.length;
-  const bLen = b.data.length;
-
-  if (aLen !== bLen) {
-    throw new Error("Dot product requires vectors of same length");
+export function dot(a: Vector, b: Vector): number {
+  if (a.length !== b.length) {
+    throw new Error("Dot product requires same-length vectors");
   }
 
   let sum = 0;
 
-  for (let i = 0; i < aLen; i++) {
-    sum += a.data[i] * b.data[i];
+  for (let i = 0; i < a.length; i++) {
+    sum += a[i] * b[i];
   }
 
   return sum;

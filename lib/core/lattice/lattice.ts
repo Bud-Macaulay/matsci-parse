@@ -10,18 +10,20 @@ export interface Lattice {
   readonly basis: Matrix;
 }
 
-export function createLattice(data: number[]): Lattice {
-  if (data.length !== 9) {
+export function createLattice(data: number[] | Matrix): Lattice {
+  const values = "data" in data ? data.data : data;
+
+  if (values.length !== 9) {
     throw new Error("Lattice requires 9 values (3x3)");
   }
 
   const cleaned = new Float64Array(9);
 
   for (let i = 0; i < 9; i++) {
-    cleaned[i] = clean(data[i]);
+    cleaned[i] = clean(values[i]);
   }
 
-  const basis = createMatrix(3, 3, cleaned);
-
-  return { basis };
+  return {
+    basis: createMatrix(3, 3, cleaned),
+  };
 }

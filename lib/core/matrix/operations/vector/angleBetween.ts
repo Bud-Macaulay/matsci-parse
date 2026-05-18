@@ -1,17 +1,19 @@
-import { Matrix } from "../../matrix";
+import { Vector } from "../../vector";
 import { dot } from "./dot";
 import { norm } from "./norm";
 
-export function angleBetween(a: Matrix, b: Matrix): number {
-  const denom = norm(a) * norm(b);
+const EPS = 1e-12;
 
-  if (denom === 0) {
+export function angleBetween(a: Vector, b: Vector): number {
+  const na = norm(a);
+  const nb = norm(b);
+
+  if (na < EPS || nb < EPS) {
     throw new Error("Cannot compute angle with zero vector");
   }
 
-  const cosTheta = dot(a, b) / denom;
+  const cosTheta = dot(a, b) / (na * nb);
 
-  // clamp for numerical stability
   const clamped = Math.max(-1, Math.min(1, cosTheta));
 
   return Math.acos(clamped);

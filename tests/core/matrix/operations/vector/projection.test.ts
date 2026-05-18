@@ -1,38 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { createMatrix } from "@/core/matrix/matrix";
 import { projection } from "@/core/matrix/operations/vector/projection";
 
-describe("projection", () => {
+describe("projection (vector)", () => {
   it("projects onto same direction", () => {
-    const a = createMatrix(2, 1, [2, 0]);
-    const b = createMatrix(2, 1, [1, 0]);
+    const a = new Float64Array([2, 0]);
+    const b = new Float64Array([1, 0]);
 
     const r = projection(a, b);
 
-    expect(Array.from(r.data)).toEqual([2, 0]);
+    expect(Array.from(r)).toEqual([2, 0]);
   });
 
   it("projects orthogonal vectors to zero", () => {
-    const a = createMatrix(2, 1, [1, 0]);
-    const b = createMatrix(2, 1, [0, 1]);
+    const a = new Float64Array([1, 0]);
+    const b = new Float64Array([0, 1]);
 
     const r = projection(a, b);
 
-    expect(Array.from(r.data)).toEqual([0, 0]);
+    expect(Array.from(r)).toEqual([0, 0]);
   });
 
   it("handles general projection", () => {
-    const a = createMatrix(2, 1, [3, 4]);
-    const b = createMatrix(2, 1, [1, 0]);
+    const a = new Float64Array([3, 4]);
+    const b = new Float64Array([1, 0]);
 
     const r = projection(a, b);
 
-    expect(Array.from(r.data)).toEqual([3, 0]);
+    expect(Array.from(r)).toEqual([3, 0]);
   });
 
   it("throws on zero vector", () => {
-    const a = createMatrix(2, 1, [1, 2]);
-    const b = createMatrix(2, 1, [0, 0]);
+    const a = new Float64Array([1, 2]);
+    const b = new Float64Array([0, 0]);
 
     expect(() => projection(a, b)).toThrow();
   });

@@ -1,16 +1,22 @@
-import { Matrix } from "../../matrix";
+import { Vector } from "../../vector";
 import { dot } from "./dot";
-import { scale } from "../scale";
-import { sub } from "../sub";
 
-export function reflect(v: Matrix, n: Matrix): Matrix {
-  const denom = dot(n, n);
+const EPS = 1e-12;
 
-  if (denom === 0) {
+export function reflect(v: Vector, n: Vector): Vector {
+  const nn = dot(n, n);
+
+  if (nn < EPS) {
     throw new Error("Cannot reflect across zero vector");
   }
 
-  const factor = (2 * dot(v, n)) / denom;
+  const scale = (2 * dot(v, n)) / nn;
 
-  return sub(v, scale(n, factor));
+  const out = new Float64Array(v.length);
+
+  for (let i = 0; i < v.length; i++) {
+    out[i] = v[i] - scale * n[i];
+  }
+
+  return out;
 }

@@ -1,13 +1,12 @@
-import { Matrix } from "../../matrix";
+import { Vector } from "../../vector";
 
-export function norm(v: Matrix): number {
+const EPS = 1e-12;
+
+export function norm(v: Vector): number {
   let sum = 0;
 
-  const data = v.data;
-  const len = data.length;
-
-  for (let i = 0; i < len; i++) {
-    const x = data[i];
+  for (let i = 0; i < v.length; i++) {
+    const x = v[i];
     sum += x * x;
   }
 

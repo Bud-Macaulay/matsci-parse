@@ -1,15 +1,23 @@
-import { Matrix } from "../../matrix";
+import { Vector } from "../../vector";
 import { dot } from "./dot";
-import { scale } from "../scale";
+import { norm } from "./norm";
 
-export function projection(a: Matrix, b: Matrix): Matrix {
+const EPS = 1e-12;
+
+export function projection(a: Vector, b: Vector): Vector {
   const denom = dot(b, b);
 
-  if (denom === 0) {
+  if (denom < EPS) {
     throw new Error("Cannot project onto zero vector");
   }
 
-  const factor = dot(a, b) / denom;
+  const scale = dot(a, b) / denom;
 
-  return scale(b, factor);
+  const out = new Float64Array(b.length);
+
+  for (let i = 0; i < b.length; i++) {
+    out[i] = scale * b[i];
+  }
+
+  return out;
 }
