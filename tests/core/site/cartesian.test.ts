@@ -11,6 +11,6 @@ describe("cartesian", () => {
       frac: [0.5, 0.5, 0.5],
     });
 
-    expect(result).toEqual([1, 1, 1]);
+    expect(result).toEqual(new Float64Array([1, 1, 1]));
   });
 });

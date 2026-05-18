@@ -1,11 +1,10 @@
 import { mul } from "../matrix/operations/mul";
 import { Site } from "./site";
 import { Lattice } from "../lattice/lattice";
+import { Vector } from "../matrix/vector";
+import { Matrix } from "@/math/matrix";
 
-export function cartesian(
-  lattice: Lattice,
-  site: Site,
-): [number, number, number] {
+export function cartesian(lattice: Lattice, site: Site): Vector {
   const [x, y, z] = site.frac;
 
   const frac = {
@@ -16,5 +15,5 @@ export function cartesian(
 
   const result = mul(lattice.basis, frac);
 
-  return [result.data[0], result.data[1], result.data[2]];
+  return new Float64Array([result.data[0], result.data[1], result.data[2]]);
 }
