@@ -1,86 +1,54 @@
 import { describe, it, expect } from "vitest";
+
 import { fromXYZ, toXYZ } from "@/core/io/xyz";
-import {
-  classicXyz,
-  extendedXyz,
-  extendedXyzSelective,
-  malformedXyz,
-} from "./teststrings/xyz";
 
-function expectStructureBasic(structure: any) {
-  expect(structure.sites.length).toBeTruthy();
+import * as fixtures from "./teststrings/xyz";
+import * as unsupported from "./teststrings/xyzUnsupported";
 
-  expect(structure.sites[0].species.symbol).toBeDefined();
-  expect(structure.sites[1].species.symbol).toBeDefined();
+describe("XYZ invalid fixtures", () => {
+  for (const [name, text] of Object.entries(unsupported)) {
+    it(`rejects ${name}`, () => {
+      expect(() => fromXYZ(text)).toThrow();
+    });
+  }
+});
 
-  expect(structure.sites[0].frac.length).toBe(3);
-  expect(structure.sites[1].frac.length).toBe(3);
-}
+const cases = Object.entries(fixtures) as [string, string][];
 
-describe("XYZ IO fixtures", () => {
-  it("rejects classic XYZ (no lattice)", () => {
-    expect(() => fromXYZ(classicXyz)).toThrow();
-  });
+describe("XYZ round-trip fixtures", () => {
+  for (const [name, text] of cases) {
+    it(`round-trips ${name}`, () => {
+      const a = fromXYZ(text);
 
-  it("rejects classic XYZ (no lattice)", () => {
-    expect(() => fromXYZ(malformedXyz)).toThrow();
-  });
+      const text1 = toXYZ(a);
 
-  it("parses extended XYZ with lattice", () => {
-    const s = fromXYZ(extendedXyz);
+      const b = fromXYZ(text1);
 
-    expectStructureBasic(s);
+      const text2 = toXYZ(b);
 
-    const m = s.lattice.basis.data;
+      const c = fromXYZ(text2);
 
-    expect(m[0]).toBeCloseTo(3);
-    expect(m[4]).toBeCloseTo(3);
-    expect(m[8]).toBeCloseTo(3);
-  });
+      // serializer reaches fixed representation
+      expect(text2).toBe(text1);
 
-  it("parses selective dynamics XYZ (ignores flags for now)", () => {
-    const s = fromXYZ(extendedXyzSelective);
+      expect(c.sites.length).toBe(a.sites.length);
 
-    expectStructureBasic(s);
+      for (let i = 0; i < a.sites.length; i++) {
+        expect(c.sites[i].species.symbol).toBe(a.sites[i].species.symbol);
 
-    // still same structure for now
-    expect(s.sites[0].species.symbol).toBe("Na");
-    expect(s.sites[1].species.symbol).toBe("Cl");
-  });
+        expect(c.sites[i].frac[0]).toBeCloseTo(a.sites[i].frac[0]);
 
-  it("round-trips extended XYZ consistently over multiple cycles", () => {
-    const a = fromXYZ(extendedXyz);
+        expect(c.sites[i].frac[1]).toBeCloseTo(a.sites[i].frac[1]);
 
-    const b = fromXYZ(toXYZ(a));
-    const c = fromXYZ(toXYZ(b));
+        expect(c.sites[i].frac[2]).toBeCloseTo(a.sites[i].frac[2]);
+      }
 
-    expect(b.sites.length).toBe(a.sites.length);
-    expect(c.sites.length).toBe(b.sites.length);
+      const m1 = a.lattice.basis.data;
+      const m2 = c.lattice.basis.data;
 
-    for (let i = 0; i < a.sites.length; i++) {
-      expect(c.sites[i].species.symbol).toBe(b.sites[i].species.symbol);
-
-      expect(c.sites[i].frac[0]).toBeCloseTo(b.sites[i].frac[0]);
-      expect(c.sites[i].frac[1]).toBeCloseTo(b.sites[i].frac[1]);
-      expect(c.sites[i].frac[2]).toBeCloseTo(b.sites[i].frac[2]);
-    }
-  });
-
-  it("round-trips extended XYZ with other flags", () => {
-    const a = fromXYZ(extendedXyzSelective);
-
-    const b = fromXYZ(toXYZ(a));
-    const c = fromXYZ(toXYZ(b));
-
-    expect(b.sites.length).toBe(a.sites.length);
-    expect(c.sites.length).toBe(b.sites.length);
-
-    for (let i = 0; i < a.sites.length; i++) {
-      expect(c.sites[i].species.symbol).toBe(b.sites[i].species.symbol);
-
-      expect(c.sites[i].frac[0]).toBeCloseTo(b.sites[i].frac[0]);
-      expect(c.sites[i].frac[1]).toBeCloseTo(b.sites[i].frac[1]);
-      expect(c.sites[i].frac[2]).toBeCloseTo(b.sites[i].frac[2]);
-    }
-  });
+      for (let i = 0; i < 9; i++) {
+        expect(m2[i]).toBeCloseTo(m1[i]);
+      }
+    });
+  }
 });
