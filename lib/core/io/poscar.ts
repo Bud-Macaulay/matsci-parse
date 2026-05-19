@@ -95,8 +95,6 @@ export function fromPOSCAR(text: string): Structure {
       ? new Float64Array(coords)
       : fractional(lattice, new Float64Array(coords));
 
-    console.log("f", frac);
-
     sites.push({
       species: {
         symbol: symbols[speciesIndex],

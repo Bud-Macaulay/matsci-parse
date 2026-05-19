@@ -17,7 +17,6 @@ describe("XSF round-trip fixtures", () => {
 
       const c = fromXSF(text2);
 
-      // serializer converges
       expect(text2).toBe(text1);
 
       expect(c.sites.length).toBe(a.sites.length);

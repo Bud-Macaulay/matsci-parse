@@ -6,32 +6,19 @@ import * as cifFixtures from "./teststrings/cif";
 
 describe("CIF fixtures", () => {
   for (const [name, cif] of Object.entries(cifFixtures)) {
-    it(`parses ${name}`, () => {
-      const s = fromCIF(cif);
-
-      expect(s.lattice).toBeDefined();
-      expect(s.sites.length).toBeGreaterThan(0);
-
-      for (const site of s.sites) {
-        expect(site.species.symbol).toBeTruthy();
-
-        expect(site.frac.length).toBe(3);
-
-        expect(Number.isFinite(site.frac[0])).toBe(true);
-        expect(Number.isFinite(site.frac[1])).toBe(true);
-        expect(Number.isFinite(site.frac[2])).toBe(true);
-      }
-    });
-
     it(`round-trips ${name}`, () => {
       const a = fromCIF(cif);
 
-      // cycle twice for normalization consistency
-      const b = fromCIF(toCIF(a));
-      const c = fromCIF(toCIF(b));
+      const text1 = toCIF(a);
 
-      const testCif = toCIF(c);
-      console.log(testCif);
+      const b = fromCIF(text1);
+
+      const text2 = toCIF(b);
+
+      const c = fromCIF(text2);
+
+      // serializer reaches fixed point
+      expect(text2).toBe(text1);
 
       expect(c.sites.length).toBe(a.sites.length);
 

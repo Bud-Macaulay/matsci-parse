@@ -13,10 +13,8 @@ describe("XYZ invalid fixtures", () => {
   }
 });
 
-const cases = Object.entries(fixtures) as [string, string][];
-
 describe("XYZ round-trip fixtures", () => {
-  for (const [name, text] of cases) {
+  for (const [name, text] of Object.entries(fixtures)) {
     it(`round-trips ${name}`, () => {
       const a = fromXYZ(text);
 
@@ -28,7 +26,6 @@ describe("XYZ round-trip fixtures", () => {
 
       const c = fromXYZ(text2);
 
-      // serializer reaches fixed representation
       expect(text2).toBe(text1);
 
       expect(c.sites.length).toBe(a.sites.length);
