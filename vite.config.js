@@ -23,7 +23,10 @@ export default defineConfig({
     },
     sourcemap: true,
     rollupOptions: {
-      external: [...Object.keys(packageJson.peerDependencies ?? {})],
+      external: [
+        ...Object.keys(packageJson.peerDependencies ?? {}),
+        "@spglib/moyo-wasm",
+      ],
       plugins: [
         visualizer({
           filename: "dist/stats.html",
