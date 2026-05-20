@@ -1,8 +1,8 @@
 import { resolve } from "path";
 import { defineConfig } from "vite";
-
-import packageJson from "./package.json";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
+import packageJson from "./package.json";
 
 export default defineConfig({
   resolve: {
@@ -18,11 +18,21 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, "lib/main.ts"),
-      fileName: "main",
+      fileName: "index",
       formats: ["es"],
     },
+    sourcemap: true,
     rollupOptions: {
       external: [...Object.keys(packageJson.peerDependencies ?? {})],
+      plugins: [
+        visualizer({
+          filename: "dist/stats.html",
+          open: true,
+          gzipSize: true,
+          brotliSize: true,
+          template: "treemap",
+        }),
+      ],
     },
   },
 });
