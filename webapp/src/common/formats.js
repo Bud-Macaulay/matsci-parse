@@ -1,10 +1,4 @@
-import {
-  pwToStructure,
-  xsfToStructure,
-  xyzToStructure,
-  poscarToStructure,
-  cifToStructure,
-} from "matsci-parse";
+import { fromCIF, fromXYZ, fromPOSCAR, fromXSF } from "matsci-parse/dist";
 
 export function detectFormat(fileText) {
   const lines = fileText
@@ -37,11 +31,11 @@ export function detectFormat(fileText) {
 }
 
 export const importers = {
-  pw: pwToStructure,
-  cif: cifToStructure,
-  xsf: xsfToStructure,
-  xyz: xyzToStructure,
-  poscar: poscarToStructure,
+  // pw: pwToStructure,
+  cif: fromCIF,
+  xsf: fromXSF,
+  xyz: fromXYZ,
+  poscar: fromPOSCAR,
 };
 
 export function parseFileText(fileText) {

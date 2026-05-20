@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-import {
-  structureToXyz,
-  structureToPoscar,
-  structureToXsf,
-  structureToCif,
-} from "matsci-parse";
+import { toXYZ, toPOSCAR, toXSF, toCIF } from "matsci-parse/dist";
 
 const defaultFormats = [
   { format: "json", label: "JSON" },
@@ -61,16 +56,16 @@ export default function StructureDownload({ structure, download_formats }) {
     let filename = "structure";
 
     if (format === "cif") {
-      content = structureToCif(structure);
+      content = toCIF(structure);
       filename += ".cif";
     } else if (format === "xyz") {
-      content = structureToXyz(structure);
+      content = toXYZ(structure);
       filename += ".xyz";
     } else if (format === "poscar") {
-      content = structureToPoscar(structure);
+      content = toPOSCAR(structure);
       filename += ".vasp";
     } else if (format === "xsf") {
-      content = structureToXsf(structure);
+      content = toXSF(structure);
       filename += ".xsf";
     } else if (format === "json") {
       content = JSON.stringify(structure, null, 2);
