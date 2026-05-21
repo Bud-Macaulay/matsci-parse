@@ -1,5 +1,4 @@
-export const simplePoscar = `
-NaCl
+export const simplePoscar = `NaCl
 1.0
 3.0 0.0 0.0
 0.0 3.0 0.0
@@ -11,8 +10,19 @@ Cartesian
 1.5 1.5 1.5
 `;
 
-export const multiElementPoscar = `
-GePbO3
+export const NoFormat = `NaCl
+1.0
+3.0 0.0 0.0
+0.0 3.0 0.0
+0.0 0.0 3.0
+Na Cl
+1 1
+
+0.0 0.0 0.0
+1.5 1.5 1.5
+`;
+
+export const multiElementPoscar = `GePbO3
 1.0
 3.8884369999999979 0 0
 0 3.8884369999999979 0
@@ -27,8 +37,7 @@ Direct
 0.5 0.0 0.5 O
 `;
 
-export const selectiveDynamicsPoscar = `
-Example selective dynamics POSCAR
+export const selectiveDynamicsPoscar = `Example selective dynamics POSCAR
 1.0
 5.6402 0.0000 0.0000
 0.0000 5.6402 0.0000

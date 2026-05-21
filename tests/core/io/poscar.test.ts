@@ -3,6 +3,15 @@ import { describe, it, expect } from "vitest";
 import { fromPOSCAR, toPOSCAR } from "@/core/io/poscar";
 
 import * as fixtures from "./teststrings/poscar";
+import * as unsupported from "./teststrings/malformed/poscarMalformed";
+
+describe("XYZ invalid fixtures", () => {
+  for (const [name, text] of Object.entries(unsupported)) {
+    it(`rejects ${name}`, () => {
+      expect(() => fromPOSCAR(text)).toThrow();
+    });
+  }
+});
 
 describe("POSCAR round-trip fixtures", () => {
   for (const [name, text] of Object.entries(fixtures)) {

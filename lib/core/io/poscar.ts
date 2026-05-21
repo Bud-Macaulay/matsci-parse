@@ -10,14 +10,9 @@ function isSelective(line: string): boolean {
   return line.toLowerCase().startsWith("selective");
 }
 
-function isDirect(line: string): boolean {
-  const l = line.toLowerCase();
-  return l.startsWith("direct") || l.startsWith("fractional");
-}
-
 function isCartesian(line: string): boolean {
-  const l = line.toLowerCase();
-  return l.startsWith("cart");
+  const l = line.trim().toLowerCase();
+  return l.startsWith("c") || l.startsWith("k");
 }
 
 // TODO: Currently nukes the selective dynamics flag from the input file.
@@ -25,10 +20,7 @@ function isCartesian(line: string): boolean {
 // TODO: would be good to ensure that the title is also optionally
 // maintained.
 export function fromPOSCAR(text: string): Structure {
-  const lines = text
-    .split("\n")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const lines = text.split("\n").map((x) => x.trim());
 
   let cursor = 0;
 
@@ -68,12 +60,9 @@ export function fromPOSCAR(text: string): Structure {
     cursor++;
   }
 
-  const direct = isDirect(lines[cursor]);
-  const cartesian = isCartesian(lines[cursor]);
-
-  if (!direct && !cartesian) {
-    throw new Error("Expected Direct or Cartesian");
-  }
+  // direct is true unless cartesian is.
+  let direct = true;
+  direct = !isCartesian(lines[cursor]);
 
   cursor++;
 
@@ -82,7 +71,7 @@ export function fromPOSCAR(text: string): Structure {
   let speciesIndex = 0;
   let remaining = counts[0];
 
-  const latticeInv = cartesian ? inverse(lattice) : null;
+  const latticeInv = !direct ? inverse(lattice) : null;
 
   const totalAtoms = counts.reduce((a, b) => a + b, 0);
 

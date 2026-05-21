@@ -1,4 +1,4 @@
-import { Structure } from "./structure";
+import { Structure } from "../structure/structure";
 import { createLattice } from "../lattice/lattice";
 
 export function toJSON(structure: Structure) {

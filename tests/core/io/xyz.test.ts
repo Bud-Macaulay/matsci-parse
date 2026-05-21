@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { fromXYZ, toXYZ } from "@/core/io/xyz";
 
 import * as fixtures from "./teststrings/xyz";
-import * as unsupported from "./teststrings/xyzUnsupported";
+import * as unsupported from "./teststrings/malformed/xyzUnsupported";
 
 describe("XYZ invalid fixtures", () => {
   for (const [name, text] of Object.entries(unsupported)) {
