@@ -1,4 +1,4 @@
-import { LengthUnitSystem } from "../../lib/units/index";
+import { LengthUnitSystem } from "@/core/units/index";
 
 describe("LengthUnitSystem", () => {
   test("identity conversion", () => {

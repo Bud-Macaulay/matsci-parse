@@ -1,7 +1,7 @@
 import {
   convertMeasurement,
   convertMeasurementArray,
-} from "../../lib/units/index";
+} from "@/core/units/index";
 
 describe("convertMeasurement (generic engine)", () => {
   const conversions = {

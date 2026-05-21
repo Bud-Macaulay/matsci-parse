@@ -1,4 +1,4 @@
-import { AngleUnitSystem } from "../../lib/units/index";
+import { AngleUnitSystem } from "@/core/units/index";
 
 describe("AngleUnitSystem", () => {
   test("identity conversion", () => {

@@ -1,4 +1,4 @@
-import { EnergyUnitSystem } from "../../lib/units/index";
+import { EnergyUnitSystem } from "@/core/units/index";
 
 describe("EnergyUnitSystem", () => {
   test("identity conversion", () => {
