@@ -1,8 +1,4 @@
-import {
-  cifToStructure,
-  structureToCif,
-  getReciprocalLattice,
-} from "matsci-parse";
+import { fromCIF, toCIF } from "matsci-parse/dist";
 import StructureVisualizer from "mc-react-structure-visualizer";
 
 import BaseTable from "../common/BaseTable";
@@ -11,16 +7,16 @@ import StructureDownload from "../common/structureDownload";
 import SymmetrySubpanel from "./SymmetrySubPanel";
 import TransformLatticePanel from "./TransformLatticePanel";
 
+import { replaceSite, removeSite } from "matsci-parse/dist";
+
 export default function MainPanel({ tab, updateTab }) {
   if (!tab) return null;
 
   const { structure, undoStack = [], redoStack = [] } = tab;
 
-  const reciprocalLattice = structure
-    ? getReciprocalLattice(structure.lattice)
-    : null;
+  const reciprocalLattice = structure ? structure.lattice : null;
 
-  const cifText = structure ? structureToCif(structure) : "";
+  const cifText = structure ? toCIF(structure) : "";
 
   const pushUndo = (meta = {}) => {
     updateTab((t) => ({
@@ -29,7 +25,7 @@ export default function MainPanel({ tab, updateTab }) {
         ...t.undoStack,
         {
           structure: t.structure,
-          cif: structureToCif(t.structure),
+          cif: toCIF(t.structure),
           timestamp: Date.now(),
           ...meta,
         },
@@ -45,27 +41,31 @@ export default function MainPanel({ tab, updateTab }) {
     }));
   };
 
-  const replaceSite = (idx, newSpecies) => {
+  const replace = (idx, newSpecies) => {
     pushUndo({
       action: "replace-site",
       label: `Replaced atom ${idx} with ${newSpecies}`,
     });
 
-    const copy = cifToStructure(structureToCif(structure));
-    copy.replaceSite(idx, newSpecies);
+    const currentPos = structure.sites[idx].frac;
+    const newSite = { species: { symbol: newSpecies }, frac: currentPos };
 
-    setStructure(copy);
+    console.log(newSite);
+
+    const newStructure = replaceSite(structure, idx, newSite);
+
+    setStructure(newStructure);
   };
 
-  const removeSite = (idx) => {
+  const remove = (idx) => {
     pushUndo({
       action: "replace-site",
       label: `Removed atom ${idx}`,
     });
-    const copy = cifToStructure(structureToCif(structure));
-    copy.removeSite(idx);
 
-    setStructure(copy);
+    const newStructure = removeSite(structure, idx);
+
+    setStructure(newStructure);
   };
 
   const undo = () => {
@@ -80,12 +80,12 @@ export default function MainPanel({ tab, updateTab }) {
         redoStack: [
           ...t.redoStack,
           {
-            cif: structureToCif(t.structure),
+            cif: toCIF(t.structure),
             label: last.label,
             timestamp: Date.now(),
           },
         ],
-        structure: cifToStructure(last.cif),
+        structure: fromCIF(last.cif),
       };
     });
   };
@@ -102,12 +102,12 @@ export default function MainPanel({ tab, updateTab }) {
         undoStack: [
           ...t.undoStack,
           {
-            cif: structureToCif(t.structure),
+            cif: toCIF(t.structure),
             label: last.label,
             timestamp: Date.now(),
           },
         ],
-        structure: cifToStructure(last.cif),
+        structure: fromCIF(last.cif),
       };
     });
   };
@@ -176,23 +176,23 @@ export default function MainPanel({ tab, updateTab }) {
                     <tr key={idx} className="hover:bg-gray-50 text-[12px]">
                       <td className="px-2 py-1 border-b">{idx}</td>
                       <td className="px-2 py-1 border-b">
-                        {structure.species[site.speciesIndex]}
+                        {site.species.symbol}
                       </td>
                       <td className="px-2 py-1 border-b">
-                        {site.cart[0].toFixed(3)}
+                        {site.frac[0].toFixed(3)}
                       </td>
                       <td className="px-2 py-1 border-b">
-                        {site.cart[1].toFixed(3)}
+                        {site.frac[1].toFixed(3)}
                       </td>
                       <td className="px-2 py-1 border-b">
-                        {site.cart[2].toFixed(3)}
+                        {site.frac[2].toFixed(3)}
                       </td>
                       <td className="px-2 py-1 border-b">
                         <div className="flex gap-1">
                           <button
                             onClick={() => {
                               const newSp = prompt("New species:");
-                              if (newSp) replaceSite(idx, newSp);
+                              if (newSp) replace(idx, newSp);
                             }}
                             className="buttonSimple gray"
                           >
@@ -200,7 +200,7 @@ export default function MainPanel({ tab, updateTab }) {
                           </button>
 
                           <button
-                            onClick={() => removeSite(idx)}
+                            onClick={() => remove(idx)}
                             className="buttonSimple red"
                           >
                             Remove
@@ -216,22 +216,24 @@ export default function MainPanel({ tab, updateTab }) {
 
           {/* LATTICE */}
           <BaseTable title="Lattice">
-            {structure.lattice.map((vec, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-4 py-1 border-b font-mono">
-                  {vec[0].toFixed(3)}
-                </td>
-                <td className="px-2 py-1 border-b font-mono">
-                  {vec[1].toFixed(3)}
-                </td>
-                <td className="px-2 py-1 border-b font-mono">
-                  {vec[2].toFixed(3)}
-                </td>
-              </tr>
-            ))}
+            {Array.from({ length: structure.lattice.basis.rows }).map(
+              (_, i) => {
+                const { data, cols } = structure.lattice.basis;
+
+                return (
+                  <tr key={i} className="hover:bg-gray-50">
+                    {Array.from({ length: cols }).map((_, j) => (
+                      <td key={j} className="px-2 py-1 border-b font-mono">
+                        {data[i * cols + j].toFixed(3)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              },
+            )}
           </BaseTable>
 
-          {/* RECIP LATTICE */}
+          {/* RECIP LATTICE
           <BaseTable title="Reciprocal Lattice">
             {reciprocalLattice?.map((vec, i) => (
               <tr key={i} className="hover:bg-gray-50">
@@ -246,7 +248,7 @@ export default function MainPanel({ tab, updateTab }) {
                 </td>
               </tr>
             ))}
-          </BaseTable>
+          </BaseTable> */}
 
           <SymmetrySubpanel
             structure={structure}

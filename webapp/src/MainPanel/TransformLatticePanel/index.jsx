@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { makeSupercell } from "matsci-parse";
+
+import { supercell } from "matsci-parse/dist";
 
 export default function TransformLatticePanel({
   structure,
@@ -24,7 +25,7 @@ export default function TransformLatticePanel({
     });
 
     try {
-      const newStructure = makeSupercell(structure, dims);
+      const newStructure = supercell(structure, dims);
       setStructure(newStructure);
     } catch (e) {
       console.error("Supercell failed:", e);

@@ -1,4 +1,5 @@
-import { cifToStructure, structureToCif } from "matsci-parse";
+import { toCIF, fromCIF } from "matsci-parse/dist";
+
 import { useHotkey } from "@tanstack/react-hotkeys";
 
 import SidePanel from "./SidePanel";
@@ -46,8 +47,8 @@ export default function App() {
         autosave={autosave}
         setAutosave={actions.setAutosave}
         structure={activeTab?.structure ?? null}
-        structureToCif={structureToCif}
-        cifToStructure={cifToStructure}
+        toCIF={toCIF}
+        fromCIF={fromCIF}
         onLoadStructure={(parsed, meta) => actions.createTab(parsed, meta)}
       />
 

@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+
+import { createMatrix } from "../../../../lib/core/matrix/matrix";
+import { col } from "../../../../lib/core/matrix/operations/col";
+
+describe("col", () => {
+  it("extracts columns correctly", () => {
+    const m = createMatrix(3, 3, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+    expect(Array.from(col(m, 0))).toEqual([1, 4, 7]);
+    expect(Array.from(col(m, 1))).toEqual([2, 5, 8]);
+    expect(Array.from(col(m, 2))).toEqual([3, 6, 9]);
+  });
+
+  it("works for rectangular matrices", () => {
+    const m = createMatrix(2, 3, [1, 2, 3, 4, 5, 6]);
+
+    expect(Array.from(col(m, 0))).toEqual([1, 4]);
+    expect(Array.from(col(m, 1))).toEqual([2, 5]);
+    expect(Array.from(col(m, 2))).toEqual([3, 6]);
+  });
+
+  it("handles Nx1 matrices", () => {
+    const m = createMatrix(4, 1, [1, 2, 3, 4]);
+
+    expect(Array.from(col(m, 0))).toEqual([1, 2, 3, 4]);
+  });
+
+  it("does not mutate matrix data", () => {
+    const m = createMatrix(2, 2, [1, 2, 3, 4]);
+    const original = Array.from(m.data);
+
+    col(m, 0);
+
+    expect(Array.from(m.data)).toEqual(original);
+  });
+
+  it("returns correct length", () => {
+    const m = createMatrix(
+      5,
+      3,
+      Array.from({ length: 15 }, (_, i) => i),
+    );
+
+    const c = col(m, 1);
+
+    expect(c.length).toBe(5);
+  });
+});

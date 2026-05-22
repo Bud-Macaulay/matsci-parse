@@ -1,0 +1,67 @@
+import { Matrix, createMatrix, index } from "../matrix";
+
+function minor(matrix: Matrix, skipRow: number, skipCol: number): Matrix {
+  const out = createMatrix(matrix.rows - 1, matrix.cols - 1);
+
+  let ptr = 0;
+
+  for (let row = 0; row < matrix.rows; row++) {
+    if (row === skipRow) continue;
+
+    for (let col = 0; col < matrix.cols; col++) {
+      if (col === skipCol) continue;
+
+      out.data[ptr++] = matrix.data[index(matrix.cols, row, col)];
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Computes the determinant of a matrix.
+ *
+ * The determinant is a scalar value that provides information about the matrix
+ * (invertibility, volume scaling, orientation). Only defined for square matrices.
+ *
+ * @param matrix - The square matrix
+ * @returns The determinant value
+ * @throws Error if the matrix is not square
+ *
+ * @remarks
+ * - A determinant of 0 indicates the matrix is singular (not invertible)
+ * - Uses recursive cofactor expansion
+ * - Computationally expensive for large matrices (O(n!) complexity)
+ * - For performance-critical applications, consider using the rank or LU decomposition instead
+ *
+ * @example
+ * ```typescript
+ * const m = createMatrix(2, 2, [1, 2, 3, 4]);
+ * const det = determinant(m);  // -2
+ * ```
+ */
+export function determinant(matrix: Matrix): number {
+  if (matrix.rows !== matrix.cols) {
+    throw new Error("Determinant requires a square matrix");
+  }
+
+  const n = matrix.rows;
+
+  if (n === 1) {
+    return matrix.data[0];
+  }
+
+  if (n === 2) {
+    return matrix.data[0] * matrix.data[3] - matrix.data[1] * matrix.data[2];
+  }
+
+  let det = 0;
+
+  for (let col = 0; col < n; col++) {
+    const sign = col % 2 === 0 ? 1 : -1;
+
+    det += sign * matrix.data[col] * determinant(minor(matrix, 0, col));
+  }
+
+  return det;
+}

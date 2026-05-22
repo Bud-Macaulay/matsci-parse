@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
   test: {
@@ -8,6 +9,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       reportsDirectory: "coverage",
+      reportOnFailure: true,
 
       include: ["lib/**/*.{ts,js}"],
       exclude: ["lib/**/*.d.ts", "src/webapp/**"],
@@ -20,6 +22,7 @@ export default defineConfig({
     alias: {
       // Mock the ?url import in tests
       "moyo-wasm/moyo_wasm_bg.wasm?url": "moyo-wasm/moyo_wasm_bg.wasm",
+      "@": path.resolve(__dirname, "lib"),
     },
   },
 });

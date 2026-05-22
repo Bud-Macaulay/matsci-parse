@@ -7,8 +7,8 @@ export default function SidePanel({
   autosave,
   setAutosave,
   structure,
-  structureToCif,
-  cifToStructure,
+  toCIF,
+  fromCIF,
   onLoadStructure,
 }) {
   const [error, setError] = useState("");
@@ -22,7 +22,7 @@ export default function SidePanel({
     const newItem = {
       id: crypto.randomUUID(),
       name: `Structure ${savedList.length + 1}`,
-      cif: structureToCif(structure),
+      cif: toCIF(structure),
     };
 
     const updated = [...savedList, newItem];
@@ -52,7 +52,7 @@ export default function SidePanel({
   };
 
   const loadStructure = (cif, name) => {
-    const parsed = cifToStructure(cif);
+    const parsed = fromCIF(cif);
     onLoadStructure(parsed, {
       name,
       source: "saved",
@@ -79,7 +79,7 @@ export default function SidePanel({
           {
             id: crypto.randomUUID(),
             name: `Imported ${new Date().toLocaleString()}`,
-            cif: structureToCif(parsed),
+            cif: toCIF(parsed),
           },
         ];
 
