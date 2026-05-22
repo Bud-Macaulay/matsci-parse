@@ -4,6 +4,38 @@ import type { Site } from "@/core/site/site";
 
 type SupercellSize = number | [number, number, number];
 
+/**
+ * Creates a supercell by repeating the structure a specified number of times.
+ *
+ * Expands the unit cell along one or more directions, creating a larger supercell
+ * with multiple copies of each atom. The fractional coordinates are updated accordingly.
+ *
+ * @param structure - The original structure
+ * @param size - Number of repetitions: either a single number (uniform) or [nx, ny, nz]
+ * @returns A new structure with the supercell and duplicated atoms
+ * @throws Error if supercell dimensions are not positive integers
+ *
+ * @remarks
+ * - Lattice basis vectors are scaled by the repetition factors
+ * - Each atom is copied to all equivalent positions in the supercell
+ * - Fractional coordinates are scaled accordingly (position / repetition)
+ * - Useful for calculating properties that require larger cells
+ * - Equivalent to a k-point mesh reduction in some contexts
+ *
+ * @example
+ * ```typescript
+ * const structure = {
+ *   lattice: cubic(3.14),
+ *   sites: [{ species: 'Fe', frac: [0, 0, 0] }]
+ * };
+ *
+ * // Create 2×2×2 supercell (8 atoms total)
+ * const super2x2x2 = supercell(structure, 2);
+ *
+ * // Create 2×3×2 supercell (asymmetric)
+ * const superAsym = supercell(structure, [2, 3, 2]);
+ * ```
+ */
 export function supercell(
   structure: Structure,
   size: SupercellSize,

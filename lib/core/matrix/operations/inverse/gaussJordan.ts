@@ -1,5 +1,29 @@
 import { Matrix, createMatrix, clone, index } from "../../matrix";
 
+/**
+ * Computes the matrix inverse using Gauss-Jordan elimination.
+ *
+ * This method augments the matrix with an identity matrix and performs
+ * row operations to transform the original matrix to identity while
+ * simultaneously transforming the augmented identity to the inverse.
+ *
+ * @param m - The square matrix to invert
+ * @returns The inverted matrix
+ * @throws Error if the matrix is not square
+ * @throws Error if the matrix is singular
+ *
+ * @remarks
+ * - Time complexity: O(n³)
+ * - Uses partial pivoting to improve numerical stability
+ * - Alternative to LU decomposition
+ * - Good for small to medium-sized matrices
+ *
+ * @example
+ * ```typescript
+ * const m = createMatrix(3, 3, [1, 2, 1, 2, 1, 0, 1, 0, 2]);
+ * const inv = gjInverse(m);
+ * ```
+ */
 export function gjInverse(m: Matrix): Matrix {
   if (m.rows !== m.cols) {
     throw new Error("Inverse requires square matrix");

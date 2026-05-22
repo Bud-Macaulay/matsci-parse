@@ -1,0 +1,9 @@
+{
+  "entryPoints": ["lib/main.ts"],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "categorizeByGroup": true,
+  "excludeExternals": true,
+}

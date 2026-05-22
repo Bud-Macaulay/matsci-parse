@@ -10,6 +10,39 @@ type CoordinateMode = "crystal" | "angstrom";
 // PW is a very complex file format, it would be good if i can do some intense reading.
 // It might take a while to get a nice representation of these things...
 
+/**
+ * Parses a crystal structure from Quantum ESPRESSO input format (PW).
+ *
+ * Extracts lattice and atomic information from a Quantum ESPRESSO pw.x input file.
+ * Supports both crystal (fractional) and Cartesian (angstrom) coordinate systems.
+ *
+ * @param text - The Quantum ESPRESSO input file content
+ * @returns A Structure object parsed from the input
+ * @throws Error if required fields (CELL_PARAMETERS, ATOMIC_SPECIES, ATOMIC_POSITIONS) are missing
+ *
+ * @remarks
+ * - QE input format is very complex; this is a simplified parser
+ * - Requires CELL_PARAMETERS section for lattice definition
+ * - Requires ATOMIC_SPECIES and ATOMIC_POSITIONS for atomic information
+ * - Supports both crystal and angstrom coordinate modes
+ * - Pseudo-potential information is ignored
+ * - May not handle all advanced QE features
+ *
+ * @example
+ * ```typescript
+ * const qeInput = `
+ *   CELL_PARAMETERS angstrom
+ *   4.05 0 0
+ *   0 4.05 0
+ *   0 0 4.05
+ *   ATOMIC_SPECIES
+ *   Al 26.98 Al.pbe-n-kjpaw_psl.1.0.0.UPF
+ *   ATOMIC_POSITIONS crystal
+ *   Al 0 0 0
+ * `;
+ * const structure = fromPW(qeInput);
+ * ```
+ */
 export function fromPW(text: string): Structure {
   const lines = text.split("\n").map((x) => x.trim());
 

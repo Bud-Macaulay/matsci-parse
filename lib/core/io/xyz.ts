@@ -28,6 +28,32 @@ function parseLattice(info: ExtendedXYZInfo) {
   return createLattice([v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]]);
 }
 
+/**
+ * Parses a crystal structure from extended XYZ format.
+ *
+ * Reads atomic structure from XYZ format with extended headers containing
+ * lattice information (Extended XYZ format used by ASE and other tools).
+ *
+ * @param text - The XYZ file content as a string
+ * @returns A Structure object parsed from the XYZ data
+ * @throws Error if lattice information or required fields are missing
+ *
+ * @remarks
+ * - First line: number of atoms
+ * - Second line: properties header in key=value format (must include "Lattice")
+ * - Remaining lines: atomic species and Cartesian positions
+ * - Lattice must be specified in extended header as 9 space-separated values
+ * - Standard XYZ format (without lattice) is not supported
+ *
+ * @example
+ * ```typescript
+ * const xyzText = `2
+ * Lattice="4.05 0 0 0 4.05 0 0 0 4.05" Properties=species:S:1:pos:R:3
+ * Al 0.0 0.0 0.0
+ * Al 2.025 2.025 2.025`;
+ * const structure = fromXYZ(xyzText);
+ * ```
+ */
 export function fromXYZ(text: string) {
   const lines = text.trim().split("\n");
 
@@ -58,6 +84,29 @@ function formatLattice(lattice: Lattice): string {
   return `${m[0]} ${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]} ${m[6]} ${m[7]} ${m[8]}`;
 }
 
+/**
+ * Serializes a structure to extended XYZ format.
+ *
+ * Converts a Structure to extended XYZ format suitable for visualization
+ * and exchange with other materials science tools (ASE, OVITO, etc.).
+ *
+ * @param structure - The structure to serialize
+ * @returns The structure as an extended XYZ formatted string
+ *
+ * @remarks
+ * - Line 1: Number of atoms
+ * - Line 2: Header with lattice information in extended XYZ format
+ * - Remaining lines: Atomic species and fractional coordinates
+ * - Lattice is specified as 9 space-separated values in row-major order
+ * - The output uses fractional coordinates as given in the structure
+ *
+ * @example
+ * ```typescript
+ * const structure = { lattice: cubic(4.05), sites: [...] };
+ * const xyzString = toXYZ(structure);
+ * // Output can be written to file and opened in visualization software
+ * ```
+ */
 export function toXYZ(structure: Structure): string {
   const sites = structure.sites;
 

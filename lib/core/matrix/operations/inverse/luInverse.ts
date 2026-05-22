@@ -2,6 +2,29 @@ import { Matrix, createMatrix, clone } from "../../matrix";
 
 const EPSILON = 1e-12;
 
+/**
+ * Computes the matrix inverse using LU decomposition with partial pivoting.
+ *
+ * This is the general-purpose matrix inversion method suitable for arbitrary square matrices.
+ * Uses LU factorization followed by forward and back substitution.
+ *
+ * @param m - The square matrix to invert
+ * @returns The inverted matrix
+ * @throws Error if the matrix is not square
+ * @throws Error if the matrix is singular (determinant is 0)
+ *
+ * @remarks
+ * - Time complexity: O(n³)
+ * - Uses partial pivoting for numerical stability
+ * - Epsilon threshold: 1e-12 for determining singularity
+ * - More general than specialized 2×2, 3×3, 4×4 methods but slightly slower
+ *
+ * @example
+ * ```typescript
+ * const m = createMatrix(5, 5, [...]);
+ * const inv = luInverse(m);
+ * ```
+ */
 export function luInverse(m: Matrix): Matrix {
   if (m.rows !== m.cols) {
     throw new Error("Square matrix required");

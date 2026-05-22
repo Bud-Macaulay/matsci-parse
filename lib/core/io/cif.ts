@@ -20,6 +20,41 @@ function warnUnsupportedSymmetry(spaceGroup: string) {
   );
 }
 
+/**
+ * Parses a crystal structure from CIF (Crystallographic Information File) format.
+ *
+ * Extracts lattice parameters, atomic positions, and species information from a CIF file.
+ * Assumes the file contains a single crystal structure block.
+ *
+ * @param text - The CIF file content as a string
+ * @returns A Structure object parsed from the CIF data
+ * @throws Error if required CIF fields are missing
+ *
+ * @remarks
+ * - Currently reads only the asymmetric unit (symmetry operations are NOT applied)
+ * - Warnings are issued if space group symmetry information is detected but not used
+ * - Uncertainty values in CIF are stripped (e.g., 5.432(1) → 5.432)
+ * - Only the first data block is processed
+ * - Supports quoted values and multiple formatting styles
+ *
+ * @example
+ * ```typescript
+ * const cifText = `
+ *   data_structure
+ *   _cell_length_a 4.05
+ *   _cell_length_b 4.05
+ *   _cell_length_c 4.05
+ *   _cell_angle_alpha 90
+ *   _cell_angle_beta 90
+ *   _cell_angle_gamma 90
+ *   _atom_site_label Al1
+ *   _atom_site_fract_x 0
+ *   _atom_site_fract_y 0
+ *   _atom_site_fract_z 0
+ * `;
+ * const structure = fromCIF(cifText);
+ * ```
+ */
 export function fromCIF(text: string): Structure {
   const lines = text
     .split("\n")

@@ -1,10 +1,10 @@
-import { Site } from "./site";
+import { Site, SiteProperties } from "./site";
 
 function wrapValue(x: number): number {
   return ((x % 1) + 1) % 1;
 }
 
-export function wrap<T>(site: Site<T>): Site<T> {
+export function wrap<T extends SiteProperties>(site: Site<T>): Site<T> {
   return {
     ...site,
     frac: [

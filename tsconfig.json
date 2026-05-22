@@ -1,19 +1,19 @@
 {
   "compilerOptions": {
     "target": "ES2020",
+    "lib": ["ES2022", "DOM"],
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
     "declaration": true,
-    "types": ["vitest/globals"],
-    "baseUrl": ".",
+    "types": ["vitest/globals", "node"],
     "paths": {
-      "@/*": ["lib/*"]
+      "@/*": ["./lib/*"]
     }
   },
-  "include": ["lib", "tests"]
+  "include": ["lib"]
 }

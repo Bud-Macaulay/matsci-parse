@@ -2,7 +2,6 @@ import { mul } from "../matrix/operations/mul";
 import { Site } from "./site";
 import { Lattice } from "../lattice/lattice";
 import { Vector } from "../matrix/vector";
-import { Matrix } from "@/math/matrix";
 
 export function cartesian(lattice: Lattice, site: Site): Vector {
   const [x, y, z] = site.frac;

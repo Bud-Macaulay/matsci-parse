@@ -6,6 +6,8 @@ import { Site } from "../site/site";
 import { Structure } from "../structure/structure";
 import { fractional } from "../site/fractional";
 
+import { cartesian } from "../site";
+
 function isSelective(line: string): boolean {
   return line.toLowerCase().startsWith("selective");
 }
@@ -19,6 +21,41 @@ function isCartesian(line: string): boolean {
 // It would be good to restore this.
 // TODO: would be good to ensure that the title is also optionally
 // maintained.
+/**
+ * Parses a crystal structure from POSCAR (VASP) format.
+ *
+ * Reads lattice vectors, atomic positions, and species from VASP's POSCAR/CONTCAR format.
+ * Supports both Cartesian and fractional coordinates.
+ *
+ * @param text - The POSCAR file content as a string
+ * @returns A Structure object parsed from the POSCAR data
+ * @throws Error if required POSCAR fields are missing or malformed
+ *
+ * @remarks
+ * - Line 1: Comment/title line (ignored)
+ * - Line 2: Scaling factor
+ * - Lines 3-5: Lattice vectors (in Ångströms or scaled units)
+ * - Line 6: Element symbols
+ * - Line 7: Number of atoms per element
+ * - Line 8+: Atomic positions (Cartesian or fractional)
+ * - Selective dynamics flags are currently stripped
+ * - Structure title is not preserved in the output
+ *
+ * @example
+ * ```typescript
+ * const poscarText = `Cubic structure
+ * 1.0
+ * 4.05 0 0
+ * 0 4.05 0
+ * 0 0 4.05
+ * Al
+ * 2
+ * Fractional
+ * 0 0 0
+ * 0.5 0.5 0.5`;
+ * const structure = fromPOSCAR(poscarText);
+ * ```
+ */
 export function fromPOSCAR(text: string): Structure {
   const lines = text.split("\n").map((x) => x.trim());
 

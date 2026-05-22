@@ -1,5 +1,25 @@
 import { Matrix, createMatrix } from "../../matrix";
 
+/**
+ * Computes the inverse of a 2×2 matrix.
+ *
+ * Uses the analytical formula for 2×2 matrix inversion, which is fast and numerically stable.
+ *
+ * @param m - The 2×2 matrix to invert
+ * @returns The inverted matrix
+ * @throws Error if the matrix is not 2×2
+ * @throws Error if the matrix is singular (determinant is 0)
+ *
+ * @remarks
+ * For a matrix [[a, b], [c, d]], the inverse is (1/det) * [[d, -b], [-c, a]],
+ * where det = ad - bc.
+ *
+ * @example
+ * ```typescript
+ * const m = createMatrix(2, 2, [1, 2, 3, 4]);
+ * const inv = inverse2x2(m);
+ * ```
+ */
 export function inverse2x2(m: Matrix): Matrix {
   if (m.rows !== 2 || m.cols !== 2) {
     throw new Error("Expected 2x2 matrix");
