@@ -47,6 +47,17 @@ export function determinant(matrix: Matrix): number {
 
   const n = matrix.rows;
 
+  // fast path for BZ / geometry
+  if (n === 3) {
+    const m = matrix.data;
+
+    return (
+      m[0] * (m[4] * m[8] - m[5] * m[7]) -
+      m[1] * (m[3] * m[8] - m[5] * m[6]) +
+      m[2] * (m[3] * m[7] - m[4] * m[6])
+    );
+  }
+
   if (n === 1) {
     return matrix.data[0];
   }
