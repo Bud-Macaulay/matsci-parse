@@ -28,6 +28,7 @@ interface BrillouinZoneData {
   readonly b1: number[];
   readonly b2: number[];
   readonly b3: number[];
+  readonly hullVertices: Float64Array[];
   readonly facesData: FacesData;
   readonly kpoints: Record<string, KPoint>;
   readonly kpointsRel: Record<string, KPoint>;
@@ -89,14 +90,12 @@ function isInside(v: Float64Array, planes: Plane[]) {
   return true;
 }
 
-export async function brillouinZone(
+export async function generateBZVertices(
   structure: Structure,
   tolerance: number = 1e-4,
-): Promise<BrillouinZoneData> {
-  const spgLibStructure = await getSymmetry(structure, tolerance);
-
+): Promise<Float64Array[]> {
   const reciprocalLattice = reciprocalLatticeCrystallographic(
-    spgLibStructure.primitive.lattice,
+    structure.lattice,
   );
 
   const rcLD = reciprocalLattice.basis.data;
@@ -182,7 +181,7 @@ export async function brillouinZone(
     }
   }
 
-  const vertices = [...vertexMap.values()];
+  const hullVertices = [...vertexMap.values()];
 
-  console.log(vertices);
+  return hullVertices;
 }
