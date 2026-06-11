@@ -1,4 +1,4 @@
-import { fromCIF, toCIF } from "matsci-parse/dist";
+import { fromCIF, toCIF } from "matsci-parse";
 import StructureVisualizer from "mc-react-structure-visualizer";
 
 import BaseTable from "../common/BaseTable";
@@ -7,7 +7,7 @@ import StructureDownload from "../common/structureDownload";
 import SymmetrySubpanel from "./SymmetrySubPanel";
 import TransformLatticePanel from "./TransformLatticePanel";
 
-import { replaceSite, removeSite } from "matsci-parse/dist";
+import { replaceSite, removeSite } from "matsci-parse";
 
 export default function MainPanel({ tab, updateTab }) {
   if (!tab) return null;

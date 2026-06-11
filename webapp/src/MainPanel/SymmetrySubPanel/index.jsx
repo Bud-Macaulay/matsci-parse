@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { getSymmetry } from "matsci-parse/dist";
+import { getSymmetry } from "matsci-parse";
 
 import BaseTable from "../../common/BaseTable";
 import { formatSpaceGroupSymbol } from "../../common/textFormatting";

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-import { toXYZ, toPOSCAR, toXSF, toCIF } from "matsci-parse/dist";
+import { toXYZ, toPOSCAR, toXSF, toCIF } from "matsci-parse";
 
 const defaultFormats = [
   { format: "json", label: "JSON" },

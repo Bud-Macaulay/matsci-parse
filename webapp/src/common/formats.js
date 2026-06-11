@@ -1,4 +1,4 @@
-import { fromCIF, fromXYZ, fromPOSCAR, fromXSF } from "matsci-parse/dist";
+import { fromCIF, fromXYZ, fromPOSCAR, fromXSF } from "matsci-parse";
 
 export function detectFormat(fileText) {
   const lines = fileText

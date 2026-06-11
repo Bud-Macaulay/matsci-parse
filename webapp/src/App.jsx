@@ -1,4 +1,4 @@
-import { toCIF, fromCIF } from "matsci-parse/dist";
+import { toCIF, fromCIF } from "matsci-parse";
 
 import { useHotkey } from "@tanstack/react-hotkeys";
 

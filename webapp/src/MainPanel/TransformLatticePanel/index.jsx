@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-import { supercell } from "matsci-parse/dist";
+import { supercell } from "matsci-parse";
 
 export default function TransformLatticePanel({
   structure,
