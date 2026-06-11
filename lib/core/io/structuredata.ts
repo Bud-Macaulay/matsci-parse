@@ -6,7 +6,7 @@ import { fractional } from "../site/fractional";
 
 export interface AiiDASite {
   position: [number, number, number];
-  symbols: string[];
+  kind_name: string[];
 }
 
 export interface StructureData {

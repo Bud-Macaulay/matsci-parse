@@ -1,4 +1,6 @@
 import { mul } from "../matrix/operations/mul";
+import { transpose } from "../matrix/operations/transpose";
+
 import { Site } from "./site";
 import { Lattice } from "../lattice/lattice";
 import { Vector } from "../matrix/vector";
@@ -12,7 +14,8 @@ export function cartesian(lattice: Lattice, site: Site): Vector {
     data: new Float64Array([x, y, z]),
   };
 
-  const result = mul(lattice.basis, frac);
+  const basisT = transpose(lattice.basis);
+  const result = mul(basisT, frac);
 
   return new Float64Array([result.data[0], result.data[1], result.data[2]]);
 }
