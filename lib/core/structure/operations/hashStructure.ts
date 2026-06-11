@@ -19,31 +19,6 @@ function fnv1a(str: string): number {
   return hash >>> 0;
 }
 
-/**
- * Computes a hash of a structure for fast structure identification and comparison.
- *
- * Generates a 32-bit hash using the FNV-1a algorithm based on the canonical structure.
- * Useful for detecting duplicate structures and structure database lookups.
- *
- * @param structure - The structure to hash
- * @returns A 32-bit integer hash value
- *
- * @remarks
- * - Hash is computed from the canonicalized structure (coordinates wrapped to [0,1))
- * - Same hash does NOT guarantee identical structures (hash collisions are possible)
- * - Different structures may occasionally have the same hash (false positives)
- * - Use for quick filtering; verify with full structure comparison if needed
- * - Precision: coordinates are rounded to 8 decimal places for hash calculation
- *
- * @example
- * ```typescript
- * const struct1 = { lattice: cubic(4), sites: [...] };
- * const struct2 = { ...struct1 };
- * const hash1 = hashStructure(struct1);
- * const hash2 = hashStructure(struct2);
- * console.log(hash1 === hash2);  // true (same structure)
- * ```
- */
 export function hashStructure(structure: Structure): number {
   const s = canonicalize(structure);
 

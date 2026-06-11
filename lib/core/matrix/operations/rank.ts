@@ -2,26 +2,6 @@ import { Matrix, clone } from "../matrix";
 
 const EPS = 1e-12;
 
-/**
- * Computes the rank of a matrix using Gaussian elimination.
- *
- * The rank is the dimension of the vector space spanned by the matrix's rows or columns.
- * It indicates the number of linearly independent rows/columns.
- *
- * @param m - The matrix
- * @returns The rank of the matrix
- *
- * @remarks
- * - For an m × n matrix, rank ≤ min(m, n)
- * - A full-rank square matrix is invertible
- * - Uses row reduction with epsilon threshold (1e-12) for numerical stability
- *
- * @example
- * ```typescript
- * const m = createMatrix(3, 3, [1, 2, 3, 2, 4, 6, 1, 1, 1]);
- * const r = rank(m);  // 2 (second row is a multiple of the first)
- * ```
- */
 export function rank(m: Matrix): number {
   const A = clone(m).data;
   const rows = m.rows;

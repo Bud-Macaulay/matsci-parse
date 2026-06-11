@@ -1,25 +1,5 @@
 import { Matrix, createMatrix } from "../../matrix";
 
-/**
- * Computes the inverse of a 4×4 matrix.
- *
- * Uses an optimized analytical formula for 4×4 matrices,
- * which is more efficient than general LU decomposition for this size.
- *
- * @param m - The 4×4 matrix to invert
- * @returns The inverted matrix
- * @throws Error if the matrix is not 4×4
- * @throws Error if the matrix is singular (determinant is 0)
- *
- * @remarks
- * Commonly used in computer graphics and transformations (projection, rotation, etc.).
- *
- * @example
- * ```typescript
- * const m = createMatrix(4, 4, [...]);  // Homogeneous transformation matrix
- * const inv = inverse4x4(m);
- * ```
- */
 export function inverse4x4(m: Matrix): Matrix {
   if (m.rows !== 4 || m.cols !== 4) {
     throw new Error("Expected 4x4 matrix");

@@ -1,26 +1,5 @@
 import { Matrix, createMatrix } from "../../matrix";
 
-/**
- * Computes the inverse of a 3×3 matrix.
- *
- * Uses the analytical formula based on matrix of minors/cofactors.
- * This is faster than general LU-based methods for small matrices.
- *
- * @param m - The 3×3 matrix to invert
- * @returns The inverted matrix
- * @throws Error if the matrix is not 3×3
- * @throws Error if the matrix is singular (determinant is 0)
- *
- * @remarks
- * The 3×3 inverse is computed using the cofactor method:
- * A⁻¹ = (1/det(A)) * adj(A), where adj(A) is the adjugate matrix.
- *
- * @example
- * ```typescript
- * const m = createMatrix(3, 3, [1, 0, 0, 0, 1, 0, 0, 0, 1]);
- * const inv = inverse3x3(m);  // Identity matrix (already invertible)
- * ```
- */
 export function inverse3x3(m: Matrix): Matrix {
   if (m.rows !== 3 || m.cols !== 3) {
     throw new Error("Expected 3x3 matrix");

@@ -18,28 +18,6 @@ function minor(matrix: Matrix, skipRow: number, skipCol: number): Matrix {
   return out;
 }
 
-/**
- * Computes the determinant of a matrix.
- *
- * The determinant is a scalar value that provides information about the matrix
- * (invertibility, volume scaling, orientation). Only defined for square matrices.
- *
- * @param matrix - The square matrix
- * @returns The determinant value
- * @throws Error if the matrix is not square
- *
- * @remarks
- * - A determinant of 0 indicates the matrix is singular (not invertible)
- * - Uses recursive cofactor expansion
- * - Computationally expensive for large matrices (O(n!) complexity)
- * - For performance-critical applications, consider using the rank or LU decomposition instead
- *
- * @example
- * ```typescript
- * const m = createMatrix(2, 2, [1, 2, 3, 4]);
- * const det = determinant(m);  // -2
- * ```
- */
 export function determinant(matrix: Matrix): number {
   if (matrix.rows !== matrix.cols) {
     throw new Error("Determinant requires a square matrix");

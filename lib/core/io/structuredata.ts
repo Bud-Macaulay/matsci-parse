@@ -19,36 +19,6 @@ export interface StructureData {
   sites: AiiDASite[];
 }
 
-/**
- * Parses a crystal structure from AiiDA/StructureData representation.
- *
- * Converts AiiDA StructureData format to a Structure object.
- * Used for compatibility with AiiDA workflows.
- *
- * @param data - An AiiDA StructureData object with `cell` (3×3) and `sites` array
- * @returns A new Structure object
- * @throws Error if cell or sites data is malformed
- *
- * @remarks
- * - `cell`: 3×3 array of Cartesian lattice vectors
- * - `sites`: Array of AiiDASite objects with position and species
- * - `kinds`: Array defining species information (symbol mapping)
- * - Converts Cartesian coordinates to fractional internally
- * - Used primarily for VASP and other DFT workflow integration
- *
- * @example
- * ```typescript
- * const aiidaData = {
- *   cell: [[4.05, 0, 0], [0, 4.05, 0], [0, 0, 4.05]],
- *   kinds: [{ name: 'Al', symbol: 'Al' }],
- *   sites: [
- *     { position: [0, 0, 0], symbols: ['Al'] },
- *     { position: [2.025, 2.025, 2.025], symbols: ['Al'] }
- *   ]
- * };
- * const structure = fromStructureData(aiidaData);
- * ```
- */
 export function fromStructureData(data: StructureData): Structure {
   const lattice = createLattice([
     ...data.cell[0],
