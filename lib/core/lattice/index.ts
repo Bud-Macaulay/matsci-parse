@@ -7,6 +7,6 @@ export * from "./metricTensor";
 export * from "./parameters";
 export * from "./reciprocalLattice";
 export * from "./reciprocalLatticeCrystallographic";
-export * from "./volume";
+// export * from "./volume"; -- dont export this to avoid conflicts
 
 export * from "./create";
