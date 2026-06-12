@@ -91,12 +91,12 @@ Cartesian
 `;
 
 export const diamondCPOSCAR = `C diamond
-3.57
+1
 3.57 0.0 0.0
 0.0 3.57 0.0
 0.0 0.0 3.57
 C
-1
+4
 Cartesian
 0.0 0.0 0.0
 0.8925 0.8925 0.8925

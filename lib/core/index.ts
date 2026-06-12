@@ -5,3 +5,5 @@ export * from "./species";
 export * from "./io";
 
 export * from "./units";
+
+export * from "./data";

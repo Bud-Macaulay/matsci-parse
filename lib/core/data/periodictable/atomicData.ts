@@ -135,6 +135,10 @@ export const elementBySymbol = Object.values(PeriodicTable).reduce(
   {} as Record<string, ElementInfo>,
 );
 
+export function getElement(symbol: string): ElementInfo | undefined {
+  return elementBySymbol[symbol];
+}
+
 /**
  * Symbol → atomic number lookup (fast + safe)
  */
