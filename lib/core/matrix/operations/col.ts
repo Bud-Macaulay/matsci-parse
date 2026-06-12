@@ -1,4 +1,5 @@
 import { Matrix } from "../matrix";
+import { clone } from "../matrix";
 
 export function col(m: Matrix, c: number): Float64Array {
   const out = new Float64Array(m.rows);
@@ -10,10 +11,12 @@ export function col(m: Matrix, c: number): Float64Array {
   return out;
 }
 
-export function setCol(m: Matrix, c: number, v: ArrayLike<number>) {
-  for (let r = 0; r < m.rows; r++) {
-    m.data[r * m.cols + c] = v[r];
+export function replaceCol(m: Matrix, c: number, v: ArrayLike<number>): Matrix {
+  const out = clone(m);
+
+  for (let r = 0; r < out.rows; r++) {
+    out.data[r * out.cols + c] = v[r];
   }
 
-  return m;
+  return out;
 }

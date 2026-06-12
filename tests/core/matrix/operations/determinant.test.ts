@@ -67,4 +67,38 @@ describe("determinant", () => {
 
     expect(() => determinant(a)).toThrow();
   });
+
+  it("det(A) equals det(Aᵀ) for 20 random 8x8 matrices", () => {
+    const size = 8;
+
+    let seed = 12345;
+
+    const rand = () => {
+      seed = (1664525 * seed + 1013904223) >>> 0;
+
+      return seed / 2 ** 32;
+    };
+
+    for (let k = 0; k < 20; k++) {
+      const data = Array.from(
+        { length: size * size },
+        () => Math.floor(rand() * 21) - 10,
+      );
+
+      const a = createMatrix(size, size, data);
+
+      const at = createMatrix(
+        size,
+        size,
+        Array.from({ length: size * size }, (_, i) => {
+          const row = Math.floor(i / size);
+          const col = i % size;
+
+          return data[col * size + row];
+        }),
+      );
+
+      expect(determinant(at)).toBeCloseTo(determinant(a), 10);
+    }
+  });
 });

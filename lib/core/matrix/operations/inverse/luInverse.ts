@@ -89,10 +89,6 @@ export function luInverse(m: Matrix): Matrix {
     const rowI = i * n;
     const diag = data[rowI + i];
 
-    if (Math.abs(diag) < EPSILON) {
-      throw new Error("Singular matrix");
-    }
-
     // Divide row by diagonal
     for (let k = 0; k < n; k++) {
       invData[rowI + k] /= diag;

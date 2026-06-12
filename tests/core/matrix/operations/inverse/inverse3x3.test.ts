@@ -60,4 +60,10 @@ describe("inverse3x3", () => {
 
     expect(() => inverse3x3(A)).toThrow("Singular matrix");
   });
+
+  it("throws on non-3x3 matrix", () => {
+    const A = createMatrix(3, 4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+    expect(() => inverse3x3(A)).toThrow();
+  });
 });

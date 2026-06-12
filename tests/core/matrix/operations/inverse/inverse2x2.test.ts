@@ -59,4 +59,10 @@ describe("inverse2x2", () => {
     const A = createMatrix(2, 2, [1, 2, 2, 4]);
     expect(() => inverse2x2(A)).toThrow("Singular matrix");
   });
+
+  it("throws on non-2x2 matrix", () => {
+    const A = createMatrix(3, 4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+    expect(() => inverse2x2(A)).toThrow();
+  });
 });
