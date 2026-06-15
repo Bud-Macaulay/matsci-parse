@@ -18,11 +18,15 @@ describe("XYZ round-trip fixtures", () => {
     it(`round-trips ${name}`, () => {
       const a = fromXYZ(text);
 
+      console.log(JSON.stringify(a, null, 2));
+
       const text1 = toXYZ(a);
 
       const b = fromXYZ(text1);
 
       const text2 = toXYZ(b);
+
+      console.log(text2);
 
       const c = fromXYZ(text2);
 

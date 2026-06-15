@@ -36,4 +36,42 @@ describe("getDistance", () => {
 
     expect(getDistance(s2, 0, 1)).toBeCloseTo(0);
   });
+
+  it("across boundary tests", () => {
+    const s2 = {
+      lattice,
+      sites: [
+        { species: { symbol: "A" }, frac: new Float64Array([0, 0, 0]) },
+        { species: { symbol: "A" }, frac: new Float64Array([0.8, 0, 0]) },
+      ],
+    };
+
+    expect(getDistance(s2, 0, 1)).toBeCloseTo(0.2);
+  });
+
+  it("across boundary tests diag", () => {
+    const s2 = {
+      lattice,
+      sites: [
+        { species: { symbol: "A" }, frac: new Float64Array([0, 0, 0]) },
+        { species: { symbol: "A" }, frac: new Float64Array([0.9, 0.9, 0.9]) },
+      ],
+    };
+
+    // sqrt (3 * (0.1^2 )) = 0.173205
+    expect(getDistance(s2, 0, 1)).toBeCloseTo(0.173205);
+  });
+
+  it("across boundary tests diag", () => {
+    const s2 = {
+      lattice,
+      sites: [
+        { species: { symbol: "A" }, frac: new Float64Array([0, 0, 0]) },
+        { species: { symbol: "A" }, frac: new Float64Array([1.9, 1.9, 1.9]) },
+      ],
+    };
+
+    // sqrt (3 * (0.1^2 )) = 0.173205
+    expect(getDistance(s2, 0, 1)).toBeCloseTo(0.173205);
+  });
 });
