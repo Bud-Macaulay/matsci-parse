@@ -86,7 +86,6 @@ export function toXSF(structure: Structure): string {
 
   for (const site of structure.sites) {
     const c = cartesian(structure.lattice, site);
-
     lines.push(`${site.species.symbol} ${c[0]} ${c[1]} ${c[2]}`);
   }
 
