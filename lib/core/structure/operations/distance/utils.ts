@@ -1,13 +1,15 @@
-export type Vec3 = [number, number, number] | Float64Array | number[];
+export type Vec3 = Float64Array;
 
-export function minimumImage(df: Vec3): Vec3 {
-  return [
+// TODO: these are sort of generic geomtery utils
+// perhaps they would be better served higher up.
+
+export function minimumImage(df: Vec3): Float64Array {
+  return new Float64Array([
     df[0] - Math.round(df[0]),
     df[1] - Math.round(df[1]),
     df[2] - Math.round(df[2]),
-  ];
+  ]);
 }
-
 // flat metric tensor dot product: d^2 = x^T G x
 export function distanceSquared(mic: Vec3, G: Float64Array): number {
   const x = mic[0],
