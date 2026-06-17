@@ -6,6 +6,10 @@ function clean(x: number): number {
   return Math.abs(x) < EPS ? 0 : x;
 }
 
+export interface Lattice {
+  basis: Matrix;
+}
+
 export function createLattice(data: number[] | Float64Array | Matrix): Lattice {
   const values =
     data instanceof Float64Array ? data : "data" in data ? data.data : data;
