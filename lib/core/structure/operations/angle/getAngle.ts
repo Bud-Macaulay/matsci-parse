@@ -1,12 +1,12 @@
 import { Structure } from "../../structure";
 import { metricTensor } from "../../../lattice/metricTensor";
 
-import { Vec3, minimumImage } from "../distance/utils";
+import { Vec3 } from "../distance/utils";
+import { getDisplacement } from "../distance/getDisplacement";
 
-const RAD2DEG = 57.2957795;
+const RAD2DEG = 180 / Math.PI;
 
-// Decide whether this is a fundamental prop
-function metricDot(a: Vec3, b: Vec3, G: number[]) {
+function metricDot(a: Vec3, b: Vec3, G: ArrayLike<number>) {
   return (
     a[0] * (G[0] * b[0] + G[1] * b[1] + G[2] * b[2]) +
     a[1] * (G[3] * b[0] + G[4] * b[1] + G[5] * b[2]) +
@@ -20,38 +20,24 @@ export function getAngle(
   idx2: number,
   idx3: number,
 ): number {
-  const s1 = structure.sites[idx1];
-  const s2 = structure.sites[idx2];
-  const s3 = structure.sites[idx3];
-
-  const v1 = minimumImage([
-    s1.frac[0] - s2.frac[0],
-    s1.frac[1] - s2.frac[1],
-    s1.frac[2] - s2.frac[2],
-  ]);
-
-  const v2 = minimumImage([
-    s3.frac[0] - s2.frac[0],
-    s3.frac[1] - s2.frac[1],
-    s3.frac[2] - s2.frac[2],
-  ]);
+  // vectors from vertex idx2
+  const v1 = getDisplacement(structure, idx2, idx1);
+  const v2 = getDisplacement(structure, idx2, idx3);
 
   const G = metricTensor(structure.lattice).data;
 
-  const vv1 = metricDot(v1, v1, G);
-  const vv2 = metricDot(v2, v2, G);
-  const v1v2 = metricDot(v1, v2, G);
+  const v1Sq = metricDot(v1, v1, G);
+  const v2Sq = metricDot(v2, v2, G);
 
-  if (vv1 === 0 || vv2 === 0) {
-    return 0; // or NaN, but 0 is safer for structural workflows
+  if (v1Sq === 0 || v2Sq === 0) {
+    return 0;
   }
 
-  let cos = v1v2 / Math.sqrt(vv1 * vv2);
+  const dot = metricDot(v1, v2, G);
 
-  // numerical clamp
-  cos = Math.max(-1, Math.min(1, cos));
+  let cosTheta = dot / Math.sqrt(v1Sq * v2Sq);
 
-  const angle = Math.acos(cos);
+  cosTheta = Math.max(-1, Math.min(1, cosTheta));
 
-  return angle * RAD2DEG;
+  return Math.acos(cosTheta) * RAD2DEG;
 }

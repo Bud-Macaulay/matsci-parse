@@ -1,7 +1,8 @@
 import { Structure } from "../../structure";
 import { metricTensor } from "../../../lattice/metricTensor";
 
-import { Vec3, distanceSquared, minimumImage } from "./utils";
+import { distanceSquared } from "./utils";
+import { getDisplacement } from "./getDisplacement";
 
 export function getDistancesMatrix(structure: Structure): Float64Array[] {
   const n = structure.sites.length;
@@ -14,25 +15,12 @@ export function getDistancesMatrix(structure: Structure): Float64Array[] {
   const G = metricTensor(structure.lattice).data;
 
   for (let i = 0; i < n; i++) {
-    const si = structure.sites[i];
+    matrix[i][i] = 0;
 
-    for (let j = i; j < n; j++) {
-      const sj = structure.sites[j];
+    for (let j = i + 1; j < n; j++) {
+      const disp = getDisplacement(structure, i, j);
 
-      if (i === j) {
-        matrix[i][j] = 0;
-        continue;
-      }
-
-      const df: Vec3 = [
-        si.frac[0] - sj.frac[0],
-        si.frac[1] - sj.frac[1],
-        si.frac[2] - sj.frac[2],
-      ];
-
-      const mic = minimumImage(df);
-
-      const d = Math.sqrt(distanceSquared(mic, G));
+      const d = Math.sqrt(distanceSquared(disp, G));
 
       matrix[i][j] = d;
       matrix[j][i] = d;
