@@ -7,3 +7,6 @@ export * from "./io";
 export * from "./units";
 
 export * from "./data";
+
+// for now matrix methods remain private.
+// export * from "./matrix";

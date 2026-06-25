@@ -1,44 +1,15 @@
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import { Structure } from "@/core/structure/structure";
-import { getSymmetry } from "./spglib";
-import { lengths } from "@/core/lattice/lengths";
 import { dot, mul } from "@/core/matrix/operations";
-
-import { Matrix } from "@/core/matrix/matrix";
 
 import { determinant } from "@/core/matrix/operations";
 import { createMatrix } from "@/core/matrix/matrix";
 import { inverse3x3 } from "@/core/matrix/operations/inverse/inverse3x3";
 import { Vector } from "@/core/matrix/vector";
 
-type KPoint = [number, number, number];
-
-interface FacesData {
-  readonly triangleVertices: number[][];
-  readonly triangles: number[][];
-  readonly faces: number[][][];
-}
-
 interface Plane {
   normal: Float64Array;
   offset: number;
-}
-
-interface BrillouinZoneData {
-  readonly b1: number[];
-  readonly b2: number[];
-  readonly b3: number[];
-  readonly hullVertices: Float64Array[];
-  readonly facesData: FacesData;
-  readonly kpoints: Record<string, KPoint>;
-  readonly kpointsRel: Record<string, KPoint>;
-  readonly path: string[][];
-  readonly explicitKpointsRel: KPoint[];
-  readonly explicitKpointsLinearcoord: number[];
-  readonly explicitKpointsLabels: string[];
-  readonly explicitKpointsAbs: KPoint[];
-  readonly explicitSegments: number[][];
-  readonly spgLibStructure: Structure;
 }
 
 function intersectPlanes(
@@ -149,7 +120,7 @@ export async function generateBZVertices(
 
   const uniqueNeighbors = [...map.values()];
 
-  console.log(uniqueNeighbors); // all neighbor recip points
+  // console.log(uniqueNeighbors); // all neighbor recip points
 
   const planes = uniqueNeighbors.slice(0, 26).map((G) => ({
     normal: G,

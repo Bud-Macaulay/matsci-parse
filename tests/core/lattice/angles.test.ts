@@ -10,8 +10,6 @@ describe("angles", () => {
 
     const [a, b, c] = angles(l);
 
-    console.log(angles);
-
     expect(a).toBeCloseTo(Math.PI / 2);
     expect(b).toBeCloseTo(Math.PI / 2);
     expect(c).toBeCloseTo(Math.PI / 2);
