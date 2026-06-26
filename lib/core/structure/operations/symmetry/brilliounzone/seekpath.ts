@@ -44,26 +44,27 @@ function determineExtBravais(
     case "oP":
       return "oP1";
 
-    case "oF":
-      if (1 / a ** 2 - (1 / b ** 2 + 1 / c ** 2) < threshold) {
-        console.warn("oF degeneracy case");
+    case "oF": {
+      const A = 1.0 / a ** 2;
+      const B = 1.0 / b ** 2;
+      const C = 1.0 / c ** 2;
+
+      if (A > B + C) {
+        return "oF1";
       }
 
-      if (1 / c ** 2 - (1 / a ** 2 + 1 / b ** 2) < threshold) {
-        console.warn("oF degeneracy case");
-      }
-
-      if (1 / a ** 2 > 1 / b ** 2 + 1 / c ** 2) return "oF1";
-      if (1 / c ** 2 > 1 / a ** 2 + 1 / b ** 2) return "oF2";
-      return "oF3";
+      if (C > A + B) {
+        return "oF2";
+      } else return "oF3";
+    }
 
     case "oI": {
       const sorted = [
-        { v: c, id: 1, label: "c" },
-        { v: b, id: 3, label: "b" },
-        { v: a, id: 2, label: "a" },
+        { v: c, id: 1 },
+        { v: b, id: 3 },
+        { v: a, id: 2 },
       ]
-        .sort((x, y) => x.v - y.v)
+        .sort((x, y) => x.v - y.v || x.id - y.id)
         .reverse();
 
       if (Math.abs(sorted[0].v - sorted[1].v) < threshold) {
@@ -97,21 +98,20 @@ function determineExtBravais(
       const cosbeta = Math.cos(beta * rad);
       const sinbeta = Math.sin(beta * rad);
 
-      const term1 = b - a * Math.sqrt(1 - sinbeta);
+      const term1 = b - a * Math.sqrt(1 - cosbeta ** 2);
 
       if (Math.abs(term1) < threshold) {
         console.warn("mC near-degeneracy");
       }
 
-      if (b < a * Math.sqrt(1 - sinbeta)) return "mC1";
+      if (b < a * sinbeta) return "mC1";
 
-      const expr = (-a * cosbeta) / c + a ** 2 * (1 - cosbeta ** 2 / b ** 2);
-
+      const expr = (-a * cosbeta) / c + (a ** 2 * (1 - cosbeta ** 2)) / b ** 2;
       if (Math.abs(expr - 1.0) < threshold) {
         console.warn("mC second degeneracy");
       }
 
-      return expr <= 1 ? "mC2" : "mC3";
+      return expr >= 1 ? "mC2" : "mC3";
     }
 
     case "aP":
@@ -129,14 +129,12 @@ export async function getSeekPathHighSymPath(
 ): Promise<null> {
   const symData = await getSymmetry(structure, symTol);
 
+  const conventionalLattice = symData.conventional.lattice;
+  const [a, b, c, alpha, beta, gamma] = parameters(conventionalLattice);
   const spgN = symData.calculationResults.number;
 
   const props = spgroup_data[spgN];
   const bL = `${props[0]}${props[1]}`;
-
-  const [a, b, c, alpha, beta, gamma] = parameters(
-    symData.conventional.lattice,
-  );
 
   const extBrav = determineExtBravais(bL, spgN, a, b, c, alpha, beta, gamma);
 

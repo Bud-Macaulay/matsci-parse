@@ -1,5 +1,6 @@
 // prettier-ignore
 export const spgroup_data = [
+    null, // unused (SG = 0)
     ["a","P", false], ["a","P", true], ["m","P", false], ["m","P", false], 
     ["m","C", false], ["m","P", false], ["m","P", false], ["m","C", false], 
     ["m","C", false], ["m","P", true], ["m","P", true], ["m","C", true], 
