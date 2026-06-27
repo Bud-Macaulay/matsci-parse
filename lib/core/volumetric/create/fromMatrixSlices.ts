@@ -1,7 +1,7 @@
-import { createVolumetricData } from "../volumetric";
 import { Matrix } from "../../matrix";
+import { createVolumetricData } from "../volumetric";
 
-export function fromMatrixSlices(slices: Matrix[], channels = 1) {
+export function fromMatrixSlices(slices: Matrix[]) {
   if (slices.length === 0) {
     throw new Error("No slices provided");
   }
@@ -10,7 +10,7 @@ export function fromMatrixSlices(slices: Matrix[], channels = 1) {
   const W = slices[0].cols;
   const D = slices.length;
 
-  const data = new Float64Array(D * H * W * channels);
+  const data = new Float64Array(D * H * W);
 
   let i = 0;
 
@@ -21,20 +21,12 @@ export function fromMatrixSlices(slices: Matrix[], channels = 1) {
       throw new Error("Inconsistent matrix slice dimensions");
     }
 
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const idx = y * W + x;
-
-        for (let c = 0; c < channels; c++) {
-          data[i++] = m.data[idx]; // assumes scalar matrices
-        }
-      }
-    }
+    data.set(m.data, i);
+    i += m.data.length;
   }
 
   return createVolumetricData({
     shape: [D, H, W],
-    channels,
     data,
   });
 }

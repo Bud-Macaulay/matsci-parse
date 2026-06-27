@@ -11,10 +11,22 @@ export interface VolumetricData {
   readonly metadata?: Record<string, unknown>;
 }
 
+type ReduceAxis = "all" | "channels";
+
+export interface ReduceOptions {
+  axis?: ReduceAxis;
+}
+
 export function createVolumetricData(params: {
   shape: [number, number, number];
   channels?: number;
 
+  /**
+   * Flat voxel-major buffer.
+   *
+   * Layout:
+   * [v000c0, v000c1, ..., v001c0, v001c1, ...]
+   */
   data?: Float64Array | Iterable<number>;
 
   basis?: Matrix;
@@ -58,4 +70,17 @@ export function createVolumetricData(params: {
     field,
     metadata,
   };
+}
+
+export function index(
+  vol: VolumetricData,
+  x: number,
+  y: number,
+  z: number,
+  c: number,
+) {
+  const [D, H, W] = vol.shape;
+  const { channels } = vol;
+
+  return ((z * H + y) * W + x) * channels + c;
 }
