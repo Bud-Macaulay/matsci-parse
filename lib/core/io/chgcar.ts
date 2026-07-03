@@ -1,13 +1,11 @@
 import { Structure } from "../structure/structure";
-import { createLattice } from "../lattice/lattice";
 import { VolumetricData, createVolumetricData } from "../volumetric/volumetric";
-import { Site } from "../site/site";
-import { Species } from "../species/species";
-import { Matrix } from "../matrix/matrix";
+import { Matrix, identity } from "../matrix/matrix";
+import { fromPOSCAR } from "./poscar";
 
 export interface CHGCAROptions {
-  includeAugmentation?: boolean;
   spinChannel?: "total" | "up" | "down" | "magnetization";
+  includeAugmentation?: boolean;
 }
 
 export function fromCHGCAR(
@@ -19,269 +17,142 @@ export function fromCHGCAR(
   magnetization?: VolumetricData[];
 } {
   const lines = text.split("\n");
-  let lineIndex = 0;
 
-  // Parse structure block (POSCAR format)
-  const structure = parseStructureBlock(lines, lineIndex);
-  lineIndex = structure.lineIndex;
+  // Find where the POSCAR part ends (after the coordinates)
+  // The POSCAR part ends when we hit the grid dimensions (3 integers)
+  let gridLineIndex = -1;
 
-  // Parse first FFT grid dimensions
-  let gridLine = lines[lineIndex++].trim();
-  while (gridLine === "" && lineIndex < lines.length) {
-    gridLine = lines[lineIndex++].trim();
+  // We need to find the first line with 3 integers (NGX, NGY, NGZ)
+  // This marks the end of the POSCAR structure block
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line === "") continue;
+
+    const parts = line.split(/\s+/).map(Number);
+    // If we have 3 integers, this is the grid line
+    if (
+      parts.length === 3 &&
+      parts.every((p) => Number.isInteger(p) && p > 0)
+    ) {
+      gridLineIndex = i;
+      break;
+    }
   }
-  const gridParts = gridLine.split(/\s+/).map(Number);
-  const ngx = gridParts[0];
-  const ngy = gridParts[1];
-  const ngz = gridParts[2];
 
-  // Parse charge density data
+  if (gridLineIndex === -1) {
+    throw new Error("Could not find grid dimensions (NGX, NGY, NGZ) in CHGCAR");
+  }
+
+  // Get the POSCAR part (lines before the grid)
+  const poscarLines = lines.slice(0, gridLineIndex);
+  const poscarText = poscarLines.join("\n");
+
+  // Parse the structure using the existing fromPOSCAR function
+  const structure = fromPOSCAR(poscarText);
+
+  // Parse grid dimensions
+  const gridParts = lines[gridLineIndex].trim().split(/\s+/).map(Number);
+  const [ngx, ngy, ngz] = gridParts;
   const totalGridPoints = ngx * ngy * ngz;
-  const chargeData = parseVolumetricBlock(lines, lineIndex, totalGridPoints);
-  lineIndex = chargeData.lineIndex;
 
-  // Parse augmentation occupancies (skip for now)
-  lineIndex = skipAugmentationBlock(lines, lineIndex);
+  // Parse the volumetric data (after the grid line)
+  const dataValues: number[] = [];
+  let lineIndex = gridLineIndex + 1;
 
-  // Check for magnetization data (spin-polarized or noncollinear)
-  const magnetizationData: VolumetricData[] = [];
-  let hasMagnetization = false;
+  // Skip augmentation occupancies if present
+  // We'll collect all numbers until we either:
+  // 1. Have enough data for the grid
+  // 2. Hit another grid line (for magnetization)
+  // 3. Reach end of file
 
-  // Try to read next grid dimensions for magnetization
-  let nextLine = lines[lineIndex]?.trim();
-  while (nextLine === "" && lineIndex < lines.length) {
-    lineIndex++;
-    nextLine = lines[lineIndex]?.trim();
-  }
-
-  if (nextLine && /^\s*\d+\s+\d+\s+\d+\s*$/.test(nextLine)) {
-    hasMagnetization = true;
-    const magGridParts = nextLine.split(/\s+/).map(Number);
-    const magNgx = magGridParts[0];
-    const magNgy = magGridParts[1];
-    const magNgz = magGridParts[2];
-    lineIndex++; // Consume grid line
-
-    const magTotalPoints = magNgx * magNgy * magNgz;
-    const magResult = parseVolumetricBlock(lines, lineIndex, magTotalPoints);
-
-    // Create magnetization volumetric data
-    const magVol = createVolumetricDataFromCHGCAR(
-      magResult.data,
-      [magNgx, magNgy, magNgz],
-      structure.latticeVectors,
-      options.spinChannel || "magnetization",
-      true, // is magnetization
-    );
-    magnetizationData.push(magVol);
-    lineIndex = magResult.lineIndex;
-  }
-
-  // Create the main volumetric data
-  const volumetric = createVolumetricDataFromCHGCAR(
-    chargeData.data,
-    [ngx, ngy, ngz],
-    structure.latticeVectors,
-    options.spinChannel || "total",
-    false, // is magnetization
-  );
-
-  return {
-    volumetric,
-    structure: structure.structure,
-    ...(magnetizationData.length > 0 && { magnetization: magnetizationData }),
-  };
-}
-
-interface StructureParseResult {
-  structure: Structure;
-  latticeVectors: number[][];
-  lineIndex: number;
-}
-
-function parseStructureBlock(
-  lines: string[],
-  startIndex: number,
-): StructureParseResult {
-  let lineIndex = startIndex;
-
-  // Parse header comment (line 1)
-  const comment = lines[lineIndex++].trim();
-
-  // Parse scaling factor (line 2)
-  const scalingFactor = parseFloat(lines[lineIndex++]);
-
-  // Parse lattice vectors (lines 3-5)
-  const latticeVectors: number[][] = [];
-  for (let i = 0; i < 3; i++) {
-    const parts = lines[lineIndex++].trim().split(/\s+/).map(Number);
-    latticeVectors.push(parts);
-  }
-
-  // Apply scaling factor to lattice vectors
-  const scaledLatticeVectors = latticeVectors.map((row) =>
-    row.map((val) => val * scalingFactor),
-  );
-
-  // Parse atomic species and counts
-  let speciesNames: string[] = [];
-  let speciesCounts: number[] = [];
-
-  let speciesLine = lines[lineIndex++].trim().split(/\s+/);
-
-  // Check if this line contains species names or counts
-  if (speciesLine.some((part) => isNaN(Number(part)))) {
-    speciesNames.push(...speciesLine);
-    const countsLine = lines[lineIndex++].trim().split(/\s+/).map(Number);
-    speciesCounts.push(...countsLine);
-  } else {
-    const counts = speciesLine.map(Number);
-    const namesLine = lines[lineIndex++].trim().split(/\s+/);
-    speciesNames.push(...namesLine);
-    speciesCounts.push(...counts);
-  }
-
-  // Parse coordinate mode
-  let coordMode = lines[lineIndex++].trim();
-  if (coordMode.toLowerCase().startsWith("d")) {
-    coordMode = "Direct";
-  } else if (
-    coordMode.toLowerCase().startsWith("c") ||
-    coordMode.toLowerCase().startsWith("k")
-  ) {
-    coordMode = "Cartesian";
-  }
-
-  // Parse atomic coordinates
-  const totalAtoms = speciesCounts.reduce((a, b) => a + b, 0);
-  const coordinates: number[][] = [];
-  for (let i = 0; i < totalAtoms; i++) {
-    const parts = lines[lineIndex++].trim().split(/\s+/).map(Number);
-    coordinates.push(parts);
-  }
-
-  // Build structure
-  const structure = buildStructure(
-    scaledLatticeVectors,
-    speciesNames,
-    speciesCounts,
-    coordinates,
-    coordMode,
-  );
-
-  return {
-    structure,
-    latticeVectors: scaledLatticeVectors,
-    lineIndex,
-  };
-}
-
-function parseVolumetricBlock(
-  lines: string[],
-  startIndex: number,
-  totalPoints: number,
-): { data: number[]; lineIndex: number } {
-  const data: number[] = [];
-  let lineIndex = startIndex;
-
-  while (data.length < totalPoints && lineIndex < lines.length) {
+  while (lineIndex < lines.length && dataValues.length < totalGridPoints) {
     const line = lines[lineIndex++].trim();
     if (line === "") continue;
-    const values = line.split(/\s+/).map(Number);
-    data.push(...values);
-  }
 
-  return { data, lineIndex };
-}
-
-function skipAugmentationBlock(lines: string[], startIndex: number): number {
-  let lineIndex = startIndex;
-
-  // Augmentation occupancies are written with 5 values per line
-  // We need to skip until we hit either:
-  // 1. A line with 3 integers (next grid)
-  // 2. End of file
-  while (lineIndex < lines.length) {
-    const line = lines[lineIndex].trim();
-    if (line === "") {
-      lineIndex++;
-      continue;
-    }
-
-    // Check if this looks like grid dimensions (3 integers)
-    const parts = line.split(/\s+/);
-    if (parts.length === 3 && parts.every((p) => /^\d+$/.test(p))) {
+    // Check if this line could be another grid line (3 integers)
+    const parts = line.split(/\s+/).map(Number);
+    if (
+      parts.length === 3 &&
+      parts.every((p) => Number.isInteger(p) && p > 0)
+    ) {
+      // This is likely a new grid for magnetization
       break;
     }
 
-    // Check if we're at end of file or next block is empty
-    if (lineIndex + 1 < lines.length && lines[lineIndex + 1].trim() === "") {
-      // Check if the line after next is grid dimensions
-      if (lineIndex + 2 < lines.length) {
-        const nextNext = lines[lineIndex + 2].trim().split(/\s+/);
-        if (nextNext.length === 3 && nextNext.every((p) => /^\d+$/.test(p))) {
-          break;
-        }
-      }
-    }
-
-    lineIndex++;
+    const values = line.split(/\s+/).map(Number);
+    dataValues.push(...values);
   }
 
-  return lineIndex;
-}
+  // Get the lattice vectors from the structure
+  // The basis from the lattice is already in the correct format
+  const basis = structure.lattice.basis;
 
-function buildStructure(
-  latticeVectors: number[][],
-  speciesNames: string[],
-  speciesCounts: number[],
-  coordinates: number[][],
-  coordMode: string,
-): Structure {
-  // Create lattice from vectors
-  const lattice = createLattice(
-    latticeVectors[0],
-    latticeVectors[1],
-    latticeVectors[2],
+  // Create the volumetric data
+  const volumetric = createVolumetricDataFromCHGCAR(
+    dataValues,
+    [ngx, ngy, ngz],
+    basis,
+    options.spinChannel || "total",
+    false,
   );
 
-  // Build sites
-  const sites: Site[] = [];
-  let atomIndex = 0;
+  // Check if there's magnetization data (spin-polarized case)
+  const magnetization: VolumetricData[] = [];
+  if (lineIndex < lines.length) {
+    // Try to read magnetization grid
+    const nextLine = lines[lineIndex].trim();
+    if (nextLine) {
+      const parts = nextLine.split(/\s+/).map(Number);
+      if (
+        parts.length === 3 &&
+        parts.every((p) => Number.isInteger(p) && p > 0)
+      ) {
+        // We found a second grid - this is spin-polarized
+        const [magNgx, magNgy, magNgz] = parts;
+        const magTotalPoints = magNgx * magNgy * magNgz;
+        lineIndex++;
 
-  for (let i = 0; i < speciesNames.length; i++) {
-    const speciesName = speciesNames[i];
-    const count = speciesCounts[i];
+        const magData: number[] = [];
+        while (lineIndex < lines.length && magData.length < magTotalPoints) {
+          const line = lines[lineIndex++].trim();
+          if (line === "") continue;
 
-    for (let j = 0; j < count; j++) {
-      const coord = coordinates[atomIndex++];
+          // Check if we hit another grid
+          const parts = line.split(/\s+/).map(Number);
+          if (
+            parts.length === 3 &&
+            parts.every((p) => Number.isInteger(p) && p > 0)
+          ) {
+            break;
+          }
 
-      let fracCoord: [number, number, number];
-      if (coordMode === "Cartesian") {
-        // Convert Cartesian to fractional using inverse lattice
-        // For CHGCAR, coordinates are usually fractional (Direct)
-        // but we handle both cases
-        const invLattice = Matrix.fromArray(latticeVectors).inverse();
-        const cart = Matrix.fromArray([coord]);
-        const frac = invLattice.multiply(cart.transpose());
-        fracCoord = [frac.get(0, 0), frac.get(1, 0), frac.get(2, 0)];
-      } else {
-        fracCoord = [coord[0], coord[1], coord[2]];
+          const values = line.split(/\s+/).map(Number);
+          magData.push(...values);
+        }
+
+        const magVol = createVolumetricDataFromCHGCAR(
+          magData,
+          [magNgx, magNgy, magNgz],
+          basis,
+          "magnetization",
+          true,
+        );
+        magnetization.push(magVol);
       }
-
-      const species = new Species(speciesName);
-      const site = new Site(species, fracCoord, lattice);
-      sites.push(site);
     }
   }
 
-  return { lattice, sites };
+  return {
+    volumetric,
+    structure,
+    ...(magnetization.length > 0 && { magnetization }),
+  };
 }
 
 function createVolumetricDataFromCHGCAR(
   dataValues: number[],
   grid: [number, number, number],
-  latticeVectors: number[][],
+  basis: Matrix,
   fieldType: string,
   isMagnetization: boolean,
 ): VolumetricData {
@@ -297,15 +168,12 @@ function createVolumetricDataFromCHGCAR(
         ]
       : dataValues.slice(0, totalGridPoints);
 
-  // CHGCAR stores data as: NX fastest, then NY, then NZ
-  // Our VolumetricData expects: x fastest, then y, then z
-  // So no reordering needed! The index function: ((z * H + y) * W + x) * channels + c
-  // matches CHGCAR ordering where x varies fastest, then y, then z
-
-  // Calculate cell volume
-  const a = latticeVectors[0];
-  const b = latticeVectors[1];
-  const c = latticeVectors[2];
+  // Calculate cell volume from basis
+  // The basis matrix columns are the lattice vectors
+  const basisData = basis.data;
+  const a = [basisData[0], basisData[1], basisData[2]];
+  const b = [basisData[3], basisData[4], basisData[5]];
+  const c = [basisData[6], basisData[7], basisData[8]];
 
   // Cross product b × c
   const crossBc = [
@@ -326,19 +194,11 @@ function createVolumetricDataFromCHGCAR(
   const scaleFactor = 1.0 / (gridVolume * cellVolume);
   const scaledData = paddedData.map((val) => val * scaleFactor);
 
-  // Create basis matrix from lattice vectors
-  // The basis should be a 3x3 matrix where columns are lattice vectors
-  const basis = Matrix.fromArray([
-    [latticeVectors[0][0], latticeVectors[1][0], latticeVectors[2][0]],
-    [latticeVectors[0][1], latticeVectors[1][1], latticeVectors[2][1]],
-    [latticeVectors[0][2], latticeVectors[1][2], latticeVectors[2][2]],
-  ]);
-
   const fieldName = isMagnetization
     ? `magnetization_${fieldType}`
     : `charge_density_${fieldType}`;
 
-  // Create volumetric data
+  // Create volumetric data using the existing createVolumetricData function
   return createVolumetricData({
     shape: [ngx, ngy, ngz],
     channels: 1,
@@ -355,6 +215,8 @@ function createVolumetricDataFromCHGCAR(
       gridVolume,
       scalingFactor: scaleFactor,
       fieldType,
+      dataPointsRead: dataValues.length,
+      dataPadded: dataValues.length < totalGridPoints,
     },
   });
 }
