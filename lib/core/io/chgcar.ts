@@ -208,15 +208,13 @@ function createVolumetricDataFromCHGCAR(
     field: fieldName,
     metadata: {
       source: "CHGCAR",
-      grid: [ngx, ngy, ngz],
-      totalPoints: totalGridPoints,
-      isMagnetization,
-      cellVolume,
-      gridVolume,
-      scalingFactor: scaleFactor,
-      fieldType,
-      dataPointsRead: dataValues.length,
-      dataPadded: dataValues.length < totalGridPoints,
+      sourceGrid: [ngx, ngy, ngz],
+      sourceTotalPoints: totalGridPoints,
+      sourceMagnetization: isMagnetization,
+      sourceCellVolume: cellVolume,
+      sourceGridVolume: gridVolume,
+      sourceFieldType: fieldType,
+      sourceDataPointsRead: dataValues.length,
     },
   });
 }
