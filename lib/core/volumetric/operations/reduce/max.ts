@@ -1,4 +1,4 @@
-import { ReduceOptions, VolumetricData } from "../volumetric";
+import { ReduceOptions, VolumetricData } from "../../volumetric";
 
 export function max(
   vol: VolumetricData,

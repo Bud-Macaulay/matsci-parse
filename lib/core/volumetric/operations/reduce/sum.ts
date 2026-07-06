@@ -1,4 +1,4 @@
-import { VolumetricData, ReduceOptions } from "../volumetric";
+import { VolumetricData, ReduceOptions } from "../../volumetric";
 
 export function sum(
   vol: VolumetricData,

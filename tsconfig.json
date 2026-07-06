@@ -11,6 +11,7 @@
     "outDir": "dist",
     "declaration": true,
     "types": ["vitest/globals", "node"],
+
     "paths": {
       "@/*": ["./lib/*"]
     }

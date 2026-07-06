@@ -1,4 +1,4 @@
-import { VolumetricData } from "../volumetric";
+import { VolumetricData } from "../../volumetric";
 
 export function zip(
   a: VolumetricData,

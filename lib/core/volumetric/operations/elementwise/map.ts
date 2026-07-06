@@ -1,4 +1,4 @@
-import { VolumetricData } from "../volumetric";
+import { VolumetricData } from "../../volumetric";
 
 export function map(
   vol: VolumetricData,
