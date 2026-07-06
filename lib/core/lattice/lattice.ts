@@ -10,21 +10,33 @@ export interface Lattice {
   basis: Matrix;
 }
 
-export function createLattice(data: number[] | Float64Array | Matrix): Lattice {
+export function createLattice(
+  data: number[] | Float64Array | Matrix | [number, number, number],
+): Lattice {
   const values =
-    data instanceof Float64Array ? data : "data" in data ? data.data : data;
+    data instanceof Float64Array
+      ? Array.from(data)
+      : "data" in data
+        ? Array.from(data.data)
+        : data;
 
-  if (values.length !== 9) {
-    throw new Error("Lattice requires 9 values (3x3)");
-  }
+  let m: Float64Array;
 
-  const cleaned = new Float64Array(9);
+  if (values.length === 3) {
+    const [a, b, c] = values;
 
-  for (let i = 0; i < 9; i++) {
-    cleaned[i] = clean(values[i]);
+    m = new Float64Array([a, 0, 0, 0, b, 0, 0, 0, c]);
+  } else if (values.length === 9) {
+    m = new Float64Array(9);
+
+    for (let i = 0; i < 9; i++) {
+      m[i] = clean(values[i]);
+    }
+  } else {
+    throw new Error("Lattice requires 3 or 9 values");
   }
 
   return {
-    basis: createMatrix(3, 3, cleaned),
+    basis: createMatrix(3, 3, m),
   };
 }

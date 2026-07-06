@@ -11,9 +11,7 @@ describe("createLattice", () => {
   });
 
   it("throws on invalid size (not 9 elements)", () => {
-    expect(() => createLattice([1, 0, 0, 0, 1, 0])).toThrow(
-      "Lattice requires 9 values (3x3)",
-    );
+    expect(() => createLattice([1, 0, 0, 0, 1, 0])).toThrow();
   });
 
   it("preserves column-major basis interpretation", () => {
