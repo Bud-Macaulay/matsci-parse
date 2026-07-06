@@ -3,6 +3,9 @@
 // NOTE: GROMACS stores all lengths (coordinates and box vectors) in nm.
 // Internally matsci-parse uses Å.
 
+// Its common convention for GROMACs to use Hw or Ow for water, we dont try to fix this at-all
+// therefore cross format parsing (to a software that needs elemental indication) will probably fail.
+
 import { createLattice } from "../lattice";
 import { cartesian } from "../site";
 import { fractional } from "../site/fractional";
