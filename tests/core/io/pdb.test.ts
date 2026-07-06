@@ -24,11 +24,11 @@ describe("PDB round-trip fixtures", () => {
       const a = fromPDB(text);
 
       // DEBUG: write POSCAR from parsed structure
-      const poscar = toPOSCAR(a, {
-        title: `PDB fixture: ${name}`,
-      });
+      // const poscar = toPOSCAR(a, {
+      //   title: `PDB fixture: ${name}`,
+      // });
 
-      writeFile(`${name}.vasp`, poscar);
+      // writeFile(`${name}.vasp`, poscar);
 
       const text1 = toPDB(a);
       const b = fromPDB(text1);
@@ -39,6 +39,7 @@ describe("PDB round-trip fixtures", () => {
 
       expect(c.sites.length).toBe(a.sites.length);
 
+      // if its round trip-able we presume its valid as a parser
       for (let i = 0; i < a.sites.length; i++) {
         expect(c.sites[i].species.symbol).toBe(a.sites[i].species.symbol);
 
