@@ -105,6 +105,7 @@ export function fromPOSCAR(text: string): Structure {
   return {
     lattice,
     sites,
+    _cursorEnd: cursor,
   };
 }
 

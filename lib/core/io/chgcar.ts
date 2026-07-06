@@ -8,6 +8,8 @@ export interface CHGCAROptions {
   includeAugmentation?: boolean;
 }
 
+// Currently only supports the first channel ... which is perhaps not the best...
+// TODO: fix this to support multichannel
 export function fromCHGCAR(
   text: string,
   options: CHGCAROptions = {},
@@ -16,54 +18,37 @@ export function fromCHGCAR(
   structure: Structure;
   magnetization?: VolumetricData[];
 } {
-  const lines = text.split("\n");
-
-  // Find where the POSCAR part ends (after the coordinates)
-  // The POSCAR part ends when we hit the grid dimensions (3 integers)
-  let gridLineIndex = -1;
-
-  // We need to find the first line with 3 integers (NGX, NGY, NGZ)
-  // This marks the end of the POSCAR structure block
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line === "") continue;
-
-    const parts = line.split(/\s+/).map(Number);
-    // If we have 3 integers, this is the grid line
-    if (
-      parts.length === 3 &&
-      parts.every((p) => Number.isInteger(p) && p > 0)
-    ) {
-      gridLineIndex = i;
-      break;
-    }
-  }
-
-  if (gridLineIndex === -1) {
-    throw new Error("Could not find grid dimensions (NGX, NGY, NGZ) in CHGCAR");
-  }
-
-  // Get the POSCAR part (lines before the grid)
-  const poscarLines = lines.slice(0, gridLineIndex);
-  const poscarText = poscarLines.join("\n");
+  const structure = fromPOSCAR(text);
+  const lines = text.split("\n").map((l) => l.trim());
 
   // Parse the structure using the existing fromPOSCAR function
-  const structure = fromPOSCAR(poscarText);
+  const cursorEnd = structure._cursorEnd;
 
-  // Parse grid dimensions
-  const gridParts = lines[gridLineIndex].trim().split(/\s+/).map(Number);
+  if (cursorEnd == null) {
+    throw new Error("POSCAR parser did not return cursor position");
+  }
+
+  let lineIndex = structure._cursorEnd as number;
+
+  // skip empty lines safely
+  while (lineIndex < lines.length && lines[lineIndex] === "") {
+    lineIndex++;
+  }
+
+  const gridParts = lines[lineIndex++].split(/\s+/).map(Number);
+
+  if (
+    gridParts.length !== 3 ||
+    !gridParts.every((p) => Number.isInteger(p) && p > 0)
+  ) {
+    throw new Error("Invalid CHGCAR grid dimensions");
+  }
+
   const [ngx, ngy, ngz] = gridParts;
   const totalGridPoints = ngx * ngy * ngz;
 
   // Parse the volumetric data (after the grid line)
   const dataValues: number[] = [];
-  let lineIndex = gridLineIndex + 1;
-
-  // Skip augmentation occupancies if present
-  // We'll collect all numbers until we either:
-  // 1. Have enough data for the grid
-  // 2. Hit another grid line (for magnetization)
-  // 3. Reach end of file
 
   while (lineIndex < lines.length && dataValues.length < totalGridPoints) {
     const line = lines[lineIndex++].trim();
@@ -75,7 +60,6 @@ export function fromCHGCAR(
       parts.length === 3 &&
       parts.every((p) => Number.isInteger(p) && p > 0)
     ) {
-      // This is likely a new grid for magnetization
       break;
     }
 
@@ -159,14 +143,12 @@ function createVolumetricDataFromCHGCAR(
   const [ngx, ngy, ngz] = grid;
   const totalGridPoints = ngx * ngy * ngz;
 
-  // Pad with zeros if data is incomplete
-  const paddedData =
-    dataValues.length < totalGridPoints
-      ? [
-          ...dataValues,
-          ...new Array(totalGridPoints - dataValues.length).fill(0),
-        ]
-      : dataValues.slice(0, totalGridPoints);
+  // Throw if the number of gridpoints do not match
+  if (dataValues.length !== totalGridPoints) {
+    throw new Error(
+      `CHGCAR grid contains ${dataValues.length} values, expected ${totalGridPoints}.`,
+    );
+  }
 
   // Calculate cell volume from basis
   // The basis matrix columns are the lattice vectors
@@ -192,7 +174,10 @@ function createVolumetricDataFromCHGCAR(
   // Convert data to proper charge density units (1/Å³)
   // n(r) = data(r) / (V_grid * V_cell)
   const scaleFactor = 1.0 / (gridVolume * cellVolume);
-  const scaledData = paddedData.map((val) => val * scaleFactor);
+  const scaledData = new Float64Array(totalGridPoints);
+  for (let i = 0; i < totalGridPoints; i++) {
+    scaledData[i] = dataValues[i] * scaleFactor;
+  }
 
   const fieldName = isMagnetization
     ? `magnetization_${fieldType}`
