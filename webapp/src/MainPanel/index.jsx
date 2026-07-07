@@ -10,6 +10,7 @@ import {
   replaceSite,
   removeSite,
   replaceSites,
+  removeSites,
   findSitesBySpecies,
 } from "matsci-parse";
 
@@ -31,6 +32,14 @@ function replaceSpecies(structure, oldSpecies, newSpecies) {
       },
     })),
   );
+}
+
+function removeSpecies(structure, species) {
+  const indices = findSitesBySpecies(structure, {
+    symbol: species,
+  });
+
+  return removeSites(structure, indices);
 }
 
 export default function MainPanel({ tab, updateTab }) {
@@ -92,6 +101,19 @@ export default function MainPanel({ tab, updateTab }) {
     });
 
     const newStructure = replaceSpecies(structure, oldSpecies, newSpecies);
+
+    setStructure(newStructure);
+  };
+
+  const removeAllSpecies = (species) => {
+    pushUndo({
+      action: "remove-species",
+      label: `Removed all ${species}`,
+    });
+
+    const newStructure = removeSpecies(structure, species);
+
+    console.log(newStructure);
 
     setStructure(newStructure);
   };
@@ -186,20 +208,33 @@ export default function MainPanel({ tab, updateTab }) {
         <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4">
           <div className="flex justify-between items-center text-[12px]">
             <span className="text-sm">Atoms ({structure.sites.length})</span>
-            <button
-              onClick={() => {
-                const oldSp = prompt("Replace species:");
-                if (!oldSp) return;
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const oldSp = prompt("Remove species:");
+                  if (!oldSp) return;
 
-                const newSp = prompt(`Replace ${oldSp} with:`);
-                if (!newSp) return;
+                  removeAllSpecies(oldSp);
+                }}
+                className="buttonSimple red"
+              >
+                Remove Species
+              </button>
+              <button
+                onClick={() => {
+                  const oldSp = prompt("Replace species:");
+                  if (!oldSp) return;
 
-                replaceAllSpecies(oldSp, newSp);
-              }}
-              className="buttonSimple gray"
-            >
-              Replace Species
-            </button>
+                  const newSp = prompt(`Replace ${oldSp} with:`);
+                  if (!newSp) return;
+
+                  replaceAllSpecies(oldSp, newSp);
+                }}
+                className="buttonSimple gray"
+              >
+                Replace Species
+              </button>
+            </div>
           </div>
           {/* ATOMS TABLE (max 2/3) */}
           <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[25%]">
