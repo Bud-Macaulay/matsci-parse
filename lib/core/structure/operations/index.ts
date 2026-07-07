@@ -6,3 +6,4 @@ export * from "./symmetry";
 export * from "./supercell";
 
 export * from "./distance";
+export * from "./query";

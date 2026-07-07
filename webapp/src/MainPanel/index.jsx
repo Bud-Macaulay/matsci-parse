@@ -6,7 +6,32 @@ import StructureDownload from "../common/structureDownload";
 import SymmetrySubpanel from "./SymmetrySubPanel";
 import TransformLatticePanel from "./TransformLatticePanel";
 
-import { replaceSite, removeSite } from "matsci-parse";
+import {
+  replaceSite,
+  removeSite,
+  replaceSites,
+  findSitesBySpecies,
+} from "matsci-parse";
+
+function replaceSpecies(structure, oldSpecies, newSpecies) {
+  const indices = findSitesBySpecies(
+    structure,
+    structure.sites.find((s) => s.species.symbol === oldSpecies)?.species,
+  );
+
+  return replaceSites(
+    structure,
+    indices.map((index) => ({
+      index,
+      site: {
+        ...structure.sites[index],
+        species: {
+          symbol: newSpecies,
+        },
+      },
+    })),
+  );
+}
 
 export default function MainPanel({ tab, updateTab }) {
   if (!tab) return null;
@@ -56,6 +81,17 @@ export default function MainPanel({ tab, updateTab }) {
     });
 
     const newStructure = removeSite(structure, idx);
+
+    setStructure(newStructure);
+  };
+
+  const replaceAllSpecies = (oldSpecies, newSpecies) => {
+    pushUndo({
+      action: "replace-species",
+      label: `Replaced ${oldSpecies} with ${newSpecies}`,
+    });
+
+    const newStructure = replaceSpecies(structure, oldSpecies, newSpecies);
 
     setStructure(newStructure);
   };
@@ -148,6 +184,23 @@ export default function MainPanel({ tab, updateTab }) {
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* LEFT COLUMN (atoms + lattice) */}
         <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4">
+          <div className="flex justify-between items-center text-[12px]">
+            <span className="text-sm">Atoms ({structure.sites.length})</span>
+            <button
+              onClick={() => {
+                const oldSp = prompt("Replace species:");
+                if (!oldSp) return;
+
+                const newSp = prompt(`Replace ${oldSp} with:`);
+                if (!newSp) return;
+
+                replaceAllSpecies(oldSp, newSp);
+              }}
+              className="buttonSimple gray"
+            >
+              Replace Species
+            </button>
+          </div>
           {/* ATOMS TABLE (max 2/3) */}
           <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[25%]">
             <div className="overflow-y-auto">
