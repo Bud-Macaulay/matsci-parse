@@ -22,3 +22,9 @@ describe("fromParameters", () => {
     }
   });
 });
+
+it("throws for gamma close to 180 degrees", () => {
+  expect(() => fromParameters(2, 2, 2, 90, 90, 180)).toThrow(
+    "Invalid lattice: gamma too close to 0 or 180 degrees",
+  );
+});

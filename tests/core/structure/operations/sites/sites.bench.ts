@@ -52,6 +52,25 @@ describe("500 site edits", () => {
     insertSites(structure, 0, sites);
   });
 
+  bench("replace 500", () => {
+    let s = structure;
+
+    for (let i = 0; i < 500; i++) {
+      const index = i % s.sites.length;
+      s = replaceSite(s, index, site);
+    }
+  });
+
+  bench("replaceSites 500", () => {
+    replaceSites(
+      structure,
+      Array.from({ length: 500 }, (_, i) => ({
+        index: i,
+        site,
+      })),
+    );
+  });
+
   bench("remove 500", () => {
     let s = structure;
 
