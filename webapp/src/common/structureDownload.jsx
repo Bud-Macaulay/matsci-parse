@@ -1,14 +1,44 @@
 import { useState, useRef, useEffect } from "react";
 
-import { toXYZ, toPOSCAR, toXSF, toCIF } from "matsci-parse";
+import { toXYZ, toPOSCAR, toXSF, toCIF, toGRO, toPDB } from "matsci-parse";
 
-const defaultFormats = [
-  { format: "json", label: "JSON" },
-  { format: "cif", label: "CIF" },
-  { format: "xyz", label: "XYZ" },
-  { format: "xsf", label: "XSF" },
-  { format: "poscar", label: "VASP" },
-];
+const formatHandlers = {
+  json: {
+    label: "JSON",
+    extension: "json",
+    serialize: (structure) => JSON.stringify(structure, null, 2),
+  },
+  cif: {
+    label: "CIF",
+    extension: "cif",
+    serialize: toCIF,
+  },
+  xyz: {
+    label: "XYZ",
+    extension: "xyz",
+    serialize: toXYZ,
+  },
+  xsf: {
+    label: "XSF",
+    extension: "xsf",
+    serialize: toXSF,
+  },
+  poscar: {
+    label: "VASP",
+    extension: "vasp",
+    serialize: toPOSCAR,
+  },
+  // gro: {
+  //   label: "GROMACS",
+  //   extension: "gro",
+  //   serialize: toGRO,
+  // },
+  // pdb: {
+  //   label: "PDB",
+  //   extension: "pdb",
+  //   serialize: toPDB,
+  // },
+};
 
 export function DownloadIcon({ size = 14, className = "" }) {
   return (
@@ -49,30 +79,26 @@ export default function StructureDownload({ structure, download_formats }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
-  const downloadFormats = download_formats || defaultFormats;
+  const downloadFormats =
+    download_formats ??
+    Object.entries(formatHandlers).map(([format, { label }]) => ({
+      format,
+      label,
+    }));
 
   const handleDownload = (format) => {
-    let content = "";
-    let filename = "structure";
+    const handler = formatHandlers[format];
 
-    if (format === "cif") {
-      content = toCIF(structure);
-      filename += ".cif";
-    } else if (format === "xyz") {
-      content = toXYZ(structure);
-      filename += ".xyz";
-    } else if (format === "poscar") {
-      content = toPOSCAR(structure);
-      filename += ".vasp";
-    } else if (format === "xsf") {
-      content = toXSF(structure);
-      filename += ".xsf";
-    } else if (format === "json") {
-      content = JSON.stringify(structure, null, 2);
-      filename += ".json";
+    if (!handler) {
+      console.warn(`Unsupported format: ${format}`);
+      return;
     }
 
-    if (content) downloadFile(content, filename);
+    downloadFile(
+      handler.serialize(structure),
+      `structure.${handler.extension}`,
+    );
+
     setOpen(false);
   };
 
