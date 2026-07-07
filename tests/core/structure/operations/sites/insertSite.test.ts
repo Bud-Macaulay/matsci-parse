@@ -1,24 +1,9 @@
-import { Structure } from "../../structure";
-import { Site } from "../../../site/site";
-
-export function insertSite(
-  structure: Structure,
-  index: number,
-  site: Site,
-): Structure {
-  return {
-    ...structure,
-    sites: [
-      ...structure.sites.slice(0, index),
-      site,
-      ...structure.sites.slice(index),
-    ],
-  };
-}
 import { describe, it, expect } from "vitest";
-import { appendSite } from "@/core/structure/operations/sites/appendSite";
+import { insertSite } from "@/core/structure/operations/sites/insertSite";
 
-describe("appendSite", () => {
+// TODO: improve this test
+
+describe("insertSite", () => {
   it("adds a site at the end", () => {
     const structure = {
       lattice: {},
@@ -27,7 +12,7 @@ describe("appendSite", () => {
 
     const site = { species: "B", frac: [0.5, 0.5, 0.5] };
 
-    const result = appendSite(structure, site);
+    const result = insertSite(structure, 1, site);
 
     expect(result.sites).toHaveLength(2);
     expect(result.sites[1]).toEqual(site);
@@ -41,7 +26,37 @@ describe("appendSite", () => {
 
     const site = { species: "A", frac: [0, 0, 0] };
 
-    const result = appendSite(structure, site);
+    const result = insertSite(structure, 0, site);
+
+    expect(structure.sites).toHaveLength(0);
+    expect(result.sites).toHaveLength(1);
+  });
+
+  it("adds a site in middle", () => {
+    const siteA = { species: "A", frac: [0, 0, 0] };
+    const siteB = { species: "B", frac: [0.5, 0.5, 0.5] };
+    const siteC = { species: "C", frac: [0.25, 0.25, 0.25] };
+
+    const structure = {
+      lattice: {},
+      sites: [siteA, siteC],
+    };
+
+    const result = insertSite(structure, 1, siteB);
+
+    expect(result.sites).toHaveLength(3);
+    expect(result.sites).toEqual([siteA, siteB, siteC]);
+  });
+
+  it("no mutation", () => {
+    const structure = {
+      lattice: {},
+      sites: [],
+    };
+
+    const site = { species: "A", frac: [0, 0, 0] };
+
+    const result = insertSite(structure, 0, site);
 
     expect(structure.sites).toHaveLength(0);
     expect(result.sites).toHaveLength(1);

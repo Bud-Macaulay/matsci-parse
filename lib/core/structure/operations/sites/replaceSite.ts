@@ -6,8 +6,30 @@ export function replaceSite(
   index: number,
   site: Site,
 ): Structure {
+  const sites = structure.sites.slice();
+  sites[index] = site;
+
   return {
     ...structure,
-    sites: structure.sites.map((s, i) => (i === index ? site : s)),
+    sites,
+  };
+}
+
+export function replaceSites(
+  structure: Structure,
+  replacements: readonly {
+    index: number;
+    site: Site;
+  }[],
+): Structure {
+  const sites = structure.sites.slice();
+
+  for (const { index, site } of replacements) {
+    sites[index] = site;
+  }
+
+  return {
+    ...structure,
+    sites,
   };
 }
