@@ -1,4 +1,3 @@
-import { fromCIF, toCIF } from "matsci-parse";
 import StructureVisualizer from "mc-react-structure-visualizer";
 
 import BaseTable from "../common/BaseTable";
@@ -14,10 +13,6 @@ export default function MainPanel({ tab, updateTab }) {
 
   const { structure, undoStack = [], redoStack = [] } = tab;
 
-  const reciprocalLattice = structure ? structure.lattice : null;
-
-  const cifText = structure ? toCIF(structure) : "";
-
   const pushUndo = (meta = {}) => {
     updateTab((t) => ({
       ...t,
@@ -25,7 +20,6 @@ export default function MainPanel({ tab, updateTab }) {
         ...t.undoStack,
         {
           structure: t.structure,
-          cif: toCIF(t.structure),
           timestamp: Date.now(),
           ...meta,
         },
@@ -49,8 +43,6 @@ export default function MainPanel({ tab, updateTab }) {
 
     const currentPos = structure.sites[idx].frac;
     const newSite = { species: { symbol: newSpecies }, frac: currentPos };
-
-    console.log(newSite);
 
     const newStructure = replaceSite(structure, idx, newSite);
 
@@ -80,12 +72,12 @@ export default function MainPanel({ tab, updateTab }) {
         redoStack: [
           ...t.redoStack,
           {
-            cif: toCIF(t.structure),
+            structure: t.structure,
             label: last.label,
             timestamp: Date.now(),
           },
         ],
-        structure: fromCIF(last.cif),
+        structure: last.structure,
       };
     });
   };
@@ -102,12 +94,12 @@ export default function MainPanel({ tab, updateTab }) {
         undoStack: [
           ...t.undoStack,
           {
-            cif: toCIF(t.structure),
+            structure: t.structure,
             label: last.label,
             timestamp: Date.now(),
           },
         ],
-        structure: fromCIF(last.cif),
+        structure: last.structure,
       };
     });
   };
@@ -271,7 +263,7 @@ export default function MainPanel({ tab, updateTab }) {
 
           <StructureVisualizer
             // key={cifText} dont pass cifText, to avoid regen.
-            cifText={cifText}
+            structure={structure}
             initSupercell={[1, 1, 1]}
           />
         </div>

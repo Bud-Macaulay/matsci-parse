@@ -12,8 +12,8 @@
   "dependencies": {
     "@tanstack/react-hotkeys": "^0.9.1",
     "@tanstack/react-store": "^0.10.0",
-    "matsci-parse": "file:../matsci-parse-0.7.5.tgz",
-    "mc-react-structure-visualizer": "^0.8.6",
+    "matsci-parse": "file:../matsci-parse-0.8.4.tgz",
+    "mc-react-structure-visualizer": "file:mc-react-structure-visualizer-0.10.0.tgz",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
