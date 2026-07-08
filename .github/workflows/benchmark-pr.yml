@@ -1,0 +1,31 @@
+name: Benchmark PR
+on:
+  pull_request:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - uses: nerivec/action-ci-bench@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          compare-against: ${{ github.base_ref }}
+          base-cmd: npx vitest bench --run --outputJson=bench.json
+          compare-cmd: npx vitest bench --run --compare=bench.json
+          base-result: bench.json
