@@ -1,4 +1,4 @@
-/** Element metadata from the periodic table. */
+/** Element metadata from the periodic table.  */
 export interface ElementInfo {
   atomicNumber: number;
   symbol: string;
