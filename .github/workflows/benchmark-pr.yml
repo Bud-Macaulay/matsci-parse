@@ -11,12 +11,14 @@ jobs:
           ref: ${{ github.base_ref }}
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
       - name: Run benchmarks on base (${{ github.base_ref }})
         run: npx vitest bench --run --outputJson=/tmp/base-results.json
