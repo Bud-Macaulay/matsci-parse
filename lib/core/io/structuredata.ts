@@ -4,11 +4,13 @@ import { createLattice } from "../lattice/lattice";
 import { cartesian } from "../site/cartesian";
 import { fractional } from "../site/fractional";
 
+/** AiiDA-compatible site representation. */
 export interface AiiDASite {
   position: [number, number, number];
   kind_name: string[];
 }
 
+/** AiiDA-compatible structure data format. */
 export interface StructureData {
   cell: [
     [number, number, number],
@@ -19,6 +21,7 @@ export interface StructureData {
   sites: AiiDASite[];
 }
 
+/** Parses an AiiDA StructureData object into a Structure. */
 export function fromStructureData(data: StructureData): Structure {
   const lattice = createLattice([
     ...data.cell[0],
@@ -50,6 +53,7 @@ export function fromStructureData(data: StructureData): Structure {
   };
 }
 
+/** Serializes a Structure to an AiiDA StructureData-compatible object. */
 export function toStructureData(structure: Structure) {
   const m = structure.lattice.basis.data;
 

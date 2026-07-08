@@ -1,5 +1,12 @@
 import { VolumetricData, index } from "../../volumetric";
 
+/** Trilinear interpolation at a continuous position in the volume.
+ * @param vol - The volumetric dataset.
+ * @param x - Continuous x coordinate.
+ * @param y - Continuous y coordinate.
+ * @param z - Continuous z coordinate.
+ * @returns Array of interpolated values for all channels.
+ */
 export function sampleLinear(
   vol: VolumetricData,
   x: number,
@@ -7,6 +14,14 @@ export function sampleLinear(
   z: number,
 ): number[];
 
+/** Trilinear interpolation for a single channel at a continuous position.
+ * @param vol - The volumetric dataset.
+ * @param x - Continuous x coordinate.
+ * @param y - Continuous y coordinate.
+ * @param z - Continuous z coordinate.
+ * @param channel - The channel index to sample.
+ * @returns Interpolated value for the given channel.
+ */
 export function sampleLinear(
   vol: VolumetricData,
   x: number,

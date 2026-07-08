@@ -4,6 +4,10 @@ import { norm } from "./norm";
 
 const EPS = 1e-12;
 
+/** Compute the scalar projection of a onto b.
+ * @param a - Vector to project.
+ * @param b - Vector to project onto.
+ * @returns The projection vector. */
 export function projection(a: Vector, b: Vector): Vector {
   const denom = dot(b, b);
 

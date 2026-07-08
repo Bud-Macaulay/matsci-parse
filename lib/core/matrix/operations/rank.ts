@@ -2,6 +2,9 @@ import { Matrix, clone } from "../matrix";
 
 const EPS = 1e-12;
 
+/** Compute the rank of a matrix using Gaussian elimination.
+ * @param m - Input matrix.
+ * @returns The rank. */
 export function rank(m: Matrix): number {
   const A = clone(m).data;
   const rows = m.rows;

@@ -4,6 +4,11 @@ import { cartesian } from "./cartesian";
 
 import { norm } from "../matrix/operations/vector/norm";
 
+/** Compute the minimum image distance between two sites.
+ * @param lattice - The lattice.
+ * @param a - First site.
+ * @param b - Second site.
+ * @returns Minimum image distance. */
 export function distance(lattice: Lattice, a: Site, b: Site): number {
   const dFrac: [number, number, number] = [
     b.frac[0] - a.frac[0],

@@ -1,5 +1,10 @@
 import { VolumetricData } from "../../volumetric";
 
+/** Apply a function to every voxel value, producing a new volume.
+ * @param vol - The volumetric dataset.
+ * @param fn - Mapping function receiving (value, x, y, z, channel, index).
+ * @returns New volume with transformed voxel values.
+ */
 export function map(
   vol: VolumetricData,
   fn: (

@@ -1,5 +1,8 @@
 import { Matrix, createMatrix } from "../../matrix";
 
+/** Compute the inverse of a 3x3 matrix using cofactors.
+ * @param m - A 3x3 matrix.
+ * @returns The inverse Matrix. */
 export function inverse3x3(m: Matrix): Matrix {
   if (m.rows !== 3 || m.cols !== 3) {
     throw new Error("Expected 3x3 matrix");

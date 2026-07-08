@@ -1,6 +1,11 @@
 import { VolumetricData } from "../../volumetric";
 import { resize } from "./resize";
 
+/** Increase spatial resolution by an integer or per-axis factor.
+ * @param vol - The volumetric dataset.
+ * @param factor - Upsampling factor (scalar or per-axis tuple).
+ * @returns The upsampled volumetric dataset.
+ */
 export function upsample(
   vol: VolumetricData,
   factor: number | [number, number, number] = 2,

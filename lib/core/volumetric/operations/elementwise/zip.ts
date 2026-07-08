@@ -1,5 +1,11 @@
 import { VolumetricData } from "../../volumetric";
 
+/** Combine two volumes element-wise using a binary function.
+ * @param a - First volumetric dataset.
+ * @param b - Second volumetric dataset.
+ * @param fn - Binary function receiving (va, vb, x, y, z, channel, index).
+ * @returns New volume with combined voxel values.
+ */
 export function zip(
   a: VolumetricData,
   b: VolumetricData,

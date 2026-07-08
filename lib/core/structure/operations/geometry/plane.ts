@@ -6,11 +6,13 @@ import { cartesian } from "../../../site/cartesian";
 
 import { reciprocalLattice } from "@/main";
 
+/** A plane defined by a unit normal and a point on the plane (Cartesian). */
 export interface Plane {
   readonly normal: Float64Array;
   readonly point: Float64Array;
 }
 
+/** Plane equation in the form ax + by + cz + d = 0. */
 export interface PlaneEquation {
   readonly a: number;
   readonly b: number;
@@ -18,6 +20,7 @@ export interface PlaneEquation {
   readonly d: number;
 }
 
+/** Plane through three non-collinear sites. */
 export function planeFromSites(
   structure: Structure,
   i: number,
@@ -43,6 +46,7 @@ export function planeFromSites(
   return { normal, point };
 }
 
+/** Convert a Plane to PlaneEquation coefficients (ax + by + cz + d = 0). */
 export function planeEquation(plane: Plane): PlaneEquation {
   const { normal, point } = plane;
 
@@ -60,6 +64,7 @@ export function planeEquation(plane: Plane): PlaneEquation {
   };
 }
 
+/** Signed distance from a Cartesian point to a plane. */
 export function distanceFromPlane(
   point: Float64Array,
   plane: PlaneEquation,
@@ -75,6 +80,7 @@ export function distanceFromPlane(
   return (a * point[0] + b * point[1] + c * point[2] + d) / denominator;
 }
 
+/** Signed distance from a site to a plane. */
 export function distanceFromSiteToPlane(
   structure: Structure,
   siteIndex: number,
@@ -85,6 +91,7 @@ export function distanceFromSiteToPlane(
   return distanceFromPlane(point, plane);
 }
 
+/** Plane from Miller indices (hkl) using the reciprocal lattice. */
 export function planeFromMillerIndex(
   structure: Structure,
   h: number,

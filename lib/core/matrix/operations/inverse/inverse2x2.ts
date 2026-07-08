@@ -1,5 +1,8 @@
 import { Matrix, createMatrix } from "../../matrix";
 
+/** Compute the inverse of a 2x2 matrix using the closed-form formula.
+ * @param m - A 2x2 matrix.
+ * @returns The inverse Matrix. */
 export function inverse2x2(m: Matrix): Matrix {
   if (m.rows !== 2 || m.cols !== 2) {
     throw new Error("Expected 2x2 matrix");

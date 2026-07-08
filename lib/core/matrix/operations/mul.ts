@@ -1,5 +1,9 @@
 import { Matrix, createMatrix, index } from "../matrix";
 
+/** Multiply two matrices (matrix product).
+ * @param a - Left matrix.
+ * @param b - Right matrix.
+ * @returns A new Matrix containing the product. */
 export function mul(a: Matrix, b: Matrix): Matrix {
   if (a.cols !== b.rows) {
     throw new Error("Invalid matrix multiplication dimensions");

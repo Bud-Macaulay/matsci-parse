@@ -1,5 +1,10 @@
 import { ReduceOptions, VolumetricData } from "../../volumetric";
 
+/** Compute the minimum voxel value across all or per-channel.
+ * @param vol - The volumetric dataset.
+ * @param options - Reduction options specifying axis mode.
+ * @returns Global minimum or per-channel minimum array.
+ */
 export function min(
   vol: VolumetricData,
   { axis = "all" }: ReduceOptions = {},

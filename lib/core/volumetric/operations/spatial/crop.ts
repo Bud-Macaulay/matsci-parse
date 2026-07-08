@@ -1,5 +1,15 @@
 import { VolumetricData, createVolumetricData, index } from "../../volumetric";
 
+/** Extract a rectangular sub-volume from the dataset.
+ * @param vol - The volumetric dataset.
+ * @param x0 - Start x coordinate (inclusive).
+ * @param y0 - Start y coordinate (inclusive).
+ * @param z0 - Start z coordinate (inclusive).
+ * @param x1 - End x coordinate (exclusive).
+ * @param y1 - End y coordinate (exclusive).
+ * @param z1 - End z coordinate (exclusive).
+ * @returns The cropped volumetric dataset.
+ */
 export function crop(
   vol: VolumetricData,
   x0: number,

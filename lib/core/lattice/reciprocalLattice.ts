@@ -6,6 +6,7 @@ import { createLattice } from "./lattice";
 
 const TWO_PI = 2 * Math.PI;
 
+/** Compute the reciprocal lattice scaled by 2*pi. */
 export function reciprocalLattice(lattice: Lattice): Lattice {
   const inv = inverse(lattice);
   const invT = transpose(inv);

@@ -5,6 +5,7 @@ import { Structure } from "../../structure";
 
 let ready: Promise<void> | null = null;
 
+/** Ensure the Moyo WASM module is loaded (idempotent). */
 export function initMoyo() {
   if (!ready) {
     ready = (async () => {
@@ -37,6 +38,7 @@ export function initMoyo() {
   return ready;
 }
 
+/** Compute primitive and conventional structures plus calculation results via Moyo/SPGLIB. */
 export async function getSymmetry(
   structure: Structure,
   tolerance = 1e-4,

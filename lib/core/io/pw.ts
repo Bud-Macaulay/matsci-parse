@@ -10,6 +10,7 @@ type CoordinateMode = "crystal" | "angstrom";
 // PW is a very complex file format, it would be good if i can do some intense reading.
 // It might take a while to get a nice representation of these things...
 
+/** Parses a Quantum ESPRESSO PW input string into a Structure. */
 export function fromPW(text: string): Structure {
   const lines = text.split("\n").map((x) => x.trim());
 
@@ -104,6 +105,7 @@ export function fromPW(text: string): Structure {
   };
 }
 
+/** Serializes a Structure to a Quantum ESPRESSO PW input string. */
 export function toPW(structure: Structure): string {
   const lines: string[] = [];
 

@@ -4,6 +4,10 @@ import { mul } from "../matrix/operations/mul";
 import { Vector } from "../matrix/vector";
 import { Lattice } from "../lattice/lattice";
 
+/** Convert Cartesian coordinates to fractional.
+ * @param lattice - The lattice.
+ * @param cart - Cartesian vector.
+ * @returns Fractional coordinate vector. */
 export function fractional(lattice: Lattice, cart: Vector): Vector {
   const vec = {
     rows: 3,

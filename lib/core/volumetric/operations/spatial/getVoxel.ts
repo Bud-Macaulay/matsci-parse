@@ -1,5 +1,12 @@
 import { VolumetricData, index } from "../../volumetric";
 
+/** Retrieve all channel values at a single voxel position.
+ * @param vol - The volumetric dataset.
+ * @param x - Voxel x coordinate.
+ * @param y - Voxel y coordinate.
+ * @param z - Voxel z coordinate.
+ * @returns Array of channel values at the given position.
+ */
 export function getVoxel(
   vol: VolumetricData,
   x: number,

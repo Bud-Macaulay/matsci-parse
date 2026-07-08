@@ -1,5 +1,13 @@
 import { VolumetricData, createVolumetricData, index } from "../../volumetric";
 
+/** Set all channel values at a single voxel position, returning a new volume.
+ * @param vol - The volumetric dataset.
+ * @param x - Voxel x coordinate.
+ * @param y - Voxel y coordinate.
+ * @param z - Voxel z coordinate.
+ * @param value - Array of channel values to set.
+ * @returns A new volumetric dataset with the updated voxel.
+ */
 export function setVoxel(
   vol: VolumetricData,
   x: number,

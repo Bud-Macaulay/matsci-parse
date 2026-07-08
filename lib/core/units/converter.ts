@@ -1,3 +1,12 @@
+/**
+ * Convert a single measurement between units.
+ * @param value - Numeric value to convert.
+ * @param from - Source unit.
+ * @param to - Target unit.
+ * @param conversions - Map of unit to base conversion factor.
+ * @param aliases - Optional alias map for unit names.
+ * @returns Converted value.
+ */
 export function convertMeasurement<T extends string>(
   value: number,
   from: T,
@@ -16,6 +25,15 @@ export function convertMeasurement<T extends string>(
   return valueInBase / conversions[toUnit];
 }
 
+/**
+ * Convert an array of measurements between units.
+ * @param arr - Array of numeric values to convert.
+ * @param from - Source unit.
+ * @param to - Target unit.
+ * @param conversions - Map of unit to base conversion factor.
+ * @param aliases - Optional alias map for unit names.
+ * @returns Array of converted values.
+ */
 export function convertMeasurementArray<T extends string>(
   arr: number[],
   from: T,

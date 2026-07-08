@@ -19,6 +19,7 @@ function fnv1a(str: string): number {
   return hash >>> 0;
 }
 
+/** FNV-1a hash of a canonicalized structure (lattice + sorted sites). */
 export function hashStructure(structure: Structure): number {
   const s = canonicalize(structure);
 

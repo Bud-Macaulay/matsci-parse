@@ -21,6 +21,7 @@ function formatCoord(x: number) {
   return x.toFixed(3).padStart(8);
 }
 
+/** Parses a GROMACS GRO string into a Structure. */
 export function fromGRO(text: string): Structure {
   const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
 
@@ -114,6 +115,7 @@ export function fromGRO(text: string): Structure {
   };
 }
 
+/** Serializes a Structure to a GROMACS GRO string. */
 export function toGRO(
   structure: Structure,
   options?: {

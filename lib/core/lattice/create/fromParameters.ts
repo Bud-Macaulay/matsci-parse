@@ -7,6 +7,7 @@ function clean(x: number) {
   return Math.abs(x) < EPS ? 0 : x;
 }
 
+/** Create a Lattice from conventional cell parameters (angles in degrees). */
 export function fromParameters(
   a: number,
   b: number,

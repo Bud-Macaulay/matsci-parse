@@ -20,6 +20,7 @@ function warnUnsupportedSymmetry(spaceGroup: string) {
   );
 }
 
+/** Parses a CIF (Crystallographic Information File) string into a Structure. */
 export function fromCIF(text: string): Structure {
   const lines = text
     .split("\n")
@@ -126,6 +127,7 @@ export function fromCIF(text: string): Structure {
   };
 }
 
+/** Serializes a Structure to a CIF string. */
 export function toCIF(structure: Structure, precision = 6): string {
   const p = parameters(structure.lattice);
 

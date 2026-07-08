@@ -1,6 +1,9 @@
 import { Matrix } from "../../matrix";
 import { createVolumetricData } from "../volumetric";
 
+/** Stack a list of 2-D Matrix slices into a 3-D volumetric grid. */
+/** @param slices - Array of matrices (depth dimension). */
+/** @returns A new VolumetricData with shape [slices.length, H, W]. */
 export function fromMatrixSlices(slices: Matrix[]) {
   if (slices.length === 0) {
     throw new Error("No slices provided");

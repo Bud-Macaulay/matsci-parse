@@ -16,6 +16,7 @@ function findSection(lines: string[], section: string): number {
 
 // TODO: support atomic numbers instead of symbols in primvec.
 
+/** Parses an XSF (XCrySDen Structure Format) string into a Structure. */
 export function fromXSF(text: string): Structure {
   const lines = text
     .split("\n")
@@ -73,6 +74,7 @@ function formatLattice(lattice: Structure["lattice"]): string[] {
   ];
 }
 
+/** Serializes a Structure to an XSF string. */
 export function toXSF(structure: Structure): string {
   const lines: string[] = [];
 

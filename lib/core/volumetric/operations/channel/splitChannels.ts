@@ -1,5 +1,9 @@
 import { createVolumetricData, VolumetricData } from "../../volumetric";
 
+/** Split a multi-channel volume into an array of single-channel volumes.
+ * @param vol - The volumetric dataset to split.
+ * @returns Array of single-channel volumetric datasets.
+ */
 export function splitChannels(vol: VolumetricData): VolumetricData[] {
   const { shape, channels, data, basis, origin, field, metadata } = vol;
 

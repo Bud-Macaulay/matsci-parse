@@ -1,5 +1,10 @@
 import { VolumetricData, ReduceOptions } from "../../volumetric";
 
+/** Compute the sum of voxel values across all or per-channel.
+ * @param vol - The volumetric dataset.
+ * @param options - Reduction options specifying axis mode.
+ * @returns Global sum or per-channel sum array.
+ */
 export function sum(
   vol: VolumetricData,
   { axis = "all" }: ReduceOptions = {},

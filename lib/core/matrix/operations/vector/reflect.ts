@@ -3,6 +3,10 @@ import { dot } from "./dot";
 
 const EPS = 1e-12;
 
+/** Reflect vector v across the normal n.
+ * @param v - Vector to reflect.
+ * @param n - Normal vector.
+ * @returns The reflected vector. */
 export function reflect(v: Vector, n: Vector): Vector {
   const nn = dot(n, n);
 

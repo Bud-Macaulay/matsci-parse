@@ -8,6 +8,11 @@ function gcd(a: number, b: number): number {
   return Math.abs(a);
 }
 
+/**
+ * Count each element's occurrences in the structure.
+ * @param structure - Structure to evaluate.
+ * @returns Map of element symbols to counts.
+ */
 export function composition(structure: Structure): Record<string, number> {
   const out: Record<string, number> = {};
 
@@ -66,10 +71,20 @@ function reducedComposition(
   return out;
 }
 
+/**
+ * Return the Hill-ordered chemical formula of a structure.
+ * @param structure - Structure to evaluate.
+ * @returns Hill-formula string.
+ */
 export function hillFormula(structure: Structure): string {
   return formulaFromComposition(composition(structure), hillOrder);
 }
 
+/**
+ * Return the reduced Hill-ordered chemical formula.
+ * @param structure - Structure to evaluate.
+ * @returns Reduced formula string.
+ */
 export function reducedFormula(structure: Structure): string {
   return formulaFromComposition(
     reducedComposition(composition(structure)),

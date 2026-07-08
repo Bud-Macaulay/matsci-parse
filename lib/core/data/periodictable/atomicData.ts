@@ -1,3 +1,4 @@
+/** Element metadata from the periodic table. */
 export interface ElementInfo {
   atomicNumber: number;
   symbol: string;
@@ -6,6 +7,7 @@ export interface ElementInfo {
   [key: string]: unknown;
 }
 
+/** Atomic-number-keyed periodic table of all known elements. */
 export const PeriodicTable: Record<number, ElementInfo> = {
   1: { atomicNumber: 1, symbol: "H", name: "Hydrogen", mass: 1.008 },
   2: { atomicNumber: 2, symbol: "He", name: "Helium", mass: 4.0026 },
@@ -127,6 +129,7 @@ export const PeriodicTable: Record<number, ElementInfo> = {
   118: { atomicNumber: 118, symbol: "Og", name: "Oganesson", mass: 294 },
 };
 
+/** Symbol-keyed element lookup, derived from PeriodicTable. */
 export const elementBySymbol = Object.values(PeriodicTable).reduce(
   (acc, el) => {
     acc[el.symbol] = el;
@@ -135,6 +138,9 @@ export const elementBySymbol = Object.values(PeriodicTable).reduce(
   {} as Record<string, ElementInfo>,
 );
 
+/** Look up an element by its chemical symbol.
+ * @param symbol - Element symbol (e.g. "Fe")
+ * @returns The matching ElementInfo, or undefined if not found. */
 export function getElement(symbol: string): ElementInfo | undefined {
   return elementBySymbol[symbol];
 }
@@ -146,6 +152,7 @@ export const SymbolToAtomicNumber = new Map<string, number>(
   Object.values(PeriodicTable).map((el) => [el.symbol, el.atomicNumber]),
 );
 
+/** Atomic-number-to-symbol lookup map. */
 export const AtomicNumberToSymbol = new Map<number, string>(
   Object.values(PeriodicTable).map((el) => [el.atomicNumber, el.symbol]),
 );

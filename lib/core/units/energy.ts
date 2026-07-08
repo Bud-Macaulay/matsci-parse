@@ -1,5 +1,6 @@
 import { convertMeasurement, convertMeasurementArray } from "./converter";
 
+/** Supported energy unit identifiers. */
 export type EnergyUnits = "eV" | "Hartree" | "kJ/mol" | "kcal/mol";
 
 const EnergyConversions: Record<EnergyUnits, number> = {
@@ -15,6 +16,7 @@ const EnergyAliases: Record<string, EnergyUnits> = {
   electronvolt: "eV",
 };
 
+/** Unit system for energy conversions with eV as base. */
 export const EnergyUnitSystem = {
   conversions: EnergyConversions,
   aliases: EnergyAliases,

@@ -1,40 +1,66 @@
 <!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>matsci-parse</title><meta name="description" content="Documentation for matsci-parse"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">matsci-parse</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>matsci-parse</h1></div><div class="tsd-panel tsd-typography"><h1 id="matsci-parse" class="tsd-anchor-link">matsci-parse<a href="#matsci-parse" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
-<p>A TypeScript-based library and web toolset for parsing, transforming, and analyzing atomistic materials science data, including crystal structures, symmetry data, and common simulation file formats.</p>
-<p>This project is written to be functional, allowing tree-shakability.</p>
+<p>A TypeScript library and web toolset for parsing, transforming, and analyzing atomistic materials science data.</p>
+<p>Crystal structures, periodic systems, volumetric fields (electron density, electrostatic potentials), symmetry operations, lattice geometry — all handled in a fully <strong>functional</strong>, <strong>tree-shakeable</strong> style.</p>
+<pre><code><span class="hl-0">pnpm</span><span class="hl-1"> </span><span class="hl-0">add</span><span class="hl-1"> </span><span class="hl-0">matsci</span><span class="hl-1">-</span><span class="hl-0">parse</span>
+</code><button>Copy</button></pre>
+
 <hr>
-<h3 id="project-overview" class="tsd-anchor-link">Project overview<a href="#project-overview" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<h4 id="_" class="tsd-anchor-link"><code>io/</code><a href="#_" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<p>Parsers and data models for multiple file formats:</p>
-<ul>
-<li>CIF</li>
-<li>VASP (POSCAR, CHGCAR)</li>
-<li>Quantum ESPRESSO (pw)</li>
-<li>Gaussian cube files</li>
-<li>XYZ</li>
-<li>XSF</li>
-<li>AiiDA structure objects</li>
-<li>Generic crystal and molecular structures</li>
-</ul>
-<h4 id="_-1" class="tsd-anchor-link"><code>math/</code><a href="#_-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<p>Linear algebra and crystallographic geometry utilities:</p>
-<ul>
-<li>Matrix operations</li>
-<li>Coordinate transformations</li>
-<li>Lattice calculations</li>
-</ul>
-<h4 id="_-2" class="tsd-anchor-link"><code>symmetry/</code><a href="#_-2" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<p>Symmetry and reciprocal space tools:</p>
-<ul>
-<li>Space group data and operations (using moyo-wasm)</li>
-</ul>
-<h4 id="_-3" class="tsd-anchor-link"><code>units/</code><a href="#_-3" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h4>
-<p>Unit systems and conversions:</p>
-<ul>
-<li>Length units</li>
-<li>Energy units</li>
-<li>Angle units</li>
-<li>General conversion utilities</li>
-</ul>
+<h3 id="whats-inside" class="tsd-anchor-link">What's inside<a href="#whats-inside" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>io/</code></strong></td>
+<td>Parse/write CIF, VASP (POSCAR, CHGCAR), Quantum ESPRESSO (pw), XYZ, XSF, PDB, GRO, Gaussian cube, AiiDA, Optimade</td>
+</tr>
+<tr>
+<td><strong><code>structure/</code></strong></td>
+<td>Create, query, and manipulate crystal structures — sites, species, supercells, canonicalization, hashing</td>
+</tr>
+<tr>
+<td><strong><code>lattice/</code></strong></td>
+<td>Lattice creation (cubic, hexagonal, monoclinic, etc.), parameters, metric tensor, reciprocal space, volumes</td>
+</tr>
+<tr>
+<td><strong><code>symmetry/</code></strong></td>
+<td>Space group data, Brillouin zone paths (seekpath), symmetry operations via moyo-wasm</td>
+</tr>
+<tr>
+<td><strong><code>site/</code></strong></td>
+<td>Site-level operations: cartesian/fractional conversion, distances, periodic wrapping</td>
+</tr>
+<tr>
+<td><strong><code>species/</code></strong></td>
+<td>Element/species types with optional arbitrary properties</td>
+</tr>
+<tr>
+<td><strong><code>volumetric/</code></strong></td>
+<td>N-dimensional volumetric data arrays — creation, elementwise ops, channel ops, spatial transforms (crop, pad, resize, upsample, downsample, sample)</td>
+</tr>
+<tr>
+<td><strong><code>matrix/</code></strong></td>
+<td>Linear algebra primitives (3×3, 4×4): inverse, determinant, LLL reduction, vector ops</td>
+</tr>
+<tr>
+<td><strong><code>units/</code></strong></td>
+<td>Length, angle, and energy conversions</td>
+</tr>
+<tr>
+<td><strong><code>data/</code></strong></td>
+<td>Periodic table reference (symbols, atomic numbers, masses)</td>
+</tr>
+</tbody>
+</table>
 <hr>
-<h3 id="a-frontend-demo-of-some-of-the-utilities-possible-is-available-" class="tsd-anchor-link">A frontend demo of some of the utilities possible is available (<code>webapp/</code>)<a href="#a-frontend-demo-of-some-of-the-utilities-possible-is-available-" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#matsci-parse"><span>matsci-<wbr/>parse</span></a><ul><li><a href="#project-overview"><span>Project overview</span></a></li><li><ul><li><a href="#_"><span></span></a></li><li><a href="#_-1"><span></span></a></li><li><a href="#_-2"><span></span></a></li><li><a href="#_-3"><span></span></a></li></ul></li><li><a href="#a-frontend-demo-of-some-of-the-utilities-possible-is-available-"><span>A frontend demo of some of the utilities possible is available ()</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">matsci-parse</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+<h3 id="quick-example" class="tsd-anchor-link">Quick example<a href="#quick-example" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="ts"><span class="hl-2">import</span><span class="hl-1"> { </span><span class="hl-0">fromCIF</span><span class="hl-1"> } </span><span class="hl-2">from</span><span class="hl-1"> </span><span class="hl-3">&quot;matsci-parse&quot;</span><span class="hl-1">;</span><br/><span class="hl-2">import</span><span class="hl-1"> { </span><span class="hl-0">volume</span><span class="hl-1"> } </span><span class="hl-2">from</span><span class="hl-1"> </span><span class="hl-3">&quot;matsci-parse/core/lattice/volume&quot;</span><span class="hl-1">;</span><br/><br/><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">structure</span><span class="hl-1"> = </span><span class="hl-6">fromCIF</span><span class="hl-1">(</span><span class="hl-0">cifText</span><span class="hl-1">);</span><br/><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">V</span><span class="hl-1"> = </span><span class="hl-6">volume</span><span class="hl-1">(</span><span class="hl-0">structure</span><span class="hl-1">.</span><span class="hl-0">lattice</span><span class="hl-1">); </span><span class="hl-7">// cell volume in Å³</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="docs" class="tsd-anchor-link">Docs<a href="#docs" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Full API reference: <code>pnpm run docs</code> → <code>docs/index.html</code></p>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#matsci-parse"><span>matsci-<wbr/>parse</span></a><ul><li><a href="#whats-inside"><span>What&#39;s inside</span></a></li><li><a href="#quick-example"><span>Quick example</span></a></li><li><a href="#docs"><span>Docs</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">matsci-parse</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

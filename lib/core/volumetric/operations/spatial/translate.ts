@@ -1,5 +1,12 @@
 import { VolumetricData, createVolumetricData } from "../../volumetric";
 
+/** Shift the volume content by an integer offset along each axis.
+ * @param vol - The volumetric dataset.
+ * @param dx - Translation along x axis.
+ * @param dy - Translation along y axis.
+ * @param dz - Translation along z axis.
+ * @returns A new translated volumetric dataset.
+ */
 export function translate(
   vol: VolumetricData,
   dx: number,

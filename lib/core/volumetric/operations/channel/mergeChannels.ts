@@ -1,5 +1,9 @@
 import { createVolumetricData, VolumetricData } from "../../volumetric";
 
+/** Merge multiple single-channel volumes into a multi-channel volume.
+ * @param volumes - Array of single-channel volumes with matching spatial dimensions.
+ * @returns A new multi-channel volumetric dataset.
+ */
 export function mergeChannels(volumes: VolumetricData[]): VolumetricData {
   if (volumes.length === 0) {
     throw new Error("No volumes provided");

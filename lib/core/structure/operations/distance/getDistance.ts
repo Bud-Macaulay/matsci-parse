@@ -4,6 +4,7 @@ import { metricTensor } from "../../../lattice/metricTensor";
 import { distanceSquared } from "./utils";
 import { getDisplacement } from "./getDisplacement";
 
+/** Minimum-image distance between two sites. */
 export function getDistance(
   structure: Structure,
   idx1: number,

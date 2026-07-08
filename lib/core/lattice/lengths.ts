@@ -1,5 +1,6 @@
 import { norm } from "../matrix/operations/vector/norm";
 import { Lattice } from "./lattice";
+/** Compute the three lattice vector lengths (a, b, c). */
 export function lengths(lattice: Lattice): [number, number, number] {
   const m = lattice.basis.data;
 

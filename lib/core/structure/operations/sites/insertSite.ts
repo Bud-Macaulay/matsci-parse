@@ -1,6 +1,7 @@
 import { Structure } from "../../structure";
 import { Site } from "../../../site/site";
 
+/** Insert a single site at the given index. */
 export function insertSite(
   structure: Structure,
   index: number,
@@ -25,6 +26,7 @@ export function insertSite(
   };
 }
 
+/** Insert multiple sites starting at the given index. */
 export function insertSites(
   structure: Structure,
   index: number,

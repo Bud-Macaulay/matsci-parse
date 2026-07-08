@@ -14,6 +14,7 @@ function metricDot(a: Vec3, b: Vec3, G: ArrayLike<number>) {
   );
 }
 
+/** Angle (degrees) about idx2 between the vectors idx2->idx1 and idx2->idx3. */
 export function getAngle(
   structure: Structure,
   idx1: number,

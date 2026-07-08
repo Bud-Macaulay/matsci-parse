@@ -1,49 +1,42 @@
 # matsci-parse
 
-A TypeScript-based library and web toolset for parsing, transforming, and analyzing atomistic materials science data, including crystal structures, symmetry data, and common simulation file formats.
+A TypeScript library and web toolset for parsing, transforming, and analyzing atomistic materials science data.
 
-This project is written to be functional, allowing tree-shakability.
+Crystal structures, periodic systems, volumetric fields (electron density, electrostatic potentials), symmetry operations, lattice geometry — all handled in a fully **functional**, **tree-shakeable** style.
 
----
-
-### Project overview
-
-#### `io/`
-
-Parsers and data models for multiple file formats:
-
-- CIF
-- VASP (POSCAR, CHGCAR)
-- Quantum ESPRESSO (pw)
-- Gaussian cube files
-- XYZ
-- XSF
-- AiiDA structure objects
-- Generic crystal and molecular structures
-
-#### `math/`
-
-Linear algebra and crystallographic geometry utilities:
-
-- Matrix operations
-- Coordinate transformations
-- Lattice calculations
-
-#### `symmetry/`
-
-Symmetry and reciprocal space tools:
-
-- Space group data and operations (using moyo-wasm)
-
-#### `units/`
-
-Unit systems and conversions:
-
-- Length units
-- Energy units
-- Angle units
-- General conversion utilities
+```
+pnpm add matsci-parse
+```
 
 ---
 
-### A frontend demo of some of the utilities possible is available (`webapp/`)
+### What's inside
+
+| Module | What it does |
+|---|---|
+| **`io/`** | Parse/write CIF, VASP (POSCAR, CHGCAR), Quantum ESPRESSO (pw), XYZ, XSF, PDB, GRO, Gaussian cube, AiiDA, Optimade |
+| **`structure/`** | Create, query, and manipulate crystal structures — sites, species, supercells, canonicalization, hashing |
+| **`lattice/`** | Lattice creation (cubic, hexagonal, monoclinic, etc.), parameters, metric tensor, reciprocal space, volumes |
+| **`symmetry/`** | Space group data, Brillouin zone paths (seekpath), symmetry operations via moyo-wasm |
+| **`site/`** | Site-level operations: cartesian/fractional conversion, distances, periodic wrapping |
+| **`species/`** | Element/species types with optional arbitrary properties |
+| **`volumetric/`** | N-dimensional volumetric data arrays — creation, elementwise ops, channel ops, spatial transforms (crop, pad, resize, upsample, downsample, sample) |
+| **`matrix/`** | Linear algebra primitives (3×3, 4×4): inverse, determinant, LLL reduction, vector ops |
+| **`units/`** | Length, angle, and energy conversions |
+| **`data/`** | Periodic table reference (symbols, atomic numbers, masses) |
+
+---
+
+### Quick example
+
+```ts
+import { fromCIF } from "matsci-parse";
+import { volume } from "matsci-parse/core/lattice/volume";
+
+const structure = fromCIF(cifText);
+const V = volume(structure.lattice); // cell volume in Å³
+```
+
+### Docs
+
+Full API reference: `pnpm run docs` → `docs/index.html`

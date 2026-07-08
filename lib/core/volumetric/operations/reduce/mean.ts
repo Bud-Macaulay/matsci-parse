@@ -1,5 +1,10 @@
 import { ReduceOptions, VolumetricData } from "../../volumetric";
 
+/** Compute the mean voxel value across all or per-channel.
+ * @param vol - The volumetric dataset.
+ * @param options - Reduction options specifying axis mode.
+ * @returns Global mean or per-channel mean array.
+ */
 export function mean(
   vol: VolumetricData,
   { axis = "all" }: ReduceOptions = {},

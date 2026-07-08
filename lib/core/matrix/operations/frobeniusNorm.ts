@@ -1,5 +1,8 @@
 import { Matrix } from "../matrix";
 
+/** Compute the Frobenius norm (sqrt of sum of squared elements) of a matrix.
+ * @param matrix - Input matrix.
+ * @returns The Frobenius norm. */
 export function frobeniusNorm(matrix: Matrix): number {
   let sum = 0;
 

@@ -1,5 +1,6 @@
 import { Structure } from "../../structure";
 
+/** Remove the site at the given index. */
 export function removeSite(structure: Structure, index: number): Structure {
   const sites = structure.sites.slice();
   sites.splice(index, 1);
@@ -10,6 +11,7 @@ export function removeSite(structure: Structure, index: number): Structure {
   };
 }
 
+/** Remove sites at the given indices. */
 export function removeSites(
   structure: Structure,
   indices: readonly number[],

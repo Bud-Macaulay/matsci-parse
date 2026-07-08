@@ -4,6 +4,10 @@ import { norm } from "./norm";
 
 const EPS = 1e-12;
 
+/** Compute the angle in radians between two vectors.
+ * @param a - First vector.
+ * @param b - Second vector.
+ * @returns The angle in radians. */
 export function angleBetween(a: Vector, b: Vector): number {
   const na = norm(a);
   const nb = norm(b);

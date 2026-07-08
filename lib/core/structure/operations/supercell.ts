@@ -4,6 +4,7 @@ import type { Site } from "@/core/site/site";
 
 type SupercellSize = number | [number, number, number];
 
+/** Create a supercell by replicating the structure in each lattice direction. */
 export function supercell(
   structure: Structure,
   size: SupercellSize,
