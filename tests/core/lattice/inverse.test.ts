@@ -1,16 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createMatrix } from "@/core/matrix/matrix";
 import { inverse } from "@/core/lattice/inverse";
-
-function expectIdentity(mat: Float64Array, n = 3, eps = 1e-10) {
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const v = mat[i * n + j];
-      const expected = i === j ? 1 : 0;
-      expect(Math.abs(v - expected)).toBeLessThan(eps);
-    }
-  }
-}
+import { expectIdentityFloat64 } from "../../helpers/lattice";
 
 describe("lattice inverse", () => {
   it("returns correct inverse for orthogonal lattice", () => {
@@ -37,7 +28,7 @@ describe("lattice inverse", () => {
       }
     }
 
-    expectIdentity(result);
+    expectIdentityFloat64(result);
   });
 
   it("inverts a simple shear lattice", () => {
@@ -63,7 +54,7 @@ describe("lattice inverse", () => {
       }
     }
 
-    expectIdentity(result);
+    expectIdentityFloat64(result);
   });
 
   it("produces finite values", () => {

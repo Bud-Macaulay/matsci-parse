@@ -2,14 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMatrix } from "@/core/matrix/matrix";
 import { solve } from "@/core/matrix/operations/solve";
 import { mul } from "@/core/matrix/operations/mul";
-
-function expectVectorClose(actual: Float64Array, expected: number[], tol = 6) {
-  expect(actual.length).toBe(expected.length);
-
-  for (let i = 0; i < actual.length; i++) {
-    expect(actual[i]).toBeCloseTo(expected[i], tol);
-  }
-}
+import { expectVectorClose } from "../../../helpers/matrix";
 
 describe("solve", () => {
   it("solves 2x2 system", () => {

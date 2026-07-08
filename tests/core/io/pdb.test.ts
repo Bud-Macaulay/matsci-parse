@@ -3,20 +3,8 @@ import { describe, expect, it } from "vitest";
 import { fromPDB, toPDB } from "@/core/io/pdb";
 import { toPOSCAR } from "@/core/io/poscar";
 
-import * as fs from "fs";
-import * as path from "path";
-
 import * as fixtures from "./teststrings/pdb";
-
-const OUT_DIR = path.join(process.cwd(), "test-output");
-
-function writeFile(name: string, content: string) {
-  if (!fs.existsSync(OUT_DIR)) {
-    fs.mkdirSync(OUT_DIR, { recursive: true });
-  }
-
-  fs.writeFileSync(path.join(OUT_DIR, name), content);
-}
+import { writeFile } from "../../helpers/io";
 
 describe("PDB round-trip fixtures", () => {
   for (const [name, text] of Object.entries(fixtures)) {

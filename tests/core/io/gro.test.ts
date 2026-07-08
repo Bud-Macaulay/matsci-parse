@@ -5,19 +5,8 @@ import { fromGRO as parseGROAgain } from "@/core/io/gro";
 
 import { toPOSCAR } from "@/core/io/poscar";
 
-import * as fs from "fs";
-import * as path from "path";
 import * as fixtures from "./teststrings/gro";
-
-const OUT_DIR = path.join(process.cwd(), "test-output");
-
-function writeFile(name: string, content: string) {
-  if (!fs.existsSync(OUT_DIR)) {
-    fs.mkdirSync(OUT_DIR, { recursive: true });
-  }
-
-  fs.writeFileSync(path.join(OUT_DIR, name), content);
-}
+import { writeFile } from "../../helpers/io";
 
 describe("GRO round-trip fixtures", () => {
   for (const [name, text] of Object.entries(fixtures)) {

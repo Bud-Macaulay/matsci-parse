@@ -1,44 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMatrix, identity } from "@/core/matrix/matrix";
 import { luInverse } from "@/core/matrix/operations/inverse/luInverse";
-
-function expectIdentity(m: ReturnType<typeof createMatrix>) {
-  const n = m.rows;
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      const val = m.data[r * n + c];
-
-      if (r === c) {
-        expect(val).toBeCloseTo(1);
-      } else {
-        expect(val).toBeCloseTo(0);
-      }
-    }
-  }
-}
-
-function multiplyMatrices(
-  A: ReturnType<typeof createMatrix>,
-  B: ReturnType<typeof createMatrix>,
-) {
-  const n = A.rows;
-  const result = createMatrix(n, n);
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      let sum = 0;
-
-      for (let k = 0; k < n; k++) {
-        sum += A.data[r * n + k] * B.data[k * n + c];
-      }
-
-      result.data[r * n + c] = sum;
-    }
-  }
-
-  return result;
-}
+import { expectIdentity, multiplyMatrices } from "../../../../helpers/matrix";
 
 describe("luInverse", () => {
   describe("basic functionality", () => {

@@ -1,19 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createMatrix, identity, Matrix } from "@/core/matrix/matrix";
 import { inverse4x4 } from "@/core/matrix/operations/inverse/inverse4x4";
+import { expectIdentity, multiplyMatrices } from "../../../../helpers/matrix";
 
-function expectIdentity(m: ReturnType<typeof createMatrix>) {
-  const n = m.rows;
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      const v = m.data[r * n + c];
-      expect(v).toBeCloseTo(r === c ? 1 : 0);
-    }
-  }
-}
-
-export function createRandomInvertible4x4(): Matrix {
+function createRandomInvertible4x4(): Matrix {
   const n = 4;
   const L = new Float64Array(16);
   const U = new Float64Array(16);
@@ -60,23 +50,6 @@ export function createRandomInvertible4x4(): Matrix {
   return A;
 }
 
-function multiply(A: any, B: any) {
-  const n = A.rows;
-  const out = createMatrix(n, n);
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      let sum = 0;
-      for (let k = 0; k < n; k++) {
-        sum += A.data[r * n + k] * B.data[k * n + c];
-      }
-      out.data[r * n + c] = sum;
-    }
-  }
-
-  return out;
-}
-
 describe("inverse4x4", () => {
   it("inverts identity", () => {
     const I = identity(4);
@@ -92,7 +65,7 @@ describe("inverse4x4", () => {
     );
 
     const inv = inverse4x4(A);
-    const res = multiply(inv, A);
+    const res = multiplyMatrices(inv, A);
 
     expectIdentity(res);
   });
@@ -105,7 +78,7 @@ describe("inverse4x4", () => {
     );
 
     const inv = inverse4x4(A);
-    const res = multiply(inv, A);
+    const res = multiplyMatrices(inv, A);
 
     expectIdentity(res);
   });
@@ -118,7 +91,7 @@ describe("inverse4x4", () => {
     );
 
     const inv = inverse4x4(A);
-    const res = multiply(inv, A);
+    const res = multiplyMatrices(inv, A);
 
     expectIdentity(res);
   });
@@ -137,7 +110,7 @@ describe("inverse4x4", () => {
     for (let i = 0; i < 50; i++) {
       const A = createRandomInvertible4x4();
       const inv = inverse4x4(A);
-      const I = multiply(A, inv);
+      const I = multiplyMatrices(A, inv);
       expectIdentity(I);
     }
   });

@@ -1,16 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getAngle } from "@/core/structure/operations/angle/getAngle";
 import { createLattice } from "@/core/lattice/lattice";
-
-function makeStructure(lattice, fracList: number[][]) {
-  return {
-    lattice,
-    sites: fracList.map((f) => ({
-      species: { symbol: "A" },
-      frac: new Float64Array(f),
-    })),
-  };
-}
+import { makeStructure } from "../../../../helpers/structure";
 
 describe("getAngle", () => {
   const cubic = createLattice([1, 0, 0, 0, 1, 0, 0, 0, 1]);

@@ -1,16 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getDihedral } from "@/core/structure/operations/angle/getDihedral";
 import { createLattice } from "@/core/lattice/lattice";
-
-function makeStructure(lattice: any, fracs: number[][]) {
-  return {
-    lattice,
-    sites: fracs.map((f) => ({
-      species: { symbol: "A" },
-      frac: new Float64Array(f),
-    })),
-  };
-}
+import { makeStructure } from "../../../../helpers/structure";
 
 describe("getDihedral (including skewed lattice)", () => {
   it("works in orthonormal cubic lattice", () => {

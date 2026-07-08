@@ -1,18 +1,7 @@
 import { bench, describe } from "vitest";
 import { createMatrix } from "@/core/matrix/matrix";
 import { pow } from "@/core/matrix/operations/pow";
-
-function makeInvertibleMatrix(size: number) {
-  const data = new Array(size * size).fill(0);
-
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      data[r * size + c] = r === c ? size + 1 : 1;
-    }
-  }
-
-  return createMatrix(size, size, data);
-}
+import { makeInvertibleMatrix } from "../../../helpers/matrix";
 
 const sizes = [8, 16, 32, 64];
 

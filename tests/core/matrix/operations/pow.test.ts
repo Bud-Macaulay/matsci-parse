@@ -1,22 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMatrix, identity } from "@/core/matrix/matrix";
 import { pow } from "@/core/matrix/operations/pow";
-
-function expectIdentity(m: ReturnType<typeof createMatrix>, tol = 10) {
-  const n = m.rows;
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      const val = m.data[r * n + c];
-
-      if (r === c) {
-        expect(val).toBeCloseTo(1, tol);
-      } else {
-        expect(val).toBeCloseTo(0, tol);
-      }
-    }
-  }
-}
+import { expectIdentity } from "../../../helpers/matrix";
 
 describe("pow", () => {
   it("A^0 = I", () => {

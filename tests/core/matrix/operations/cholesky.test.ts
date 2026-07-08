@@ -3,24 +3,7 @@ import { createMatrix } from "@/core/matrix/matrix";
 import { cholesky } from "@/core/matrix/operations/cholesky";
 import { mul } from "@/core/matrix/operations/mul";
 import { transpose } from "@/core/matrix/operations/transpose";
-
-function expectLLtEqualsA(L: ReturnType<typeof createMatrix>, A: ReturnType<typeof createMatrix>, tol = 10) {
-  const n = L.rows;
-  const ld = L.data;
-  const ad = A.data;
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      let sum = 0;
-
-      for (let k = 0; k < n; k++) {
-        sum += ld[r * n + k] * ld[c * n + k];
-      }
-
-      expect(sum).toBeCloseTo(ad[r * n + c], tol);
-    }
-  }
-}
+import { expectLLtEqualsA } from "../../../helpers/matrix";
 
 describe("cholesky", () => {
   it("decomposes 2x2 symmetric PD matrix (LLᵀ = A)", () => {
