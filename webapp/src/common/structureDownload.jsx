@@ -122,7 +122,7 @@ export default function StructureDownload({ structure, download_formats }) {
       {/* Button */}
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center justify-center px-2.5 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
+        className="flex items-center justify-center px-2.5 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 hover:cursor-pointer transition shadow-sm"
         title="Download"
       >
         <DownloadIcon />

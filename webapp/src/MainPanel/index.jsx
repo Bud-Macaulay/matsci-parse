@@ -2,6 +2,7 @@ import StructureVisualizer from "mc-react-structure-visualizer";
 
 import BaseTable from "../common/BaseTable";
 import StructureDownload from "../common/structureDownload";
+import QEInputButton from "../common/QEInputButton";
 
 import SymmetrySubpanel from "./SymmetrySubPanel";
 import TransformLatticePanel from "./TransformLatticePanel";
@@ -347,6 +348,10 @@ export default function MainPanel({ tab, updateTab }) {
         <div className="flex-1 bg-white overflow-hidden relative">
           <div className="absolute top-2 right-2 z-10">
             <StructureDownload structure={structure} />
+          </div>
+
+          <div className="absolute top-2 left-2 z-10">
+            <QEInputButton structure={structure} />
           </div>
 
           <StructureVisualizer
