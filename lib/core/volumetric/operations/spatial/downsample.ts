@@ -1,6 +1,11 @@
 import { VolumetricData } from "../../volumetric";
 import { resize } from "./resize";
 
+/** Reduce spatial resolution by an integer or per-axis factor.
+ * @param vol - The volumetric dataset.
+ * @param factor - Downsampling factor (scalar or per-axis tuple).
+ * @returns The downsampled volumetric dataset.
+ */
 export function downsample(
   vol: VolumetricData,
   factor: number | [number, number, number] = 2,

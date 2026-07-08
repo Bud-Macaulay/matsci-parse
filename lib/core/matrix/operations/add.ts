@@ -1,5 +1,9 @@
 import { createMatrix, type Matrix } from "../matrix";
 
+/** Add two matrices element-wise.
+ * @param a - First matrix.
+ * @param b - Second matrix.
+ * @returns A new Matrix containing the element-wise sum. */
 export function add(a: Matrix, b: Matrix): Matrix {
   if (a.rows !== b.rows || a.cols !== b.cols) {
     throw new Error("Matrix dimensions must match");

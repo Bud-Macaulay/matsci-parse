@@ -11,6 +11,7 @@ function clean(x: number): number {
   return Math.abs(x) < EPS ? 0 : x;
 }
 
+/** Return a copy with all fractional coordinates wrapped to [0, 1) and near-zero values cleaned. */
 export function canonicalize(structure: Structure): Structure {
   return {
     ...structure,

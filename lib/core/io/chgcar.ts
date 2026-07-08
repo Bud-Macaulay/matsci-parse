@@ -3,6 +3,7 @@ import { VolumetricData, createVolumetricData } from "../volumetric/volumetric";
 import { Matrix, identity } from "../matrix/matrix";
 import { fromPOSCAR } from "./poscar";
 
+/** Options for parsing VASP CHGCAR files. */
 export interface CHGCAROptions {
   spinChannel?: "total" | "up" | "down" | "magnetization";
   includeAugmentation?: boolean;
@@ -10,6 +11,7 @@ export interface CHGCAROptions {
 
 // Currently only supports the first channel ... which is perhaps not the best...
 // TODO: fix this to support multichannel
+/** Parses a VASP CHGCAR string into volumetric data and structure. */
 export function fromCHGCAR(
   text: string,
   options: CHGCAROptions = {},

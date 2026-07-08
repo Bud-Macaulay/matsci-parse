@@ -1,4 +1,5 @@
 // prettier-ignore
+/** Space group data array indexed by space group number: [bravais_letter, centering, chiral]. */
 export const spgroup_data = [
     null, // unused (SG = 0)
     ["a","P", false], ["a","P", true], ["m","P", false], ["m","P", false], 
@@ -61,6 +62,7 @@ export const spgroup_data = [
     ["c","I", true], ["c","I", true]];
 
 // prettier-ignore
+/** Centering symbols for each space group (1-indexed). */
 export const centering = [
     "P","P","P","P","C","P","P","C","C","P","P","C","P","P","C","P","P","P",
     "P","C","C","F","I","I","P","P","P","P","P","P","P","P","P","P","C","C",

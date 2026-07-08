@@ -1,6 +1,7 @@
 import { Structure } from "../../structure";
 import { Site } from "../../../site/site";
 
+/** Replace a single site at the given index. */
 export function replaceSite(
   structure: Structure,
   index: number,
@@ -15,6 +16,7 @@ export function replaceSite(
   };
 }
 
+/** Replace multiple sites at the given indices. */
 export function replaceSites(
   structure: Structure,
   replacements: readonly {

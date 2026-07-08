@@ -1,5 +1,8 @@
 import { Matrix, createMatrix } from "../../matrix";
 
+/** Compute the inverse of a 4x4 matrix using the adjugate formula.
+ * @param m - A 4x4 matrix.
+ * @returns The inverse Matrix. */
 export function inverse4x4(m: Matrix): Matrix {
   if (m.rows !== 4 || m.cols !== 4) {
     throw new Error("Expected 4x4 matrix");

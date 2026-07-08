@@ -3,6 +3,7 @@ import { createLattice } from "../lattice";
 import { fractional, cartesian } from "../site";
 import { Structure } from "../structure";
 
+/** Parses an OPTIMADE structure data object into a Structure. */
 export function fromOptimade(data: any): Structure {
   const lattice = createLattice([
     ...data.attributes.lattice_vectors[0],
@@ -27,6 +28,7 @@ export function fromOptimade(data: any): Structure {
   };
 }
 
+/** Serializes a Structure to an OPTIMADE-compatible data object. */
 export function toOptimade(structure: Structure) {
   const m = structure.lattice.basis.data;
 

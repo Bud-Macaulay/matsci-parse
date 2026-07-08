@@ -1,5 +1,8 @@
 import { Matrix, createMatrix, clone, index } from "../../matrix";
 
+/** Compute the inverse of a square matrix using Gauss-Jordan elimination with partial pivoting.
+ * @param m - A square matrix.
+ * @returns The inverse Matrix. */
 export function gjInverse(m: Matrix): Matrix {
   if (m.rows !== m.cols) {
     throw new Error("Inverse requires square matrix");

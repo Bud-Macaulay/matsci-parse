@@ -1,8 +1,10 @@
+/** A 3-component vector. */
 export type Vec3 = Float64Array;
 
 // TODO: these are sort of generic geomtery utils
 // perhaps they would be better served higher up.
 
+/** Wrap a fractional displacement into the minimum-image convention (components in [-0.5, 0.5]). */
 export function minimumImage(df: Vec3): Float64Array {
   return new Float64Array([
     df[0] - Math.round(df[0]),
@@ -10,7 +12,7 @@ export function minimumImage(df: Vec3): Float64Array {
     df[2] - Math.round(df[2]),
   ]);
 }
-// flat metric tensor dot product: d^2 = x^T G x
+/** Squared distance from a minimum-image vector using the metric tensor G. */
 export function distanceSquared(mic: Vec3, G: Float64Array): number {
   const x = mic[0],
     y = mic[1],

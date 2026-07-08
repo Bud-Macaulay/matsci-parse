@@ -4,6 +4,7 @@ import { metricTensor } from "../../../lattice/metricTensor";
 import { distanceSquared } from "./utils";
 import { getDisplacement } from "./getDisplacement";
 
+/** Pairwise distance matrix for all sites, stored as an array of Float64Array rows. */
 export function getDistancesMatrix(structure: Structure): Float64Array[] {
   const n = structure.sites.length;
 

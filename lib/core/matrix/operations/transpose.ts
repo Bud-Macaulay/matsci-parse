@@ -1,5 +1,8 @@
 import { Matrix, createMatrix, index } from "../matrix";
 
+/** Transpose the given matrix (swap rows and columns).
+ * @param matrix - Input matrix.
+ * @returns A new transposed Matrix. */
 export function transpose(matrix: Matrix): Matrix {
   const out = createMatrix(matrix.cols, matrix.rows);
 

@@ -2,6 +2,9 @@ import { Matrix, createMatrix, clone } from "../../matrix";
 
 const EPSILON = 1e-12;
 
+/** Compute the inverse of a square matrix via LU decomposition with partial pivoting.
+ * @param m - A square matrix.
+ * @returns The inverse Matrix. */
 export function luInverse(m: Matrix): Matrix {
   if (m.rows !== m.cols) {
     throw new Error("Square matrix required");

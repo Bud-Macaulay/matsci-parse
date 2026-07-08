@@ -1,5 +1,13 @@
 import { VolumetricData, createVolumetricData } from "../../volumetric";
 
+/** Pad the volume on all sides by a given number of voxels per axis.
+ * @param vol - The volumetric dataset.
+ * @param px - Padding along x axis (both sides).
+ * @param py - Padding along y axis (both sides).
+ * @param pz - Padding along z axis (both sides).
+ * @param fill - Fill value for padded regions (default 0).
+ * @returns The padded volumetric dataset.
+ */
 export function pad(
   vol: VolumetricData,
   px: number,

@@ -18,6 +18,9 @@ function minor(matrix: Matrix, skipRow: number, skipCol: number): Matrix {
   return out;
 }
 
+/** Compute the determinant of a square matrix using Laplace expansion.
+ * @param matrix - A square matrix.
+ * @returns The determinant value. */
 export function determinant(matrix: Matrix): number {
   if (matrix.rows !== matrix.cols) {
     throw new Error("Determinant requires a square matrix");

@@ -43,6 +43,7 @@ function isCRYST1Sane(
   return true;
 }
 
+/** Parses a PDB (Protein Data Bank) string into a Structure. */
 export function fromPDB(text: string): Structure {
   const lines = text.split(/\r?\n/);
 
@@ -157,6 +158,7 @@ export function fromPDB(text: string): Structure {
   };
 }
 
+/** Serializes a Structure to a PDB string. */
 export function toPDB(
   structure: Structure,
   options?: {

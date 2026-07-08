@@ -16,6 +16,7 @@ function vecSub(a: Float64Array, b: Float64Array): Float64Array {
 // - it would likely be more consistent to use metric tensor to do this math
 // I guess some investigation is worth considering
 
+/** Dihedral angle (degrees) of the chain idx1-idx2-idx3-idx4 in Cartesian space. */
 export function getDihedral(
   structure: Structure,
   idx1: number,

@@ -123,6 +123,7 @@ function determineExtBravais(
   }
 }
 
+/** Determine the Seekpath extended Bravais lattice from symmetry data. */
 export async function getSeekPathHighSymPath(
   structure: Structure,
   symTol = 1e-6,

@@ -1,5 +1,12 @@
 import { VolumetricData, index } from "../../volumetric";
 
+/** Nearest-neighbour sampling at a continuous position in the volume.
+ * @param vol - The volumetric dataset.
+ * @param x - Continuous x coordinate.
+ * @param y - Continuous y coordinate.
+ * @param z - Continuous z coordinate.
+ * @returns Array of sampled values for all channels.
+ */
 export function sampleNearest(
   vol: VolumetricData,
   x: number,
@@ -7,6 +14,14 @@ export function sampleNearest(
   z: number,
 ): number[];
 
+/** Nearest-neighbour sampling for a single channel.
+ * @param vol - The volumetric dataset.
+ * @param x - Continuous x coordinate.
+ * @param y - Continuous y coordinate.
+ * @param z - Continuous z coordinate.
+ * @param channel - The channel index to sample.
+ * @returns Sampled value for the given channel.
+ */
 export function sampleNearest(
   vol: VolumetricData,
   x: number,

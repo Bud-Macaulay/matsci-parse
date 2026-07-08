@@ -4,6 +4,7 @@ import { findSites } from "./findSites";
 
 // matches species.symbol only.
 
+/** Find site indices whose species symbol matches the given species or string. */
 export function findSitesBySpecies(
   structure: Structure,
   species: Species | string,

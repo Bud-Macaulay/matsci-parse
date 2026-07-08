@@ -3,6 +3,9 @@ import { norm } from "./norm";
 
 const EPS = 1e-12;
 
+/** Return a unit vector in the direction of v.
+ * @param v - Input vector.
+ * @returns A normalized unit vector. */
 export function normalize(v: Vector): Vector {
   const n = norm(v);
 

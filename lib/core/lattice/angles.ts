@@ -14,6 +14,7 @@ function angle(u: Vector, v: Vector) {
   return Math.acos(clamped);
 }
 
+/** Compute the three inter-vector angles (alpha, beta, gamma) in radians. */
 export function angles(lattice: Lattice): [number, number, number] {
   const m = lattice.basis.data;
 

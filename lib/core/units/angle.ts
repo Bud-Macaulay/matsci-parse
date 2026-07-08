@@ -1,5 +1,6 @@
 import { convertMeasurement, convertMeasurementArray } from "./converter";
 
+/** Supported angle unit identifiers. */
 export type AngleUnits = "rad" | "deg" | "grad";
 
 const AngleConversions: Record<AngleUnits, number> = {
@@ -15,6 +16,7 @@ const AngleAliases: Record<string, AngleUnits> = {
   gon: "grad",
 };
 
+/** Unit system for angle conversions with radian as base. */
 export const AngleUnitSystem = {
   conversions: AngleConversions,
   aliases: AngleAliases,

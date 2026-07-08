@@ -61,6 +61,7 @@ function isInside(v: Float64Array, planes: Plane[]) {
   return true;
 }
 
+/** Generate Brillouin zone vertices from the reciprocal crystallographic lattice. */
 export async function generateBZVertices(
   structure: Structure,
   tolerance: number = 1e-4,

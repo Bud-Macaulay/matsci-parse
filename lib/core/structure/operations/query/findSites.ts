@@ -3,6 +3,7 @@ import { Site } from "../../../site/site";
 
 // generic method for finding sites on a given condition.
 
+/** Find site indices matching a predicate. */
 export function findSites(
   structure: Structure,
   predicate: (site: Site, index: number) => boolean,

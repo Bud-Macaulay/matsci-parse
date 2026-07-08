@@ -1,6 +1,7 @@
 import { Matrix } from "../matrix";
 import { identity } from "../matrix";
 
+/** Scalar or multi-channel volumetric grid data. */
 export interface VolumetricData {
   readonly data: Float64Array;
   readonly shape: [number, number, number];
@@ -13,10 +14,12 @@ export interface VolumetricData {
 
 type ReduceAxis = "all" | "channels";
 
+/** Reduction axis configuration. */
 export interface ReduceOptions {
   axis?: ReduceAxis;
 }
 
+/** Create a VolumetricData from shape and optional data buffer. */
 export function createVolumetricData(params: {
   shape: [number, number, number];
   channels?: number;
@@ -72,6 +75,13 @@ export function createVolumetricData(params: {
   };
 }
 
+/** Compute the flat buffer index for a voxel coordinate and channel. */
+/** @param vol - Volumetric data. */
+/** @param x - Column index. */
+/** @param y - Row index. */
+/** @param z - Depth index. */
+/** @param c - Channel index. */
+/** @returns Linear index into the data buffer. */
 export function index(
   vol: VolumetricData,
   x: number,

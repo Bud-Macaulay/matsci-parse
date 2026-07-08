@@ -1,5 +1,10 @@
 import { createVolumetricData } from "../volumetric";
 
+/** Create a volumetric grid filled with a constant value. */
+/** @param shape - Grid dimensions [depth, height, width]. */
+/** @param value - Fill value. */
+/** @param channels - Number of channels (default 1). */
+/** @returns A new VolumetricData filled with value. */
 export function fill(
   shape: [number, number, number],
   value: number,

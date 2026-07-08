@@ -4,6 +4,7 @@ import { Lattice } from "./lattice";
 
 const RAD2DEG = 180 / Math.PI;
 
+/** Return lattice parameters (a, b, c, alpha, beta, gamma) with angles in degrees. */
 export function parameters(
   lattice: Lattice,
 ): [number, number, number, number, number, number] {

@@ -1,5 +1,6 @@
 import { convertMeasurement, convertMeasurementArray } from "./converter";
 
+/** Supported length unit identifiers. */
 export type LengthUnits =
   | "angstrom"
   | "bohr"
@@ -26,6 +27,7 @@ const LengthAliases: Record<string, LengthUnits> = {
   μm: "um",
 };
 
+/** Unit system for length conversions with angstrom as base. */
 export const LengthUnitSystem = {
   conversions: LengthConversions,
   aliases: LengthAliases,

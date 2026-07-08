@@ -4,6 +4,7 @@ import { metricTensor } from "../../../lattice/metricTensor";
 import { distanceSquared } from "./utils";
 import { getDisplacement } from "./getDisplacement";
 
+/** Distances from site `idx` to every other site. */
 export function getDistances(structure: Structure, idx: number): Float64Array {
   const n = structure.sites.length;
   const out = new Float64Array(n);

@@ -1,5 +1,10 @@
 import { VolumetricData, index } from "../../volumetric";
 
+/** Extract a single channel as a flat array of voxel values.
+ * @param vol - The volumetric dataset.
+ * @param c - The channel index to extract.
+ * @returns Flat array of voxel values for the given channel.
+ */
 export function getChannel(vol: VolumetricData, c: number): number[] {
   const { shape, data } = vol;
 

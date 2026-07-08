@@ -1,6 +1,11 @@
 import { VolumetricData, createVolumetricData } from "../../volumetric";
 import { sampleLinear } from "./sampleLinear";
 
+/** Resize the volume to a new shape using linear interpolation.
+ * @param vol - The volumetric dataset.
+ * @param newShape - Target shape as [D, H, W].
+ * @returns The resized volumetric dataset.
+ */
 export function resize(
   vol: VolumetricData,
   newShape: [number, number, number],

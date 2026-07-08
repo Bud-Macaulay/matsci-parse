@@ -22,6 +22,7 @@ function isCartesian(line: string): boolean {
 // TODO: would be good to ensure that the title is also optionally
 // maintained.
 
+/** Parses a POSCAR/CONTCAR string into a Structure. */
 export function fromPOSCAR(text: string): Structure {
   const lines = text.split("\n").map((x) => x.trim());
 
@@ -109,6 +110,7 @@ export function fromPOSCAR(text: string): Structure {
   };
 }
 
+/** Serializes a Structure to a POSCAR string. */
 export function toPOSCAR(
   structure: Structure,
   options?: {

@@ -1,5 +1,10 @@
 import { ReduceOptions, VolumetricData } from "../../volumetric";
 
+/** Compute the maximum voxel value across all or per-channel.
+ * @param vol - The volumetric dataset.
+ * @param options - Reduction options specifying axis mode.
+ * @returns Global maximum or per-channel maximum array.
+ */
 export function max(
   vol: VolumetricData,
   { axis = "all" }: ReduceOptions = {},

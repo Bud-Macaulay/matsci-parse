@@ -1,6 +1,7 @@
 import { Structure } from "../../structure";
 import { Site } from "../../../site/site";
 
+/** Append a single site to the structure. */
 export function appendSite(structure: Structure, site: Site): Structure {
   const sites = structure.sites.slice();
   sites.push(site);
@@ -11,6 +12,7 @@ export function appendSite(structure: Structure, site: Site): Structure {
   };
 }
 
+/** Append multiple sites to the structure. */
 export function appendSites(
   structure: Structure,
   sitesToAppend: readonly Site[],

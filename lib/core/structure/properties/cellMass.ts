@@ -24,6 +24,11 @@ function siteMass(site: Site): number {
   return element.mass;
 }
 
+/**
+ * Sum the masses of all sites in the structure.
+ * @param structure - Structure to evaluate.
+ * @returns Total mass in atomic mass units.
+ */
 export function cellMass(structure: Structure): number {
   let mass = 0;
 

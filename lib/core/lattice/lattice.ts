@@ -6,10 +6,12 @@ function clean(x: number): number {
   return Math.abs(x) < EPS ? 0 : x;
 }
 
+/** A lattice defined by a 3x3 basis matrix (column vectors). */
 export interface Lattice {
   basis: Matrix;
 }
 
+/** Create a Lattice from 3 diagonal lengths, 9 matrix values, or a Matrix. */
 export function createLattice(
   data: number[] | Float64Array | Matrix | [number, number, number],
 ): Lattice {
