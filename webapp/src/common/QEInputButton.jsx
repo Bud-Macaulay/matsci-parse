@@ -55,7 +55,6 @@ export default function QEInputButton({ structure }) {
       disabled={!structure}
       title="Use the chosen structure in the QE Input Generator Tool"
       className="px-2.5 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 hover:cursor-pointer transition shadow-sm"
-      //   className={`${baseButtonStyle} ${textNormal}`}
     >
       Use in QE Input Generator
     </button>
