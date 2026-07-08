@@ -6,7 +6,9 @@ import { findSites } from "./findSites";
 
 export function findSitesBySpecies(
   structure: Structure,
-  species: Species,
+  species: Species | string,
 ): number[] {
-  return findSites(structure, (site) => site.species.symbol === species.symbol);
+  const symbol = typeof species === "string" ? species : species.symbol;
+
+  return findSites(structure, (site) => site.species.symbol === symbol);
 }
