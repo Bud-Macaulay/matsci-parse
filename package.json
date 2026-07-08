@@ -19,7 +19,8 @@
     "test": "vitest",
     "bench": "vitest bench",
     "test:run": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "docs": "typedoc --skipErrorChecking"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
