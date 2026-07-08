@@ -1,6 +1,5 @@
-import { Matrix, createMatrix, clone } from "../../matrix";
-
-const EPSILON = 1e-12;
+import { Matrix, createMatrix } from "../../matrix";
+import { lu } from "../lu";
 
 /** Compute the inverse of a square matrix via LU decomposition with partial pivoting.
  * @param m - A square matrix.
@@ -11,60 +10,13 @@ export function luInverse(m: Matrix): Matrix {
   }
 
   const n = m.rows;
-  const LU = clone(m);
+  const { LU, piv, singular } = lu(m);
+
+  if (singular) {
+    throw new Error("Singular matrix");
+  }
+
   const data = LU.data;
-
-  // Pivot permutation vector
-  const piv = new Int32Array(n);
-  for (let i = 0; i < n; i++) {
-    piv[i] = i;
-  }
-
-  // LU factorization with partial pivoting
-  for (let k = 0; k < n; k++) {
-    // Find pivot row
-    let pivot = k;
-    let max = Math.abs(data[k * n + k]);
-    for (let i = k + 1; i < n; i++) {
-      const v = Math.abs(data[i * n + k]);
-      if (v > max) {
-        max = v;
-        pivot = i;
-      }
-    }
-
-    if (max < EPSILON) {
-      throw new Error("Singular matrix");
-    }
-
-    // Swap rows if needed
-    if (pivot !== k) {
-      const rowK = k * n;
-      const rowP = pivot * n;
-      for (let j = 0; j < n; j++) {
-        let tmp = data[rowK + j];
-        data[rowK + j] = data[rowP + j];
-        data[rowP + j] = tmp;
-      }
-      let tmp = piv[k];
-      piv[k] = piv[pivot];
-      piv[pivot] = tmp;
-    }
-
-    // Elimination
-    const rowK = k * n;
-    const pivotVal = data[rowK + k];
-
-    for (let i = k + 1; i < n; i++) {
-      const rowI = i * n;
-      data[rowI + k] /= pivotVal;
-      const factor = data[rowI + k];
-
-      for (let j = k + 1; j < n; j++) {
-        data[rowI + j] -= factor * data[rowK + j];
-      }
-    }
-  }
 
   // Construct inverse - solve all columns at once
   const inv = createMatrix(n, n);

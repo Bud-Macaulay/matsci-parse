@@ -25,7 +25,7 @@ describe("supercell", () => {
     expect(sc.lattice.basis.data[8]).toBeCloseTo(s.lattice.basis.data[8] * 2);
   });
 
-  it("creates 2x2x2 expansion", () => {
+  it("creates 4x4x4 expansion with scalar argument", () => {
     const s = fromPOSCAR(diamondCPOSCAR);
 
     const sc = supercell(s, 4);

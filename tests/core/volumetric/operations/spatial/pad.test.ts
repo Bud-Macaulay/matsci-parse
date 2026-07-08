@@ -35,6 +35,6 @@ describe("pad", () => {
     const data = Array.from(v2.data);
 
     // corners should be fill value
-    expect(data.filter((x) => x === 7).length).toBeGreaterThan(0);
+    expect(data.filter((x) => x === 7).length).toBe(26);
   });
 });

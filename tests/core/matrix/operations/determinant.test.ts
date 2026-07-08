@@ -98,7 +98,7 @@ describe("determinant", () => {
         }),
       );
 
-      expect(determinant(at)).toBeCloseTo(determinant(a), 10);
+      expect(determinant(at)).toBeCloseTo(determinant(a), 6);
     }
   });
 });

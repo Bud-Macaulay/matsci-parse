@@ -1,24 +1,7 @@
-import { Matrix, createMatrix, index } from "../matrix";
+import { Matrix } from "../matrix";
+import { lu } from "./lu";
 
-function minor(matrix: Matrix, skipRow: number, skipCol: number): Matrix {
-  const out = createMatrix(matrix.rows - 1, matrix.cols - 1);
-
-  let ptr = 0;
-
-  for (let row = 0; row < matrix.rows; row++) {
-    if (row === skipRow) continue;
-
-    for (let col = 0; col < matrix.cols; col++) {
-      if (col === skipCol) continue;
-
-      out.data[ptr++] = matrix.data[index(matrix.cols, row, col)];
-    }
-  }
-
-  return out;
-}
-
-/** Compute the determinant of a square matrix using Laplace expansion.
+/** Compute the determinant of a square matrix using LU decomposition (O(n³)).
  * @param matrix - A square matrix.
  * @returns The determinant value. */
 export function determinant(matrix: Matrix): number {
@@ -47,12 +30,15 @@ export function determinant(matrix: Matrix): number {
     return matrix.data[0] * matrix.data[3] - matrix.data[1] * matrix.data[2];
   }
 
-  let det = 0;
+  const { LU, sign, singular } = lu(matrix);
 
-  for (let col = 0; col < n; col++) {
-    const sign = col % 2 === 0 ? 1 : -1;
+  if (singular) return 0;
 
-    det += sign * matrix.data[col] * determinant(minor(matrix, 0, col));
+  const data = LU.data;
+  let det = sign;
+
+  for (let i = 0; i < n; i++) {
+    det *= data[i * n + i];
   }
 
   return det;
