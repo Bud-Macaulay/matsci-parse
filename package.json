@@ -17,7 +17,8 @@
     "build": "vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
-    "bench": "vitest bench",
+    "bench": "vitest bench --outputJson=benchmarks/results.json",
+    "bench:compare": "vitest bench --compare=benchmarks/results.json",
     "test:run": "vitest run",
     "coverage": "vitest run --coverage",
     "docs": "typedoc --skipErrorChecking"

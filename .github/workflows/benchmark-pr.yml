@@ -1,0 +1,32 @@
+name: Benchmark PR
+on:
+  pull_request:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run benchmarks on base (${{ github.base_ref }})
+        run: npx vitest bench --run --outputJson=/tmp/base-results.json
+
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          fetch-depth: 0
+
+      - name: Run benchmarks on HEAD and compare
+        run: npx vitest bench --run --compare=/tmp/base-results.json
