@@ -2,7 +2,9 @@ import { fromParameters } from "../lattice/create/fromParameters";
 import { parameters } from "../lattice/parameters";
 import { Structure } from "../structure/structure";
 
-function cleanValue(value: string): number {
+function cleanValue(value: string | undefined): number {
+  if (value === undefined) return NaN;
+
   // remove uncertainty notation:
   // 5.432(1) -> 5.432
   return Number(value.replace(/\(.+\)/, ""));
@@ -109,17 +111,25 @@ export function fromCIF(text: string): Structure {
     throw new Error("Missing required atom site columns");
   }
 
-  const sites = atomRows.map((row) => ({
-    species: {
-      symbol: row[ispecies],
-    },
+  const maxCol = Math.max(ix, iy, iz, ispecies);
 
-    frac: new Float64Array([
-      cleanValue(row[ix]),
-      cleanValue(row[iy]),
-      cleanValue(row[iz]),
-    ]),
-  }));
+  const sites = atomRows.map((row) => {
+    if (row.length <= maxCol) {
+      throw new Error("Incomplete atom site data row");
+    }
+
+    return {
+      species: {
+        symbol: row[ispecies],
+      },
+
+      frac: new Float64Array([
+        cleanValue(row[ix]),
+        cleanValue(row[iy]),
+        cleanValue(row[iz]),
+      ]),
+    };
+  });
 
   return {
     lattice,

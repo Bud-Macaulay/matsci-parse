@@ -23,6 +23,10 @@ export function fromPW(text: string): Structure {
 
     if (/^CELL_PARAMETERS/i.test(line)) {
       for (let j = 1; j <= 3; j++) {
+        if (i + j >= lines.length) {
+          throw new Error("Incomplete CELL_PARAMETERS block");
+        }
+
         latticeRows.push(lines[i + j].split(/\s+/).map(Number));
       }
 

@@ -4,7 +4,7 @@ import { cross } from "../../../matrix/operations/vector/cross";
 import { norm } from "../../../matrix/operations/vector/norm";
 import { cartesian } from "../../../site/cartesian";
 
-import { reciprocalLattice } from "@/main";
+import { reciprocalLattice } from "../../../lattice/reciprocalLattice";
 
 /** A plane defined by a unit normal and a point on the plane (Cartesian). */
 export interface Plane {

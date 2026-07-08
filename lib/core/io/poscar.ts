@@ -141,18 +141,21 @@ export function toPOSCAR(
   for (const site of structure.sites) {
     const symbol = site.species.symbol;
 
-    if (!grouped.has(symbol)) {
-      grouped.set(symbol, []);
-    }
+    const group = grouped.get(symbol);
 
-    grouped.get(symbol)!.push(site);
+    if (group) {
+      group.push(site);
+    } else {
+      grouped.set(symbol, [site]);
+    }
   }
+
 
   const species = [...grouped.keys()];
   const sites = [...grouped.values()].flat();
 
   lines.push(species.join(" "));
-  lines.push(species.map((s) => grouped.get(s)!.length).join(" "));
+  lines.push(species.map((s) => (grouped.get(s) ?? []).length).join(" "));
 
   lines.push(direct ? "Direct" : "Cartesian");
 

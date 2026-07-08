@@ -6,7 +6,7 @@ import { Vector } from "../matrix/vector";
 
 function angle(u: Vector, v: Vector) {
   const denom = norm(u) * norm(v);
-  if (denom === 0) throw new Error("Zero-length lattice vector");
+  if (Math.abs(denom) < 1e-300) throw new Error("Zero-length lattice vector");
 
   const c = dot(u, v) / denom;
   const clamped = Math.max(-1, Math.min(1, c));

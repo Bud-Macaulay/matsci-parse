@@ -35,6 +35,10 @@ export function cholesky(A: Matrix): Matrix {
 
     const diag = ld[j * n + j];
 
+    if (diag <= 0) {
+      throw new Error("Matrix is not positive definite");
+    }
+
     for (let i = j + 1; i < n; i++) {
       let sum2 = 0;
 

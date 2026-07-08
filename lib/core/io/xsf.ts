@@ -25,6 +25,10 @@ export function fromXSF(text: string): Structure {
 
   const vecStart = findSection(lines, "PRIMVEC");
 
+  if (vecStart + 3 >= lines.length) {
+    throw new Error("Incomplete PRIMVEC block");
+  }
+
   const lattice = createLattice([
     ...lines[vecStart + 1].split(/\s+/).map(Number),
     ...lines[vecStart + 2].split(/\s+/).map(Number),
@@ -33,7 +37,19 @@ export function fromXSF(text: string): Structure {
 
   const coordStart = findSection(lines, "PRIMCOORD");
 
+  if (coordStart + 1 >= lines.length) {
+    throw new Error("Incomplete PRIMCOORD block");
+  }
+
   const [nAtoms] = lines[coordStart + 1].split(/\s+/).map(Number);
+
+  if (!Number.isInteger(nAtoms) || nAtoms < 0) {
+    throw new Error("Invalid atom count in PRIMCOORD");
+  }
+
+  if (coordStart + 2 + nAtoms > lines.length) {
+    throw new Error("Atom count exceeds available lines in PRIMCOORD");
+  }
 
   const sites: Site[] = [];
 

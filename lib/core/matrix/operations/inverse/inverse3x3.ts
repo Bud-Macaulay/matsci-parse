@@ -32,7 +32,7 @@ export function inverse3x3(m: Matrix): Matrix {
 
   const det = a00 * c00 + a01 * c01 + a02 * c02;
 
-  if (det === 0) {
+  if (Math.abs(det) < 1e-12) {
     throw new Error("Singular matrix");
   }
 

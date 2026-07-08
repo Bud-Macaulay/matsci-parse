@@ -1,5 +1,5 @@
-import { Species } from "@/main";
-import { Structure } from "@/main";
+import { Species } from "../../../species/species";
+import { Structure } from "../../structure";
 import { findSites } from "./findSites";
 
 // matches species.symbol only.

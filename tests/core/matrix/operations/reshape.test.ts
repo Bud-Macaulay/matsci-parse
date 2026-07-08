@@ -34,13 +34,13 @@ describe("reshape", () => {
     expect([...r.data]).toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
   });
 
-  it("returns a view when no copy is performed", () => {
+  it("returns a copy of the data (not a shared view)", () => {
     const m = createMatrix(2, 2, [1, 2, 3, 4]);
 
     const r = reshape(m, 4, 1);
 
-    // same underlying buffer expected in zero-copy implementation
-    expect(r.data).toBe(m.data);
+    expect([...r.data]).toEqual([1, 2, 3, 4]);
+    expect(r.data).not.toBe(m.data);
   });
 
   it("does not mutate original matrix metadata", () => {

@@ -33,13 +33,26 @@ function parseLattice(info: ExtendedXYZInfo) {
 export function fromXYZ(text: string) {
   const lines = text.trim().split("\n");
 
+  if (lines.length < 2) {
+    throw new Error("XYZ file is too short");
+  }
+
   const n = Number(lines[0]);
+
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error("Invalid atom count in XYZ file");
+  }
+
   const comment = lines[1];
 
   const info = parseHeader(comment);
   const lattice = parseLattice(info);
 
   const sites: Site[] = [];
+
+  if (lines.length < 2 + n) {
+    throw new Error("Atom count exceeds available lines in XYZ file");
+  }
 
   for (let i = 0; i < n; i++) {
     const [symbol, x, y, z] = lines[2 + i].split(/\s+/);

@@ -1,5 +1,5 @@
 import { Structure } from "../structure";
-import { Species } from "../../site/species";
+import { Species } from "../../species/species";
 
 /**
  * Collect unique Species from a structure.

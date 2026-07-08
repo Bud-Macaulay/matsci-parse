@@ -1,6 +1,6 @@
 import { Structure } from "../structure";
 import { canonicalize } from "./canonicalize";
-import { Vec3 } from "@/main";
+import { Vec3 } from "../../site/site";
 
 function toFixedArray(v: Vec3, precision = 8): string {
   return Array.from(v)

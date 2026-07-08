@@ -15,7 +15,7 @@ export function inverse2x2(m: Matrix): Matrix {
 
   const det = a * d - b * c;
 
-  if (det === 0) {
+  if (Math.abs(det) < 1e-12) {
     throw new Error("Singular matrix");
   }
 

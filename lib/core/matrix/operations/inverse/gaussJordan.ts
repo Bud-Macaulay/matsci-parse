@@ -23,10 +23,10 @@ export function gjInverse(m: Matrix): Matrix {
     let pivotIdx = i * n + i;
 
     // Pivoting
-    if (Adata[pivotIdx] === 0) {
+    if (Math.abs(Adata[pivotIdx]) < 1e-12) {
       let swapRow = -1;
       for (let r = i + 1; r < n; r++) {
-        if (Adata[r * n + i] !== 0) {
+        if (Math.abs(Adata[r * n + i]) > 1e-12) {
           swapRow = r;
           break;
         }
@@ -66,7 +66,7 @@ export function gjInverse(m: Matrix): Matrix {
       if (r === i) continue;
 
       const factor = Adata[r * n + i];
-      if (factor === 0) continue; // Skip if already zero
+      if (Math.abs(factor) < 1e-12) continue;
 
       const rOffset = r * n;
       for (let c = 0; c < n; c++) {

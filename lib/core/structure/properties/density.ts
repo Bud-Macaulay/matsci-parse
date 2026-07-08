@@ -8,5 +8,11 @@ import { cellMass } from "./cellMass";
  * @returns Density in amu/Ang^3.
  */
 export function density(structure: Structure): number {
-  return cellMass(structure) / volume(structure);
+  const vol = volume(structure);
+
+  if (vol < 1e-300) {
+    throw new Error("Degenerate cell has no volume");
+  }
+
+  return cellMass(structure) / vol;
 }
