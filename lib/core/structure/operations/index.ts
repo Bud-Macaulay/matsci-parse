@@ -7,3 +7,4 @@ export * from "./supercell";
 
 export * from "./distance";
 export * from "./query";
+export * from "./surface";
