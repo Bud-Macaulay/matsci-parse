@@ -1,5 +1,6 @@
 import { createLattice, Lattice } from "../lattice/lattice";
-import { cartesian, fractional } from "../site";
+import { inverse } from "../lattice/inverse";
+import { cartesian } from "../site";
 import { Site } from "../site/site";
 import { Structure } from "../structure/structure";
 import { LineReader } from "./helpers";
@@ -91,14 +92,19 @@ export function fromXYZ(text: string): Structure {
 
   let hasSelective = false;
 
+  const invData = inverse(lattice).data;
+
   for (let i = 0; i < n; i++) {
     const atomLine = r.next();
-    if (atomLine === null) throw new Error("Atom count exceeds available lines in XYZ file");
+    if (atomLine === null)
+      throw new Error("Atom count exceeds available lines in XYZ file");
 
     const tokens = atomLine.trim().split(/\s+/);
 
     let symbol = "";
-    let x = 0, y = 0, z = 0;
+    let x = 0,
+      y = 0,
+      z = 0;
     const props: Record<string, unknown> = {};
 
     for (const def of propDefs) {
@@ -111,9 +117,11 @@ export function fromXYZ(text: string): Structure {
         y = Number(values[1]);
         z = Number(values[2]);
       } else if (def.name === "selectiveDynamics") {
-        const sd = values.map(
-          (v: string) => v.toLowerCase() === "t",
-        ) as [boolean, boolean, boolean];
+        const sd = values.map((v: string) => v.toLowerCase() === "t") as [
+          boolean,
+          boolean,
+          boolean,
+        ];
         props.selectiveDynamics = sd;
         hasSelective = true;
       } else {
@@ -132,7 +140,12 @@ export function fromXYZ(text: string): Structure {
 
     const site: Site = {
       species: { symbol },
-      frac: fractional(lattice, new Float64Array([x, y, z])),
+      // inlined site conv for perf.
+      frac: new Float64Array([
+        invData[0] * x + invData[3] * y + invData[6] * z,
+        invData[1] * x + invData[4] * y + invData[7] * z,
+        invData[2] * x + invData[5] * y + invData[8] * z,
+      ]),
     };
 
     if (Object.keys(props).length > 0) {
