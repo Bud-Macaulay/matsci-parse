@@ -1,60 +1,45 @@
 import { createLattice } from "../lattice/lattice";
-import { fractional } from "../site/fractional";
 import { cartesian } from "../site/cartesian";
+import { fractional } from "../site/fractional";
 import { Site } from "../site/site";
 import { Structure } from "../structure/structure";
+import { LineReader } from "./helpers";
 
-function findSection(lines: string[], section: string): number {
-  const idx = lines.findIndex((line) => line.trim().toUpperCase() === section);
-
-  if (idx === -1) {
-    throw new Error(`Missing ${section}`);
+function nextSectionLine(r: LineReader, section: string): void {
+  let line: string | null;
+  while ((line = r.next()) !== null) {
+    if (line.trim().toUpperCase() === section) return;
   }
-
-  return idx;
+  throw new Error(`Missing ${section}`);
 }
 
 // TODO: support atomic numbers instead of symbols in primvec.
 
 /** Parses an XSF (XCrySDen Structure Format) string into a Structure. */
 export function fromXSF(text: string): Structure {
-  const lines = text
-    .split("\n")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const r = new LineReader(text);
 
-  const vecStart = findSection(lines, "PRIMVEC");
-
-  if (vecStart + 3 >= lines.length) {
-    throw new Error("Incomplete PRIMVEC block");
-  }
+  nextSectionLine(r, "PRIMVEC");
 
   const lattice = createLattice([
-    ...lines[vecStart + 1].split(/\s+/).map(Number),
-    ...lines[vecStart + 2].split(/\s+/).map(Number),
-    ...lines[vecStart + 3].split(/\s+/).map(Number),
+    ...r.nextTrimmed().split(/\s+/).map(Number),
+    ...r.nextTrimmed().split(/\s+/).map(Number),
+    ...r.nextTrimmed().split(/\s+/).map(Number),
   ]);
 
-  const coordStart = findSection(lines, "PRIMCOORD");
+  nextSectionLine(r, "PRIMCOORD");
 
-  if (coordStart + 1 >= lines.length) {
-    throw new Error("Incomplete PRIMCOORD block");
-  }
-
-  const [nAtoms] = lines[coordStart + 1].split(/\s+/).map(Number);
+  const countLine = r.nextTrimmed();
+  const [nAtoms] = countLine.split(/\s+/).map(Number);
 
   if (!Number.isInteger(nAtoms) || nAtoms < 0) {
     throw new Error("Invalid atom count in PRIMCOORD");
   }
 
-  if (coordStart + 2 + nAtoms > lines.length) {
-    throw new Error("Atom count exceeds available lines in PRIMCOORD");
-  }
-
   const sites: Site[] = [];
 
   for (let i = 0; i < nAtoms; i++) {
-    const tokens = lines[coordStart + 2 + i].split(/\s+/);
+    const tokens = r.nextTrimmed().split(/\s+/);
 
     const symbol = tokens[0];
 
@@ -66,7 +51,7 @@ export function fromXSF(text: string): Structure {
 
     sites.push({
       species: { symbol },
-      frac,
+      frac: frac
     });
   }
 

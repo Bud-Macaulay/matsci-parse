@@ -50,3 +50,41 @@ describe("POSCAR round-trip fixtures", () => {
     });
   }
 });
+
+describe("selective dynamics", () => {
+  it("parses selective dynamics flags", () => {
+    const structure = fromPOSCAR(fixtures.selectiveDynamicsPoscar);
+
+    expect(structure.sites[0].properties?.selectiveDynamics).toEqual([
+      true,
+      true,
+      false,
+    ]);
+
+    expect(structure.sites[1].properties?.selectiveDynamics).toEqual([
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("preserves selective dynamics through round-trip", () => {
+    const a = fromPOSCAR(fixtures.selectiveDynamicsPoscar);
+    const text = toPOSCAR(a);
+    const b = fromPOSCAR(text);
+
+    for (let i = 0; i < a.sites.length; i++) {
+      expect(b.sites[i].properties?.selectiveDynamics).toEqual(
+        a.sites[i].properties?.selectiveDynamics,
+      );
+    }
+  });
+
+  it("does not add selective dynamics to non-SD POSCAR", () => {
+    const structure = fromPOSCAR(fixtures.simplePoscar);
+
+    for (const site of structure.sites) {
+      expect(site.properties?.selectiveDynamics).toBeUndefined();
+    }
+  });
+});

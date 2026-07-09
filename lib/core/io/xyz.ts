@@ -2,8 +2,16 @@ import { createLattice, Lattice } from "../lattice/lattice";
 import { cartesian, fractional } from "../site";
 import { Site } from "../site/site";
 import { Structure } from "../structure/structure";
+import { LineReader } from "./helpers";
 
 type ExtendedXYZInfo = Record<string, string>;
+
+type PropDef = {
+  name: string;
+  type: string;
+  count: number;
+  offset: number;
+};
 
 function parseHeader(comment: string): ExtendedXYZInfo {
   const info: ExtendedXYZInfo = {};
@@ -29,51 +37,121 @@ function parseLattice(info: ExtendedXYZInfo) {
   return createLattice([v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]]);
 }
 
-/** Parses an extended XYZ string into a Structure. */
-export function fromXYZ(text: string) {
-  const lines = text.trim().split("\n");
+function parseProperties(propStr: string): PropDef[] {
+  const parts = propStr.split(":");
+  const props: PropDef[] = [];
+  let offset = 0;
 
-  if (lines.length < 2) {
-    throw new Error("XYZ file is too short");
+  for (let i = 0; i < parts.length; i += 3) {
+    const count = Number(parts[i + 2]);
+    props.push({
+      name: parts[i],
+      type: parts[i + 1],
+      count,
+      offset,
+    });
+    offset += count;
   }
 
-  const n = Number(lines[0]);
+  return props;
+}
+
+/** Parses an extended XYZ string into a Structure. */
+export function fromXYZ(text: string): Structure {
+  const r = new LineReader(text);
+
+  // skip leading blank lines
+  let line: string | null;
+  do {
+    line = r.next();
+  } while (line !== null && line.trim().length === 0);
+
+  if (line === null) throw new Error("XYZ file is too short");
+
+  const n = Number(line.trim());
 
   if (!Number.isInteger(n) || n < 0) {
     throw new Error("Invalid atom count in XYZ file");
   }
 
-  const comment = lines[1];
+  const comment = r.next();
+  if (comment === null) throw new Error("XYZ file is too short");
 
   const info = parseHeader(comment);
   const lattice = parseLattice(info);
 
+  const propDefs = info.Properties
+    ? parseProperties(info.Properties)
+    : [
+        { name: "species", type: "S", count: 1, offset: 0 },
+        { name: "pos", type: "R", count: 3, offset: 1 },
+      ];
+
   const sites: Site[] = [];
 
-  if (lines.length < 2 + n) {
-    throw new Error("Atom count exceeds available lines in XYZ file");
-  }
+  let hasSelective = false;
 
   for (let i = 0; i < n; i++) {
-    const [symbol, x, y, z] = lines[2 + i].split(/\s+/);
+    const atomLine = r.next();
+    if (atomLine === null) throw new Error("Atom count exceeds available lines in XYZ file");
 
-    const cart = new Float64Array([+x, +y, +z]);
+    const tokens = atomLine.trim().split(/\s+/);
 
-    const frac = fractional(lattice, cart);
+    let symbol = "";
+    let x = 0, y = 0, z = 0;
+    const props: Record<string, unknown> = {};
 
-    sites.push({
+    for (const def of propDefs) {
+      const values = tokens.slice(def.offset, def.offset + def.count);
+
+      if (def.name === "species") {
+        symbol = values[0];
+      } else if (def.name === "pos") {
+        x = Number(values[0]);
+        y = Number(values[1]);
+        z = Number(values[2]);
+      } else if (def.name === "selectiveDynamics") {
+        const sd = values.map(
+          (v: string) => v.toLowerCase() === "t",
+        ) as [boolean, boolean, boolean];
+        props.selectiveDynamics = sd;
+        hasSelective = true;
+      } else {
+        if (def.type === "L") {
+          props[def.name] = values.map((v: string) => v.toLowerCase() === "t");
+        } else if (def.type === "R" || def.type === "I") {
+          props[def.name] = values.map(Number);
+        } else {
+          props[def.name] = values.length === 1 ? values[0] : values;
+        }
+      }
+    }
+
+    if (!symbol) throw new Error("Missing species in XYZ");
+    if (!z && z !== 0) throw new Error("Invalid coordinates in XYZ");
+
+    const site: Site = {
       species: { symbol },
-      frac,
-    });
+      frac: fractional(lattice, new Float64Array([x, y, z])),
+    };
+
+    if (Object.keys(props).length > 0) {
+      site.properties = props;
+    }
+
+    sites.push(site);
   }
 
-  return { lattice, sites };
+  return {
+    lattice,
+    sites,
+    selectiveDynamics: hasSelective || undefined,
+  };
 }
 
 function formatLattice(lattice: Lattice): string {
   const m = lattice.basis.data;
 
-  // row-major flattening assumption (consistent with your matrix code)
   return `${m[0]} ${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]} ${m[6]} ${m[7]} ${m[8]}`;
 }
 
@@ -86,12 +164,28 @@ export function toXYZ(structure: Structure): string {
 
   const latticeStr = formatLattice(structure.lattice);
 
-  lines.push(`Lattice="${latticeStr}" Properties=species:S:1:pos:R:3`);
+  const propParts: string[] = ["species", "S", "1", "pos", "R", "3"];
+  const hasSelective =
+    structure.selectiveDynamics ??
+    sites.some((s) => s.properties?.selectiveDynamics);
+
+  if (hasSelective) {
+    propParts.push("selectiveDynamics", "L", "3");
+  }
+
+  lines.push(`Lattice="${latticeStr}" Properties=${propParts.join(":")}`);
 
   for (const site of sites) {
     const cart = cartesian(structure.lattice, site);
+    let line = `${site.species.symbol} ${cart[0]} ${cart[1]} ${cart[2]}`;
 
-    lines.push(`${site.species.symbol} ${cart[0]} ${cart[1]} ${cart[2]}`);
+    const sd = site.properties?.selectiveDynamics;
+
+    if (sd) {
+      line += ` ${sd.map((f: boolean) => (f ? "T" : "F")).join(" ")}`;
+    }
+
+    lines.push(line);
   }
 
   return lines.join("\n");

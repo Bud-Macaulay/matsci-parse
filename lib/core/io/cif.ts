@@ -1,6 +1,7 @@
 import { fromParameters } from "../lattice/create/fromParameters";
 import { parameters } from "../lattice/parameters";
 import { Structure } from "../structure/structure";
+import { LineReader } from "./helpers";
 
 function cleanValue(value: string | undefined): number {
   if (value === undefined) return NaN;
@@ -24,11 +25,6 @@ function warnUnsupportedSymmetry(spaceGroup: string) {
 
 /** Parses a CIF (Crystallographic Information File) string into a Structure. */
 export function fromCIF(text: string): Structure {
-  const lines = text
-    .split("\n")
-    .map((x) => x.trim())
-    .filter(Boolean);
-
   let a = 0;
   let b = 0;
   let c = 0;
@@ -46,7 +42,12 @@ export function fromCIF(text: string): Structure {
   let currentHeaders: string[] = [];
   let collectingAtoms = false;
 
-  for (const line of lines) {
+  const r = new LineReader(text);
+  let rawLine: string | null;
+  while ((rawLine = r.next()) !== null) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
     if (line.startsWith("_symmetry_space_group_name_H-M")) {
       const tokens = tokenize(line);
       spaceGroup = tokens.at(-1)?.replace(/['"]/g, "") ?? "P1";

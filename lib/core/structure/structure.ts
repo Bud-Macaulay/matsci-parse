@@ -5,5 +5,6 @@ import { Site } from "../site/site";
 export interface Structure {
   readonly lattice: Lattice;
   readonly sites: Site[];
+  readonly selectiveDynamics?: boolean;
   readonly [key: string]: unknown;
 }

@@ -1,12 +1,8 @@
 import { createLattice } from "../lattice/lattice";
-import { inverse } from "../lattice/inverse";
-import { mul } from "../matrix/operations/mul";
-import { createMatrix } from "../matrix/matrix";
 import { Site } from "../site/site";
 import { Structure } from "../structure/structure";
-import { fractional } from "../site/fractional";
-
-import { cartesian } from "../site";
+import { cartesian, fractional } from "../site";
+import { LineReader } from "./helpers";
 
 function isSelective(line: string): boolean {
   return line.toLowerCase().startsWith("selective");
@@ -17,28 +13,21 @@ function isCartesian(line: string): boolean {
   return l.startsWith("c") || l.startsWith("k");
 }
 
-// TODO: Currently nukes the selective dynamics flag from the input file.
-// It would be good to restore this.
-// TODO: would be good to ensure that the title is also optionally
-// maintained.
-
 /** Parses a POSCAR/CONTCAR string into a Structure. */
 export function fromPOSCAR(text: string): Structure {
-  const lines = text.split("\n").map((x) => x.trim());
-
-  let cursor = 0;
+  const r = new LineReader(text);
 
   // comment/title
-  cursor++;
+  r.next();
 
   // scale factor
-  const scale = Number(lines[cursor++]);
+  const scale = Number(r.nextTrimmed());
 
   // lattice vectors (row-major)
   const latticeData: number[] = [];
 
   for (let i = 0; i < 3; i++) {
-    const v = lines[cursor++].split(/\s+/).map(Number);
+    const v = r.nextTrimmed().split(/\s+/).map(Number);
 
     if (v.length !== 3) {
       throw new Error("Invalid POSCAR lattice");
@@ -50,37 +39,37 @@ export function fromPOSCAR(text: string): Structure {
   const lattice = createLattice(latticeData);
 
   // VASP5 species names
-  const symbols = lines[cursor++].split(/\s+/);
+  const symbols = r.nextTrimmed().split(/\s+/);
 
   // atom counts
-  const counts = lines[cursor++].split(/\s+/).map(Number);
+  const counts = r.nextTrimmed().split(/\s+/).map(Number);
 
   if (symbols.length !== counts.length) {
     throw new Error("Species/count mismatch");
   }
 
   // optional selective dynamics
-  if (isSelective(lines[cursor])) {
-    cursor++;
+  let selective = false;
+
+  let line = r.nextTrimmed();
+  if (isSelective(line)) {
+    selective = true;
+    line = r.nextTrimmed();
   }
 
   // direct is true unless cartesian is.
   let direct = true;
-  direct = !isCartesian(lines[cursor]);
-
-  cursor++;
+  direct = !isCartesian(line);
 
   const sites: Site[] = [];
 
   let speciesIndex = 0;
   let remaining = counts[0];
 
-  const latticeInv = !direct ? inverse(lattice) : null;
-
   const totalAtoms = counts.reduce((a, b) => a + b, 0);
 
   for (let i = 0; i < totalAtoms; i++) {
-    const tokens = lines[cursor++].split(/\s+/);
+    const tokens = r.nextTrimmed().split(/\s+/);
 
     const coords = tokens.slice(0, 3).map(Number);
 
@@ -88,11 +77,22 @@ export function fromPOSCAR(text: string): Structure {
       ? new Float64Array(coords)
       : fractional(lattice, new Float64Array(coords));
 
+    const props: Record<string, unknown> = {};
+
+    if (selective) {
+      const sd = tokens.slice(3, 6).map((t) => t.toLowerCase() === "t");
+
+      if (sd.length === 3) {
+        props.selectiveDynamics = sd as [boolean, boolean, boolean];
+      }
+    }
+
     sites.push({
       species: {
         symbol: symbols[speciesIndex],
       },
       frac,
+      ...(Object.keys(props).length > 0 ? { properties: props } : {}),
     });
 
     remaining--;
@@ -106,7 +106,8 @@ export function fromPOSCAR(text: string): Structure {
   return {
     lattice,
     sites,
-    _cursorEnd: cursor,
+    selectiveDynamics: selective || undefined,
+    _cursorEnd: r.count,
   };
 }
 
@@ -157,12 +158,26 @@ export function toPOSCAR(
   lines.push(species.join(" "));
   lines.push(species.map((s) => (grouped.get(s) ?? []).length).join(" "));
 
+  const hasSelective = structure.selectiveDynamics ?? sites.some((s) => s.properties?.selectiveDynamics);
+
+  if (hasSelective) {
+    lines.push("Selective Dynamics");
+  }
+
   lines.push(direct ? "Direct" : "Cartesian");
 
   for (const site of sites) {
     const coords = direct ? site.frac : cartesian(structure.lattice, site);
 
-    lines.push(`${coords[0]} ${coords[1]} ${coords[2]}`);
+    let line = `${coords[0]} ${coords[1]} ${coords[2]}`;
+
+    const sd = site.properties?.selectiveDynamics;
+
+    if (sd) {
+      line += ` ${sd.map((f: boolean) => (f ? "T" : "F")).join(" ")}`;
+    }
+
+    lines.push(line);
   }
 
   return lines.join("\n");
