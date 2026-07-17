@@ -1,7 +1,11 @@
-import { fromParameters } from "../lattice/create/fromParameters";
-import { parameters } from "../lattice/parameters";
-import { Structure } from "../structure/structure";
-import { LineReader } from "./helpers";
+import { fromParameters } from "../../lattice/create/fromParameters";
+import { parameters } from "../../lattice/parameters";
+import { Structure } from "../../structure/structure";
+import {
+  parseOperations,
+  applyOperation,
+} from "./symmetryOperations";
+import { LineReader } from "../helpers";
 
 function cleanValue(value: string | undefined): number {
   if (value === undefined) return NaN;
@@ -15,14 +19,6 @@ function tokenize(line: string): string[] {
   return line.match(/'[^']*'|"[^"]*"|\S+/g) ?? [];
 }
 
-function warnUnsupportedSymmetry(spaceGroup: string) {
-  console.warn(
-    `Space group "${spaceGroup}" detected. ` +
-      `Symmetry operations are not currently applied; ` +
-      `only asymmetric-unit sites will be parsed.`,
-  );
-}
-
 /** Parses a CIF (Crystallographic Information File) string into a Structure. */
 export function fromCIF(text: string): Structure {
   let a = 0;
@@ -33,14 +29,14 @@ export function fromCIF(text: string): Structure {
   let beta = 0;
   let gamma = 0;
 
-  let spaceGroup = "P1";
-
   let atomHeaders: string[] = [];
   const atomRows: string[][] = [];
 
   let inLoop = false;
   let currentHeaders: string[] = [];
   let collectingAtoms = false;
+  let collectingSymOps = false;
+  const symOpStrings: string[] = [];
 
   const r = new LineReader(text);
   let rawLine: string | null;
@@ -48,13 +44,7 @@ export function fromCIF(text: string): Structure {
     const line = rawLine.trim();
     if (!line) continue;
 
-    if (line.startsWith("_symmetry_space_group_name_H-M")) {
-      const tokens = tokenize(line);
-      spaceGroup = tokens.at(-1)?.replace(/['"]/g, "") ?? "P1";
-    } else if (line.startsWith("_space_group_name_H-M_alt")) {
-      const tokens = tokenize(line);
-      spaceGroup = tokens.at(-1)?.replace(/['"]/g, "") ?? "P1";
-    } else if (line.startsWith("_cell_length_a")) {
+    if (line.startsWith("_cell_length_a")) {
       a = cleanValue(tokenize(line)[1]);
     } else if (line.startsWith("_cell_length_b")) {
       b = cleanValue(tokenize(line)[1]);
@@ -70,6 +60,7 @@ export function fromCIF(text: string): Structure {
       inLoop = true;
       currentHeaders = [];
       collectingAtoms = false;
+      collectingSymOps = false;
       continue;
     }
 
@@ -78,6 +69,10 @@ export function fromCIF(text: string): Structure {
 
       if (line.includes("_atom_site_")) {
         collectingAtoms = true;
+        collectingSymOps = false;
+      } else if (line.includes("_symmetry_equiv_pos_as_xyz")) {
+        collectingSymOps = true;
+        collectingAtoms = false;
       }
 
       continue;
@@ -90,12 +85,18 @@ export function fromCIF(text: string): Structure {
 
       atomRows.push(tokenize(line));
     }
-  }
 
-  const isP1 = /^P\s*1$/i.test(spaceGroup);
+    if (inLoop && collectingSymOps) {
+      const tokens = tokenize(line);
 
-  if (!isP1) {
-    warnUnsupportedSymmetry(spaceGroup);
+      for (const t of tokens) {
+        const cleaned = t.replace(/['"]/g, "").trim();
+
+        if (cleaned.includes(",")) {
+          symOpStrings.push(cleaned);
+        }
+      }
+    }
   }
 
   const lattice = fromParameters(a, b, c, alpha, beta, gamma);
@@ -114,7 +115,7 @@ export function fromCIF(text: string): Structure {
 
   const maxCol = Math.max(ix, iy, iz, ispecies);
 
-  const sites = atomRows.map((row) => {
+  const asymSites = atomRows.map((row) => {
     if (row.length <= maxCol) {
       throw new Error("Incomplete atom site data row");
     }
@@ -131,6 +132,57 @@ export function fromCIF(text: string): Structure {
       ]),
     };
   });
+
+  if (symOpStrings.length === 0) {
+    return { lattice, sites: asymSites };
+  }
+
+  const symOps = parseOperations(symOpStrings);
+
+  const EPS = 1e-3;
+
+  function wrapValue(x: number): number {
+    return ((x % 1) + 1) % 1;
+  }
+
+  function cleanNearZero(x: number): number {
+    return Math.abs(x) < EPS ? 0 : x;
+  }
+
+  function posKey(species: string, frac: number[]): string {
+    const w = frac.map((v) => {
+      const c = cleanNearZero(wrapValue(v));
+      return Math.round(c * 1000) / 1000;
+    });
+
+    return `${species}:${w[0]},${w[1]},${w[2]}`;
+  }
+
+  const seen = new Set<string>();
+  const sites: { species: { symbol: string }; frac: Float64Array }[] = [];
+
+  for (const site of asymSites) {
+    for (const op of symOps) {
+      const operated = applyOperation(op, Array.from(site.frac));
+
+      const frac = [
+        cleanNearZero(wrapValue(operated[0])),
+        cleanNearZero(wrapValue(operated[1])),
+        cleanNearZero(wrapValue(operated[2])),
+      ];
+
+      const key = posKey(site.species.symbol, frac);
+
+      if (!seen.has(key)) {
+        seen.add(key);
+
+        sites.push({
+          species: { symbol: site.species.symbol },
+          frac: new Float64Array(frac),
+        });
+      }
+    }
+  }
 
   return {
     lattice,

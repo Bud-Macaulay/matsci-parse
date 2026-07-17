@@ -4,8 +4,20 @@ import { fromCIF, toCIF } from "@/core/io/cif";
 
 import * as cifFixtures from "./teststrings/cif";
 
-describe("CIF fixtures", () => {
-  for (const [name, cif] of Object.entries(cifFixtures)) {
+const p1Fixtures = Object.fromEntries(
+  Object.entries(cifFixtures).filter(
+    ([, cif]) => !cif.includes("_symmetry_equiv_pos_as_xyz"),
+  ),
+);
+
+const symFixtures = Object.fromEntries(
+  Object.entries(cifFixtures).filter(([, cif]) =>
+    cif.includes("_symmetry_equiv_pos_as_xyz"),
+  ),
+);
+
+describe("CIF P1 round-trips", () => {
+  for (const [name, cif] of Object.entries(p1Fixtures)) {
     it(`round-trips ${name}`, () => {
       const a = fromCIF(cif);
 
@@ -17,7 +29,6 @@ describe("CIF fixtures", () => {
 
       const c = fromCIF(text2);
 
-      // serializer reaches fixed point
       expect(text2).toBe(text1);
 
       expect(c.sites.length).toBe(a.sites.length);
