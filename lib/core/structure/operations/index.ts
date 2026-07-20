@@ -1,8 +1,10 @@
 export * from "./applyTransformationBasis";
 export * from "./canonicalize";
 export * from "./hashStructure";
+export * from "./makeSupercell";
 
 export * from "./sites";
+export * from "./slab";
 export * from "./symmetry";
 export * from "./supercell";
 

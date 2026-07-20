@@ -18,6 +18,7 @@ import SymmetryPanel from "./SymmetrySubPanel";
 import TransformLatticePanel from "./TransformLatticePanel";
 import AddAtomPanel from "./AddAtomPanel";
 import DistanceMatrixPanel from "./DistanceMatrixPanel";
+import SlabModal from "./SlabModal";
 
 export default function MainPanel({ tab, updateTab }) {
   const [speciesModal, setSpeciesModal] = useState({ open: false, mode: null });
@@ -219,13 +220,18 @@ export default function MainPanel({ tab, updateTab }) {
             pushUndo={pushUndo}
           />
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <SymmetryPanel
               structure={structure}
               setStructure={setStructure}
               pushUndo={pushUndo}
             />
             <DistanceMatrixPanel structure={structure} />
+            <SlabModal
+              structure={structure}
+              setStructure={setStructure}
+              pushUndo={pushUndo}
+            />
           </div>
         </div>
 

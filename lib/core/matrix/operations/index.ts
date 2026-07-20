@@ -21,5 +21,5 @@ export * from "./trace";
 export * from "./transpose";
 
 export * from "./inverse";
-// export * from "./reduction";
+export * from "./latticePointsInSupercell";
 export * from "./vector";
