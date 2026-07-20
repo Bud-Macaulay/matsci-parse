@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { toCIF, fromCIF } from "matsci-parse";
 
 import { useHotkey } from "@tanstack/react-hotkeys";
 
 import SidePanel from "./SidePanel";
 import MainPanel from "./MainPanel";
+
+import { parseFileText } from "./common/formats";
 
 import { useStore } from "@tanstack/react-store";
 import { appStore, actions } from "./store/appStore";
@@ -12,8 +15,25 @@ export default function App() {
   const tabs = useStore(appStore, (s) => s.tabs);
   const activeTabId = useStore(appStore, (s) => s.activeTabId);
   const autosave = useStore(appStore, (s) => s.autosave);
+  const [dragging, setDragging] = useState(false);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const { structure: parsed } = parseFileText(text);
+      actions.createTab(parsed, { name: file.name, source: "file" });
+    } catch (err) {
+      console.error("Drop parse failed:", err);
+    }
+  };
 
   // -------------------------
   // HOTKEYS
@@ -42,7 +62,26 @@ export default function App() {
   });
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div
+      className="flex h-screen overflow-hidden relative"
+      onDragEnter={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragging(false);
+      }}
+      onDrop={handleDrop}
+    >
+      {dragging && (
+        <div className="absolute inset-0 z-50 bg-blue-500/10 border-2 border-dashed border-blue-400 flex items-center justify-center pointer-events-none">
+          <div className="bg-white rounded-lg shadow-lg px-8 py-5 text-sm font-medium text-blue-700">
+            Drop structure file here
+          </div>
+        </div>
+      )}
+
       <SidePanel
         autosave={autosave}
         setAutosave={actions.setAutosave}

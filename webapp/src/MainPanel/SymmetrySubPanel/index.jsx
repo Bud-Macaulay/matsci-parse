@@ -1,147 +1,121 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { getSymmetry } from "matsci-parse";
 
-import BaseTable from "../../common/BaseTable";
+import Modal from "../../common/Modal";
 import { formatSpaceGroupSymbol } from "../../common/textFormatting";
 
-export default function SymmetrySubpanel({
-  structure,
-  setStructure,
-  pushUndo,
-}) {
+export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
+  const [open, setOpen] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [autoAnalyze, setAutoAnalyze] = useState(false);
 
-  const runAnalysis = useCallback(async (targetStructure) => {
+  const runAnalysis = useCallback(async () => {
     setAnalyzing(true);
-
     try {
-      const result = await getSymmetry(targetStructure);
+      const result = await getSymmetry(structure);
       setAnalysis(result);
     } catch (e) {
       console.error("analyzeCrystal failed:", e);
     } finally {
       setAnalyzing(false);
     }
-  }, []);
+  }, [structure]);
 
-  // reset + optionally re-run when structure changes
-  useEffect(() => {
-    setAnalysis(null);
-
-    if (autoAnalyze) {
-      runAnalysis(structure);
-    }
-  }, [structure, autoAnalyze, runAnalysis]);
-
-  // manual trigger
-  const runManualAnalysis = () => {
-    runAnalysis(structure);
+  const handleOpen = () => {
+    setOpen(true);
+    if (!analysis) runAnalysis();
   };
 
   const applySym = useCallback(
     (mode = "conventional") => {
       if (!analysis) return;
-
       pushUndo({
         action: "symmetry-transform",
         label: `Symmetry → ${mode}`,
       });
-
-      const newStructure =
-        mode === "primitive" ? analysis.primitive : analysis.conventional;
-
-      setStructure(newStructure);
+      setStructure(mode === "primitive" ? analysis.primitive : analysis.conventional);
     },
     [analysis, pushUndo, setStructure],
   );
 
   const calc = analysis?.calculationResults;
-
   const cleanSymbol = calc?.hm_symbol?.replace(/\s+/g, "");
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Controls */}
-      <div className="flex flex-row gap-2 items-center">
-        <button
-          onClick={runManualAnalysis}
-          disabled={analyzing}
-          className="px-3 py-1.5 text-sm rounded-md bg-blue-100 hover:bg-blue-200 disabled:opacity-40"
-        >
-          {analyzing ? "Analyzing..." : "Analyze symmetry"}
-        </button>
+    <>
+      <button onClick={handleOpen} className="buttonSimple blue w-full">
+        Analyze Symmetry
+      </button>
 
-        <label className="flex items-center gap-1 text-xs text-gray-600">
-          <input
-            type="checkbox"
-            checked={autoAnalyze}
-            onChange={(e) => setAutoAnalyze(e.target.checked)}
-          />
-          Calculate on change
-        </label>
-      </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Symmetry Analysis"
+        maxWidth="max-w-lg"
+        footer={
+          analysis && calc ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => applySym("conventional")}
+                className="px-3 py-1.5 text-sm rounded-md bg-lime-100 hover:bg-lime-200 text-lime-800"
+              >
+                Apply Conventional
+              </button>
+              <button
+                onClick={() => applySym("primitive")}
+                className="px-3 py-1.5 text-sm rounded-md bg-green-100 hover:bg-green-200 text-green-800"
+              >
+                Apply Primitive
+              </button>
+            </div>
+          ) : null
+        }
+      >
+        <div className="space-y-4">
+          <button
+            onClick={runAnalysis}
+            disabled={analyzing}
+            className="px-3 py-1.5 text-sm rounded-md bg-blue-100 hover:bg-blue-200 disabled:opacity-40"
+          >
+            {analyzing ? "Analyzing..." : "Recalculate"}
+          </button>
 
-      {/* Results */}
-      {analysis && calc && (
-        <BaseTable title="Symmetry">
-          <tr>
-            <td className="px-3 py-1 text-gray-500 border-b">Space group #</td>
-            <td className="px-3 py-1 font-mono border-b">
-              {calc.number ?? "-"} ({formatSpaceGroupSymbol(cleanSymbol) ?? "-"}
-              )
-            </td>
-          </tr>
+          {analysis && calc && (
+            <table className="w-full text-xs border-separate border-spacing-0">
+              <tbody>
+                <tr>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">Space group</td>
+                  <td className="px-3 py-1.5 font-mono border-b">
+                    {calc.number ?? "-"} ({formatSpaceGroupSymbol(cleanSymbol) ?? "-"})
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">Pearson</td>
+                  <td className="px-3 py-1.5 font-mono border-b">
+                    {calc.pearson_symbol ?? "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">Hall #</td>
+                  <td className="px-3 py-1.5 font-mono border-b">
+                    {calc.hall_number ?? "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">Symmetrized sites</td>
+                  <td className="px-3 py-1.5 font-mono border-b">
+                    {calc?.prim_std_cell?.positions?.length ?? "-"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
 
-          <tr>
-            <td className="px-3 py-1 text-gray-500 border-b">Pearson Sym.</td>
-            <td className="px-3 py-1 font-mono border-b">
-              {calc.pearson_symbol ?? "-"}
-            </td>
-          </tr>
-
-          <tr>
-            <td className="px-3 py-1 text-gray-500 border-b">Hall #</td>
-            <td className="px-3 py-1 font-mono border-b">
-              {calc.hall_number ?? "-"}
-            </td>
-          </tr>
-
-          <tr>
-            <td className="px-3 py-1 text-gray-500 border-b">
-              Symmetrized site count
-            </td>
-            <td className="px-3 py-1 font-mono border-b">
-              {calc?.prim_std_cell?.positions?.length ?? "-"}
-            </td>
-          </tr>
-
-          <tr>
-            <td colSpan={2} className="px-2 py-2 border-b">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-gray-800">
-                  Convert current structure to:
-                </span>
-
-                <button
-                  onClick={() => applySym("conventional")}
-                  className="px-2 py-1 rounded bg-lime-100 hover:bg-lime-200"
-                >
-                  Conventional
-                </button>
-
-                <button
-                  onClick={() => applySym("primitive")}
-                  className="px-2 py-1 rounded bg-green-100 hover:bg-green-200"
-                >
-                  Primitive
-                </button>
-              </div>
-            </td>
-          </tr>
-        </BaseTable>
-      )}
-    </div>
+          {analysis && !calc && (
+            <p className="text-sm text-gray-500">No symmetry data found for this structure.</p>
+          )}
+        </div>
+      </Modal>
+    </>
   );
 }
