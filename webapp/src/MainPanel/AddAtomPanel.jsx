@@ -51,6 +51,7 @@ export default function AddAtomPanel({ structure, setStructure, pushUndo }) {
       <div className="flex justify-end">
         <button
           onClick={() => setOpen(true)}
+          title="Add a new atom to the structure"
           className="buttonSimple blue w-1/2"
         >
           + Add Atom
@@ -75,7 +76,7 @@ export default function AddAtomPanel({ structure, setStructure, pushUndo }) {
             >
               Cancel
             </ModalButton>
-            <ModalButton onClick={handleAdd} disabled={!validSpecies}>
+            <ModalButton onClick={handleAdd} disabled={!validSpecies} title="Add this atom to the structure">
               Add
             </ModalButton>
           </>

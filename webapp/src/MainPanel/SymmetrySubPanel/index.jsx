@@ -45,7 +45,7 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
 
   return (
     <>
-      <button onClick={handleOpen} className="buttonSimple blue w-full">
+      <button onClick={handleOpen} title="Detect crystal symmetry and view space group information" className="buttonSimple blue w-full">
         Analyze Symmetry
       </button>
 
@@ -59,12 +59,14 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
             <div className="flex gap-2">
               <button
                 onClick={() => applySym("conventional")}
+                title="Apply the conventional cell transformation"
                 className="px-3 py-1.5 text-sm rounded-md bg-lime-100 hover:bg-lime-200 text-lime-800"
               >
                 Apply Conventional
               </button>
               <button
                 onClick={() => applySym("primitive")}
+                title="Apply the primitive cell transformation"
                 className="px-3 py-1.5 text-sm rounded-md bg-green-100 hover:bg-green-200 text-green-800"
               >
                 Apply Primitive

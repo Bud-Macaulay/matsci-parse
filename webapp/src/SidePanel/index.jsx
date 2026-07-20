@@ -101,7 +101,7 @@ export default function SidePanel({
 
       <div className="p-4 flex items-center gap-4 flex-wrap">
         {/* File upload */}
-        <label className="px-1 py-2 text-sm border rounded-md cursor-pointer bg-gray-100 hover:bg-gray-200 transition">
+        <label title="Import a CIF, XYZ, XSF, or POSCAR file" className="px-1 py-2 text-sm border rounded-md cursor-pointer bg-gray-100 hover:bg-gray-200 transition">
           Choose File
           <input type="file" onChange={handleFile} className="hidden" />
         </label>
@@ -125,6 +125,7 @@ export default function SidePanel({
         <button
           onClick={saveCurrent}
           disabled={!structure}
+          title="Save the current structure to local storage"
           className="w-full px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           Save current
@@ -152,6 +153,7 @@ export default function SidePanel({
               <div className="flex gap-2 mt-2 text-xs">
                 <button
                   onClick={() => loadStructure(item.cif, item.name)}
+                  title="Load this saved structure"
                   className="buttonSimple gray flex-1"
                 >
                   Load
@@ -159,6 +161,7 @@ export default function SidePanel({
 
                 <button
                   onClick={() => deleteSaved(item.id)}
+                  title="Delete this saved structure"
                   className="buttonSimple red flex-1"
                 >
                   Delete

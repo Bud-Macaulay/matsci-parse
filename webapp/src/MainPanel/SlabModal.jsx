@@ -39,7 +39,7 @@ export default function SlabModal({ structure, setStructure, pushUndo }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="buttonSimple blue w-full">
+      <button onClick={() => setOpen(true)} title="Create a slab surface from Miller indices or site triple" className="buttonSimple blue w-full">
         Build Slab
       </button>
 
@@ -49,7 +49,7 @@ export default function SlabModal({ structure, setStructure, pushUndo }) {
         title="Build Slab"
         maxWidth="max-w-sm"
         footer={
-          <button onClick={apply} className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">
+          <button onClick={apply} title="Apply the slab transformation" className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">
             Apply
           </button>
         }

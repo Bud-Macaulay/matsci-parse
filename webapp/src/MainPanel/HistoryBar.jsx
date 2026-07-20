@@ -10,6 +10,7 @@ export default function HistoryBar({
         <button
           onClick={onUndo}
           disabled={!undoStack.length}
+          title="Undo last action (Ctrl+Z)"
           className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40"
         >
           Undo
@@ -17,6 +18,7 @@ export default function HistoryBar({
         <button
           onClick={onRedo}
           disabled={redoDisabled}
+          title="Redo last undone action (Ctrl+Shift+Z)"
           className="px-3 py-1.5 text-sm rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40"
         >
           Redo

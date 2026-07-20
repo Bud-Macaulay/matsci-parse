@@ -55,7 +55,7 @@ export default function DistanceMatrixPanel({ structure }) {
 
   return (
     <>
-      <button onClick={handleOpen} className="buttonSimple blue w-full">
+      <button onClick={handleOpen} title="Show pairwise interatomic distances as a heatmap" className="buttonSimple blue w-full">
         See Distance Matrix
       </button>
 

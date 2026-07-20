@@ -13,7 +13,7 @@ export default function VisualizerPane({ structure }) {
         <QEInputButton structure={structure} />
       </div>
       <StructureVisualizer structure={structure} initSupercell={[1, 1, 1]} />
-      <div className="absolute bottom-2 right-2 z-10 bg-slate-200/85 backdrop-blur-sm rounded-md px-3 py-1.5 shadow-sm text-xs">
+      <div className="absolute bottom-12 right-2 z-10 bg-slate-200/85 backdrop-blur-sm rounded-md px-3 py-1.5 shadow-sm text-xs">
         <span className="font-medium">{hillFormula(structure)}</span>
         <span className="text-gray-400 mx-1.5">&middot;</span>
         <span className="text-gray-500">

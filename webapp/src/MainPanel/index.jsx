@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import {
+  canonicalize,
   replaceSite,
   removeSite,
   replaceSites,
@@ -168,6 +169,11 @@ export default function MainPanel({ tab, updateTab }) {
     );
   };
 
+  const onCanonicalize = () => {
+    pushUndo({ action: "canonicalize", label: "Canonicalized structure" });
+    setStructure(canonicalize(structure));
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <HistoryBar
@@ -184,13 +190,22 @@ export default function MainPanel({ tab, updateTab }) {
             <span className="text-sm">Atoms ({structure.sites.length})</span>
             <div className="flex gap-2">
               <button
+                onClick={onCanonicalize}
+                title="Wrap fractional coords to [0,1), clean near-zero values, and sort sites"
+                className="buttonSimple blue"
+              >
+                Canonicalize
+              </button>
+              <button
                 onClick={() => setSpeciesModal({ open: true, mode: "remove" })}
+                title="Remove all atoms of a chosen element"
                 className="buttonSimple red"
               >
                 Remove Species
               </button>
               <button
                 onClick={() => setSpeciesModal({ open: true, mode: "replace" })}
+                title="Replace all atoms of one element with another"
                 className="buttonSimple gray"
               >
                 Replace Species

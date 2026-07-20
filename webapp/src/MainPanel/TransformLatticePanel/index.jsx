@@ -66,6 +66,7 @@ export default function TransformLatticePanel({
         {/* Apply */}
         <button
           onClick={applyTransform}
+          title="Create a supercell by repeating the unit cell along a, b, c"
           className="px-3 py-1.5 text-sm rounded-md bg-purple-100 hover:bg-purple-200"
         >
           Build supercell
