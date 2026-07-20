@@ -2,6 +2,7 @@ export * from "./applyTransformationBasis";
 export * from "./canonicalize";
 export * from "./hashStructure";
 export * from "./makeSupercell";
+export * from "./sortSites";
 
 export * from "./sites";
 export * from "./slab";

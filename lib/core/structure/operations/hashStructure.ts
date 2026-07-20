@@ -28,7 +28,7 @@ export function hashStructure(structure: Structure): number {
 
   const sitesKey = s.sites
     .map((site) => {
-      return site.species + ":" + toFixedArray(site.frac);
+      return site.species.symbol + ":" + toFixedArray(site.frac);
     })
     .sort()
     .join("|");
