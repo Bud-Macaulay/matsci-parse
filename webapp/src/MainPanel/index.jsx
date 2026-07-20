@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import {
   replaceSite,
   removeSite,
@@ -74,6 +75,10 @@ export default function MainPanel({ tab, updateTab }) {
     });
   }, [updateTab]);
 
+  useHotkey("Mod+z", undo);
+  useHotkey("Mod+Shift+z", redo);
+  useHotkey("Mod+y", redo);
+
   if (!tab) return null;
 
   const { structure, undoStack = [], redoStack = [] } = tab;
@@ -87,22 +92,45 @@ export default function MainPanel({ tab, updateTab }) {
 
     if (field === "species") {
       const sym = value.trim();
-      if (!sym || !elementBySymbol[sym] || sym === structure.sites[idx].species.symbol) {
+      if (
+        !sym ||
+        !elementBySymbol[sym] ||
+        sym === structure.sites[idx].species.symbol
+      ) {
         setEditingCell(null);
         return;
       }
-      pushUndo({ action: "replace-site", label: `Changed atom ${idx} to ${sym}` });
-      setStructure(replaceSite(structure, idx, { ...structure.sites[idx], species: { symbol: sym } }));
+      pushUndo({
+        action: "replace-site",
+        label: `Changed atom ${idx} to ${sym}`,
+      });
+      setStructure(
+        replaceSite(structure, idx, {
+          ...structure.sites[idx],
+          species: { symbol: sym },
+        }),
+      );
     } else {
       const num = parseFloat(value);
-      if (isNaN(num)) { setEditingCell(null); return; }
+      if (isNaN(num)) {
+        setEditingCell(null);
+        return;
+      }
       const axis = ["x", "y", "z"].indexOf(field);
-      if (num === structure.sites[idx].frac[axis]) { setEditingCell(null); return; }
+      if (num === structure.sites[idx].frac[axis]) {
+        setEditingCell(null);
+        return;
+      }
 
-      pushUndo({ action: "edit-coord", label: `Edited atom ${idx} ${field.toUpperCase()}` });
+      pushUndo({
+        action: "edit-coord",
+        label: `Edited atom ${idx} ${field.toUpperCase()}`,
+      });
       const newFrac = new Float64Array(structure.sites[idx].frac);
       newFrac[axis] = num;
-      setStructure(replaceSite(structure, idx, { ...structure.sites[idx], frac: newFrac }));
+      setStructure(
+        replaceSite(structure, idx, { ...structure.sites[idx], frac: newFrac }),
+      );
     }
     setEditingCell(null);
   };
@@ -113,19 +141,40 @@ export default function MainPanel({ tab, updateTab }) {
   };
 
   const replaceAllSpecies = (oldSp, newSp) => {
-    pushUndo({ action: "replace-species", label: `Replaced ${oldSp} with ${newSp}` });
-    const indices = findSitesBySpecies(structure, structure.sites.find((s) => s.species.symbol === oldSp)?.species);
-    setStructure(replaceSites(structure, indices.map((i) => ({ index: i, site: { ...structure.sites[i], species: { symbol: newSp } } }))));
+    pushUndo({
+      action: "replace-species",
+      label: `Replaced ${oldSp} with ${newSp}`,
+    });
+    const indices = findSitesBySpecies(
+      structure,
+      structure.sites.find((s) => s.species.symbol === oldSp)?.species,
+    );
+    setStructure(
+      replaceSites(
+        structure,
+        indices.map((i) => ({
+          index: i,
+          site: { ...structure.sites[i], species: { symbol: newSp } },
+        })),
+      ),
+    );
   };
 
   const removeAllSpecies = (sp) => {
     pushUndo({ action: "remove-species", label: `Removed all ${sp}` });
-    setStructure(removeSites(structure, findSitesBySpecies(structure, { symbol: sp })));
+    setStructure(
+      removeSites(structure, findSitesBySpecies(structure, { symbol: sp })),
+    );
   };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <HistoryBar undoStack={undoStack} onUndo={undo} onRedo={redo} redoDisabled={!redoStack.length} />
+      <HistoryBar
+        undoStack={undoStack}
+        onUndo={undo}
+        onRedo={redo}
+        redoDisabled={!redoStack.length}
+      />
 
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* LEFT COLUMN */}
@@ -133,8 +182,18 @@ export default function MainPanel({ tab, updateTab }) {
           <div className="flex justify-between items-center text-[12px]">
             <span className="text-sm">Atoms ({structure.sites.length})</span>
             <div className="flex gap-2">
-              <button onClick={() => setSpeciesModal({ open: true, mode: "remove" })} className="buttonSimple red">Remove Species</button>
-              <button onClick={() => setSpeciesModal({ open: true, mode: "replace" })} className="buttonSimple gray">Replace Species</button>
+              <button
+                onClick={() => setSpeciesModal({ open: true, mode: "remove" })}
+                className="buttonSimple red"
+              >
+                Remove Species
+              </button>
+              <button
+                onClick={() => setSpeciesModal({ open: true, mode: "replace" })}
+                className="buttonSimple gray"
+              >
+                Replace Species
+              </button>
             </div>
           </div>
 
@@ -148,12 +207,24 @@ export default function MainPanel({ tab, updateTab }) {
             onRemove={remove}
           />
 
-          <AddAtomPanel structure={structure} setStructure={setStructure} pushUndo={pushUndo} />
+          <AddAtomPanel
+            structure={structure}
+            setStructure={setStructure}
+            pushUndo={pushUndo}
+          />
           <LatticePanel lattice={structure.lattice} />
-          <TransformLatticePanel structure={structure} setStructure={setStructure} pushUndo={pushUndo} />
+          <TransformLatticePanel
+            structure={structure}
+            setStructure={setStructure}
+            pushUndo={pushUndo}
+          />
 
           <div className="grid grid-cols-2 gap-2">
-            <SymmetryPanel structure={structure} setStructure={setStructure} pushUndo={pushUndo} />
+            <SymmetryPanel
+              structure={structure}
+              setStructure={setStructure}
+              pushUndo={pushUndo}
+            />
             <DistanceMatrixPanel structure={structure} />
           </div>
         </div>

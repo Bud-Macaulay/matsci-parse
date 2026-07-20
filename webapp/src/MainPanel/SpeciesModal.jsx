@@ -2,7 +2,14 @@ import { useState } from "react";
 import { elementBySymbol } from "matsci-parse";
 import Modal, { ModalButton } from "../common/Modal";
 
-export default function SpeciesModal({ open, mode, onClose, structure, onRemoveAll, onReplaceAll }) {
+export default function SpeciesModal({
+  open,
+  mode,
+  onClose,
+  structure,
+  onRemoveAll,
+  onReplaceAll,
+}) {
   return (
     <Modal
       open={open}
@@ -37,7 +44,9 @@ export default function SpeciesModal({ open, mode, onClose, structure, onRemoveA
 
 function RemoveSpeciesForm({ structure, onConfirm }) {
   const [species, setSpecies] = useState("");
-  const speciesList = [...new Set(structure.sites.map((s) => s.species.symbol))];
+  const speciesList = [
+    ...new Set(structure.sites.map((s) => s.species.symbol)),
+  ];
 
   return (
     <div className="space-y-3">
@@ -78,7 +87,9 @@ function RemoveSpeciesForm({ structure, onConfirm }) {
 function ReplaceSpeciesForm({ structure, onConfirm }) {
   const [oldSp, setOldSp] = useState("");
   const [newSp, setNewSp] = useState("");
-  const speciesList = [...new Set(structure.sites.map((s) => s.species.symbol))];
+  const speciesList = [
+    ...new Set(structure.sites.map((s) => s.species.symbol)),
+  ];
   const validNew = newSp.trim() && !!elementBySymbol[newSp.trim()];
 
   return (

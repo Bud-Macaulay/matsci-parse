@@ -33,7 +33,9 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
         action: "symmetry-transform",
         label: `Symmetry → ${mode}`,
       });
-      setStructure(mode === "primitive" ? analysis.primitive : analysis.conventional);
+      setStructure(
+        mode === "primitive" ? analysis.primitive : analysis.conventional,
+      );
     },
     [analysis, pushUndo, setStructure],
   );
@@ -84,13 +86,18 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
             <table className="w-full text-xs border-separate border-spacing-0">
               <tbody>
                 <tr>
-                  <td className="px-3 py-1.5 text-gray-500 border-b">Space group</td>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">
+                    Space group
+                  </td>
                   <td className="px-3 py-1.5 font-mono border-b">
-                    {calc.number ?? "-"} ({formatSpaceGroupSymbol(cleanSymbol) ?? "-"})
+                    {calc.number ?? "-"} (
+                    {formatSpaceGroupSymbol(cleanSymbol) ?? "-"})
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-1.5 text-gray-500 border-b">Pearson</td>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">
+                    Pearson
+                  </td>
                   <td className="px-3 py-1.5 font-mono border-b">
                     {calc.pearson_symbol ?? "-"}
                   </td>
@@ -102,7 +109,9 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-3 py-1.5 text-gray-500 border-b">Symmetrized sites</td>
+                  <td className="px-3 py-1.5 text-gray-500 border-b">
+                    Symmetrized sites
+                  </td>
                   <td className="px-3 py-1.5 font-mono border-b">
                     {calc?.prim_std_cell?.positions?.length ?? "-"}
                   </td>
@@ -112,7 +121,9 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
           )}
 
           {analysis && !calc && (
-            <p className="text-sm text-gray-500">No symmetry data found for this structure.</p>
+            <p className="text-sm text-gray-500">
+              No symmetry data found for this structure.
+            </p>
           )}
         </div>
       </Modal>

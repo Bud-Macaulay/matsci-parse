@@ -1,4 +1,9 @@
-export default function HistoryBar({ undoStack, onUndo, onRedo, redoDisabled }) {
+export default function HistoryBar({
+  undoStack,
+  onUndo,
+  onRedo,
+  redoDisabled,
+}) {
   return (
     <div className="px-6 py-2 flex items-center justify-between gap-3 border-b">
       <div className="flex gap-2">

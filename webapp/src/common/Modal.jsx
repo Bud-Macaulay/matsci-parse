@@ -61,7 +61,12 @@ export default function Modal({
   );
 }
 
-export function ModalButton({ children, onClick, variant = "primary", ...rest }) {
+export function ModalButton({
+  children,
+  onClick,
+  variant = "primary",
+  ...rest
+}) {
   const base = "px-3 py-1.5 text-sm rounded-md transition";
 
   const variants = {
