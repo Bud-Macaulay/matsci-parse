@@ -14,22 +14,22 @@ describe("createLattice", () => {
     expect(() => createLattice([1, 0, 0, 0, 1, 0])).toThrow();
   });
 
-  it("preserves column-major basis interpretation", () => {
+  it("stores lattice vectors as rows", () => {
     const lattice = createLattice([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     const d = lattice.basis.data;
 
-    // column 1
+    // row 1 (lattice vector a)
     expect(d[0]).toBe(1);
     expect(d[1]).toBe(2);
     expect(d[2]).toBe(3);
 
-    // column 2
+    // row 2 (lattice vector b)
     expect(d[3]).toBe(4);
     expect(d[4]).toBe(5);
     expect(d[5]).toBe(6);
 
-    // column 3
+    // row 3 (lattice vector c)
     expect(d[6]).toBe(7);
     expect(d[7]).toBe(8);
     expect(d[8]).toBe(9);

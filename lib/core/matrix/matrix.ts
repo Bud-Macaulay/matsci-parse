@@ -1,4 +1,4 @@
-/** A matrix backed by a column-major Float64Array. */
+/** A matrix backed by a row-major Float64Array. */
 export interface Matrix {
   readonly rows: number;
   readonly cols: number;
@@ -58,7 +58,7 @@ export function clone(matrix: Matrix): Matrix {
   };
 }
 
-/** Compute the linear index for the given (row, col) in a column-major layout.
+/** Compute the linear index for the given (row, col) in a row-major layout.
  * @param cols - Number of columns in the matrix.
  * @param row - Row index.
  * @param col - Column index.

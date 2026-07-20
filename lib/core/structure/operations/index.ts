@@ -1,3 +1,4 @@
+export * from "./applyTransformationBasis";
 export * from "./canonicalize";
 export * from "./hashStructure";
 

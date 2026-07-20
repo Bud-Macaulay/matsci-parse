@@ -6,7 +6,7 @@ function clean(x: number): number {
   return Math.abs(x) < EPS ? 0 : x;
 }
 
-/** A lattice defined by a 3x3 basis matrix (column vectors). */
+/** A lattice defined by a 3x3 basis matrix (row vectors). */
 export interface Lattice {
   basis: Matrix;
 }
