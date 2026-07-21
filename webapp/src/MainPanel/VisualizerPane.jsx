@@ -2,7 +2,7 @@ import { useState } from "react";
 import StructureVisualizer from "mc-react-structure-visualizer";
 import StructureDownload from "../common/structureDownload";
 import QEInputButton from "../common/QEInputButton";
-import MLIPPanel from "./MLIPPanel";
+import MLIPPanel from "../mlip/MLIPPanel.jsx";
 import { hillFormula, density, volume } from "matsci-parse";
 
 export default function VisualizerPane({ structure, setStructure, pushUndo }) {
