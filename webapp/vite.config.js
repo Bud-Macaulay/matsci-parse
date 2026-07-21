@@ -11,6 +11,9 @@ export default defineConfig({
       "matsci-parse": resolve(__dirname, "../lib/main.ts"),
     },
   },
+  optimizeDeps: {
+    include: ["@peterspackman/mlip.js"],
+  },
   plugins: [
     react(),
     tailwindcss(),

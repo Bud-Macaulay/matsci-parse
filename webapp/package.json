@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@peterspackman/mlip.js": "^0.1.1",
     "@tanstack/react-hotkeys": "^0.9.1",
     "@tanstack/react-store": "^0.10.0",
     "matsci-parse": "^0.11.0",

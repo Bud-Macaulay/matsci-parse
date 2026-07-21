@@ -185,7 +185,7 @@ export default function MainPanel({ tab, updateTab }) {
 
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         {/* LEFT COLUMN */}
-        <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4">
+        <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4 overflow-y-auto">
           <div className="flex justify-between items-center text-[12px]">
             <span className="text-sm">Atoms ({structure.sites.length})</span>
             <div className="flex gap-2">
@@ -251,7 +251,7 @@ export default function MainPanel({ tab, updateTab }) {
         </div>
 
         {/* RIGHT: VISUALIZER */}
-        <VisualizerPane structure={structure} />
+        <VisualizerPane structure={structure} setStructure={setStructure} pushUndo={pushUndo} />
       </div>
 
       <SpeciesModal
