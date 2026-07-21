@@ -39,15 +39,17 @@ export default function DistanceMatrixPanel({ structure }) {
     setOpen(true);
   };
 
-  const maxD = useMemo(() => {
-    if (!matrix) return 1;
+  const { minD, maxD } = useMemo(() => {
+    if (!matrix) return { minD: 0, maxD: 1 };
+    let mn = Infinity;
     let mx = 0;
     for (const row of matrix) {
       for (let j = 0; j < row.length; j++) {
+        if (row[j] > 0 && row[j] < mn) mn = row[j];
         if (row[j] > mx) mx = row[j];
       }
     }
-    return mx || 1;
+    return { minD: mn === Infinity ? 0 : mn, maxD: mx || 1 };
   }, [matrix]);
 
   const n = structure.sites.length;
@@ -68,6 +70,9 @@ export default function DistanceMatrixPanel({ structure }) {
         {matrix &&
           (showFull ? (
             <div className="overflow-auto max-h-[75vh]">
+              <p className="text-xs text-gray-500 mb-2 font-mono">
+                Distance range: {minD.toFixed(4)} — {maxD.toFixed(4)} Å
+              </p>
               <table className="text-[10px] border-separate border-spacing-0 font-mono">
                 <thead>
                   <tr>
@@ -108,8 +113,11 @@ export default function DistanceMatrixPanel({ structure }) {
             </div>
           ) : (
             <div className="text-xs text-gray-500">
-              <p className="mb-2">
+              <p className="mb-1">
                 {n}×{n} matrix — showing upper triangle:
+              </p>
+              <p className="mb-2 font-mono">
+                Distance range: {minD.toFixed(4)} — {maxD.toFixed(4)} Å
               </p>
               <div className="overflow-auto max-h-[60vh]">
                 <table className="text-[10px] border-separate border-spacing-0 font-mono">
