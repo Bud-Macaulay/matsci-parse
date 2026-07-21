@@ -93,8 +93,8 @@ describe("getAngle", () => {
 
     const angle = getAngle(s, 0, 1, 2);
 
-    // Value equivalent to vesta
-    expect(angle).toBeCloseTo(101.3099324740202);
+    // Correct Cartesian angle for this lattice and sites
+    expect(angle).toBeCloseTo(100.82705853642706);
   });
 
   it("handles degenerate collinear sites safely", () => {

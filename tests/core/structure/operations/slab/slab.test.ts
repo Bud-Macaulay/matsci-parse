@@ -14,6 +14,7 @@ import { calculateScaleFactor } from "@/core/structure/operations/slab/calculate
 import { makeSupercell } from "@/core/structure/operations/makeSupercell";
 import { slabFromMillerIndex } from "@/core/structure/operations/slab/slabFromMillerIndex";
 import { slabFromSites } from "@/core/structure/operations/slab/slabFromSites";
+import { getDistance } from "@/core/structure/operations/distance/getDistance";
 import type { Structure } from "@/core/structure/structure";
 
 function cubicSi(): Structure {
@@ -36,15 +37,11 @@ function toCart(lattice: ReturnType<typeof createLattice>, frac: Float64Array): 
   return new Float64Array([r.data[0], r.data[1], r.data[2]]);
 }
 
-function pairwiseDistances(st: Structure): number[] {
+function micPairwiseDistances(st: Structure): number[] {
   const dists: number[] = [];
   for (let i = 0; i < st.sites.length; i++) {
     for (let j = i + 1; j < st.sites.length; j++) {
-      const ci = toCart(st.lattice, st.sites[i].frac);
-      const cj = toCart(st.lattice, st.sites[j].frac);
-      let d = 0;
-      for (let k = 0; k < 3; k++) d += (ci[k] - cj[k]) ** 2;
-      dists.push(Math.sqrt(d));
+      dists.push(getDistance(st, i, j));
     }
   }
   return dists.sort((a, b) => a - b);
@@ -220,8 +217,8 @@ describe("makeSupercell", () => {
     const s = cubicSi();
     const U = calculateScaleFactor([1, 1, 1], s.lattice);
     const sc = makeSupercell(s, U);
-    const origDists = pairwiseDistances(s);
-    const scDists = pairwiseDistances(sc);
+    const origDists = micPairwiseDistances(s);
+    const scDists = micPairwiseDistances(sc);
     for (const d of origDists) {
       expect(scDists.some((sd) => Math.abs(sd - d) < 1e-8)).toBe(true);
     }
@@ -265,8 +262,8 @@ describe("slabFromMillerIndex", () => {
 
   it("(111) preserves inter-atomic distances", () => {
     const s = cubicSi();
-    const origDists = pairwiseDistances(s);
-    const slabDists = pairwiseDistances(slabFromMillerIndex(s, 1, 1, 1, { layers: 2 }));
+    const origDists = micPairwiseDistances(s);
+    const slabDists = micPairwiseDistances(slabFromMillerIndex(s, 1, 1, 1, { layers: 2 }));
     for (const d of origDists) {
       expect(slabDists.some((sd) => Math.abs(sd - d) < 1e-8)).toBe(true);
     }
@@ -274,8 +271,8 @@ describe("slabFromMillerIndex", () => {
 
   it("(110) preserves inter-atomic distances", () => {
     const s = cubicSi();
-    const origDists = pairwiseDistances(s);
-    const slabDists = pairwiseDistances(slabFromMillerIndex(s, 1, 1, 0, { layers: 2 }));
+    const origDists = micPairwiseDistances(s);
+    const slabDists = micPairwiseDistances(slabFromMillerIndex(s, 1, 1, 0, { layers: 2 }));
     for (const d of origDists) {
       expect(slabDists.some((sd) => Math.abs(sd - d) < 1e-8)).toBe(true);
     }
@@ -283,8 +280,8 @@ describe("slabFromMillerIndex", () => {
 
   it("(100) preserves inter-atomic distances", () => {
     const s = cubicSi();
-    const origDists = pairwiseDistances(s);
-    const slabDists = pairwiseDistances(slabFromMillerIndex(s, 1, 0, 0, { layers: 2 }));
+    const origDists = micPairwiseDistances(s);
+    const slabDists = micPairwiseDistances(slabFromMillerIndex(s, 1, 0, 0, { layers: 2 }));
     for (const d of origDists) {
       expect(slabDists.some((sd) => Math.abs(sd - d) < 1e-8)).toBe(true);
     }
@@ -301,6 +298,40 @@ describe("slabFromMillerIndex", () => {
       }
     }
   });
+
+  it("minimum interatomic distance never drops below physical threshold", () => {
+    const s = cubicSi();
+    const cases: [number, number, number][] = [
+      [1, 0, 0], [0, 1, 0], [0, 0, 1],
+      [1, 1, 0], [1, 0, 1], [0, 1, 1],
+      [1, 1, 1], [1, 2, 3], [2, 1, 0], [3, 2, 1],
+    ];
+    for (const [h, k, l] of cases) {
+      const slab = slabFromMillerIndex(s, h, k, l, { layers: 3 });
+      const slabMin = micPairwiseDistances(slab)[0];
+      expect(slabMin, `(${h}${k}${l}) minimum distance ${slabMin.toFixed(4)} Å`).toBeGreaterThanOrEqual(1.0);
+    }
+  });
+
+  it("bulk atoms retain their coordination within cutoff", () => {
+    const s = cubicSi();
+    const origDists = micPairwiseDistances(s);
+    const nnCutoff = origDists[0] * 1.2;
+    const origCoord = micPairwiseDistances(s).filter((d) => d < nnCutoff).length / s.sites.length;
+
+    const cases: [number, number, number][] = [
+      [1, 0, 0], [0, 1, 0], [0, 0, 1],
+      [1, 1, 0], [1, 0, 1], [0, 1, 1],
+      [1, 1, 1], [1, 2, 3], [2, 1, 0], [3, 2, 1],
+    ];
+    for (const [h, k, l] of cases) {
+      const slab = slabFromMillerIndex(s, h, k, l, { layers: 3 });
+      const slabDists = micPairwiseDistances(slab);
+      const slabNN = slabDists.filter((d) => d < nnCutoff).length;
+      const avgCoord = slabNN / slab.sites.length;
+      expect(avgCoord, `(${h}${k}${l}) avg coordination ${avgCoord.toFixed(2)} vs orig ${origCoord.toFixed(2)}`).toBeGreaterThanOrEqual(origCoord * 0.8);
+    }
+  });
 });
 
 // ── slabFromSites ─────────────────────────────────────────────────
@@ -308,8 +339,8 @@ describe("slabFromMillerIndex", () => {
 describe("slabFromSites", () => {
   it("preserves inter-atomic distances", () => {
     const s = cubicSi();
-    const origDists = pairwiseDistances(s);
-    const slabDists = pairwiseDistances(slabFromSites(s, 0, 1, 2, { layers: 2 }));
+    const origDists = micPairwiseDistances(s);
+    const slabDists = micPairwiseDistances(slabFromSites(s, 0, 1, 2, { layers: 2 }));
     for (const d of origDists) {
       expect(slabDists.some((sd) => Math.abs(sd - d) < 1e-8)).toBe(true);
     }
