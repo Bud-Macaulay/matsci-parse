@@ -7,11 +7,16 @@ import type { Structure } from "../../structure";
 const EPS = 1e-12;
 
 /**
- * Reorient a structure so that the given Cartesian normal aligns with the z-axis.
- * Atom Cartesian positions are preserved exactly.
+ * Rotate the lattice so that the given Cartesian direction maps to the new c-axis
+ * (third lattice vector).  Atom Cartesian positions are preserved exactly.
+ *
+ * NOTE: this only guarantees the new c-axis aligns with `normal` when the original
+ * third lattice vector is parallel to `normal`.  For slab construction, the caller
+ * must first apply `calculateScaleFactor` + `supercell` to orient the cell.
+ *
  * @param structure - The input structure.
  * @param normal - A 3D Cartesian direction vector (need not be unit).
- * @returns A new Structure with reoriented lattice and sites.
+ * @returns A new Structure with rotated lattice and sites.
  */
 export function reorientToNormal(
   structure: Structure,
