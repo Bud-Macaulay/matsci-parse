@@ -1,6 +1,5 @@
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import { calculateScaleFactor } from "./calculateScaleFactor";
-import { makeSupercell } from "../makeSupercell";
 import { supercell } from "../supercell";
 import { addVacuum } from "./addVacuum";
 import type { Structure } from "../../structure";
@@ -42,7 +41,7 @@ export function slabFromMillerIndex(
   const U = calculateScaleFactor([h, k, l], structure.lattice);
 
   // Step 2: Create the oriented unit cell
-  const ouc = makeSupercell(structure, U);
+  const ouc = supercell(structure, U);
 
   // Step 3: Replicate along c
   const replicated = supercell(ouc, [1, 1, layers]);

@@ -8,10 +8,10 @@ import { dot } from "@/core/matrix/operations/vector/dot";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { determinant } from "@/core/matrix/operations/determinant";
 import { latticePointsInSupercell } from "@/core/matrix/operations/latticePointsInSupercell";
+import { supercell } from "@/core/structure/operations/supercell";
 import { reorientToNormal } from "@/core/structure/operations/slab/reorientToNormal";
 import { addVacuum } from "@/core/structure/operations/slab/addVacuum";
 import { calculateScaleFactor } from "@/core/structure/operations/slab/calculateScaleFactor";
-import { makeSupercell } from "@/core/structure/operations/makeSupercell";
 import { slabFromMillerIndex } from "@/core/structure/operations/slab/slabFromMillerIndex";
 import { slabFromSites } from "@/core/structure/operations/slab/slabFromSites";
 import { getDistance } from "@/core/structure/operations/distance/getDistance";
@@ -199,24 +199,24 @@ describe("latticePointsInSupercell", () => {
   });
 });
 
-// ── makeSupercell ─────────────────────────────────────────────────
+// ── supercell (general) ───────────────────────────────────────────
 
-describe("makeSupercell", () => {
+describe("supercell (general)", () => {
   it("identity produces same structure", () => {
     const s = cubicSi();
-    expect(makeSupercell(s, identity(3)).sites.length).toBe(s.sites.length);
+    expect(supercell(s, identity(3)).sites.length).toBe(s.sites.length);
   });
 
   it("diag(2,1,1) doubles atoms along a", () => {
     const s = cubicSi();
     const U = createMatrix(3, 3, [2, 0, 0, 0, 1, 0, 0, 0, 1]);
-    expect(makeSupercell(s, U).sites.length).toBe(8);
+    expect(supercell(s, U).sites.length).toBe(8);
   });
 
   it("preserves inter-atomic distances", () => {
     const s = cubicSi();
     const U = calculateScaleFactor([1, 1, 1], s.lattice);
-    const sc = makeSupercell(s, U);
+    const sc = supercell(s, U);
     const origDists = micPairwiseDistances(s);
     const scDists = micPairwiseDistances(sc);
     for (const d of origDists) {

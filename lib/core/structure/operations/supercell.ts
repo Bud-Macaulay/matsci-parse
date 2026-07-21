@@ -1,64 +1,83 @@
 import { createLattice } from "@/core/lattice/lattice";
+import { createMatrix } from "@/core/matrix/matrix";
+import { mul } from "@/core/matrix/operations/mul";
+import { cartesian } from "@/core/site/cartesian";
+import { fractional } from "@/core/site/fractional";
+import { latticePointsInSupercell } from "@/core/matrix/operations/latticePointsInSupercell";
+import type { Matrix } from "@/core/matrix/matrix";
 import type { Structure } from "../structure";
 import type { Site } from "@/core/site/site";
 
-type SupercellSize = number | [number, number, number];
+type SupercellSize = number | [number, number, number] | Matrix;
 
-/** Create a supercell by replicating the structure in each lattice direction. */
-export function supercell(
-  structure: Structure,
-  size: SupercellSize,
-): Structure {
-  const [nx, ny, nz] = typeof size === "number" ? [size, size, size] : size;
+function isMatrix(size: SupercellSize): size is Matrix {
+  return typeof size !== "number" && !Array.isArray(size);
+}
 
-  if (
-    nx < 1 ||
-    ny < 1 ||
-    nz < 1 ||
-    !Number.isInteger(nx) ||
-    !Number.isInteger(ny) ||
-    !Number.isInteger(nz)
-  ) {
-    throw new Error("Supercell dimensions must be positive integers");
+/** Create a supercell by applying an integer transformation matrix U.
+ *
+ * If `size` is a number or [nx, ny, nz], a diagonal supercell is formed by
+ * replicating the structure in each lattice direction.
+ *
+ * If `size` is a 3x3 integer Matrix, the general supercell algorithm from
+ * pymatgen's `Structure.__mul__` (make_supercell) is used: the new basis
+ * is U @ oldBasis and lattice points are replicated by |det(U)|.
+ *
+ * @param structure - The input structure.
+ * @param size - Supercell size: number (isotropic), [nx, ny, nz], or 3x3 integer matrix.
+ * @returns A new Structure with the supercell applied.
+ */
+export function supercell(structure: Structure, size: SupercellSize): Structure {
+  let U: Matrix;
+
+  if (isMatrix(size)) {
+    U = size;
+  } else {
+    const [nx, ny, nz] = typeof size === "number" ? [size, size, size] : size;
+    U = createMatrix(3, 3, [nx, 0, 0, 0, ny, 0, 0, 0, nz]);
   }
 
-  const m = structure.lattice.basis.data;
+  const newBasis = mul(U, structure.lattice.basis);
+  const newLattice = createLattice(newBasis);
 
-  // row-major scaling
-  const newBasis = [
-    m[0] * nx,
-    m[1] * nx,
-    m[2] * nx,
-
-    m[3] * ny,
-    m[4] * ny,
-    m[5] * ny,
-
-    m[6] * nz,
-    m[7] * nz,
-    m[8] * nz,
-  ];
+  const fracPoints = latticePointsInSupercell(U);
 
   const sites: Site[] = [];
 
   for (const site of structure.sites) {
-    const [x, y, z] = site.frac;
+    const siteCart = cartesian(structure.lattice, site);
 
-    for (let i = 0; i < nx; i++) {
-      for (let j = 0; j < ny; j++) {
-        for (let k = 0; k < nz; k++) {
-          sites.push({
-            species: site.species,
+    for (const lp of fracPoints) {
+      // Lattice point in Cartesian (using new lattice)
+      const lpCart = cartesian(newLattice, {
+        species: site.species,
+        frac: lp,
+      });
 
-            frac: new Float64Array([(x + i) / nx, (y + j) / ny, (z + k) / nz]),
-          });
-        }
+      const pos = new Float64Array([
+        siteCart[0] + lpCart[0],
+        siteCart[1] + lpCart[1],
+        siteCart[2] + lpCart[2],
+      ]);
+
+      const frac = fractional(newLattice, pos);
+
+      // Wrap to [0, 1)
+      for (let d = 0; d < 3; d++) {
+        frac[d] = frac[d] - Math.floor(frac[d]);
+        if (frac[d] > 1 - 1e-10) frac[d] = 0;
+        if (frac[d] < 1e-10) frac[d] = 0;
       }
+
+      sites.push({
+        species: site.species,
+        frac,
+      });
     }
   }
 
   return {
-    lattice: createLattice(newBasis),
+    lattice: newLattice,
     sites,
   };
 }
