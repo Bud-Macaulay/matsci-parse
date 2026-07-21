@@ -23,11 +23,12 @@ export default function VisualizerPane({ structure, setStructure, pushUndo }) {
         <StructureDownload structure={structure} />
       </div>
 
-      {mlipOpen && (
+      {/* Commented out while likely broken */}
+      {/* {mlipOpen && (
         <div className="absolute top-12 left-2 z-20 w-[400px] max-h-[60vh] overflow-y-auto shadow-xl">
           <MLIPPanel structure={structure} setStructure={setStructure} pushUndo={pushUndo} />
         </div>
-      )}
+      )} */}
 
       <StructureVisualizer structure={structure} initSupercell={[1, 1, 1]} />
       <div className="absolute bottom-25 right-2 z-10 bg-slate-200/85 backdrop-blur-sm rounded-md px-3 py-1.5 shadow-sm text-xs">
