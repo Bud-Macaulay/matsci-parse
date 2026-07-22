@@ -1,4 +1,4 @@
-import { fromCIF, fromXYZ, fromPOSCAR, fromXSF } from "matsci-parse";
+import { fromCIF, fromXYZ, fromPOSCAR, fromXSF, fromPW } from "matsci-parse";
 
 export function detectFormat(fileText) {
   const lines = fileText
@@ -31,7 +31,7 @@ export function detectFormat(fileText) {
 }
 
 export const importers = {
-  // pw: pwToStructure,
+  pw: fromPW,
   cif: fromCIF,
   xsf: fromXSF,
   xyz: fromXYZ,
