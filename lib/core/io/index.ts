@@ -8,6 +8,6 @@ export * from "./optimade";
 export * from "./gro";
 export * from "./pdb";
 export * from "./pw"; // this may be buggy
-export * from "./upf";
+export * from "./pseudo";
 
 export * from "./json";

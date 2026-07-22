@@ -5,7 +5,17 @@ export type PseudopotentialType = "NC" | "SL" | "1/r" | "US" | "PAW";
 export type RelativisticType = "scalar" | "full" | "nonrelativistic";
 
 /** UPF version string. */
-export type UPFVersion = "2.0.1";
+export type UPFVersion = "1.0.0" | "2.0.1";
+
+/** Source format identifier for interconversion. */
+export type PseudopotentialFormat =
+  | "UPF1"
+  | "UPF2"
+  | "PSP8"
+  | "PSML"
+  | "CPI"
+  | "GTH"
+  | "HGH";
 
 /** Header attributes from PP_HEADER section. */
 export interface PseudopotentialHeader {
@@ -61,10 +71,16 @@ export interface PseudopotentialHeader {
   numberOfWfc: number;
   /** Number of Kleinman-Bylander projectors. */
   numberOfProj: number;
+  /** Numeric XC functional code (PSP8 pspxc). */
+  xcCode?: number;
+  /** Spin-orbit extension switch (PSP8). */
+  extensionSwitch?: number;
 }
 
 /** Radial mesh parameters and data from PP_MESH section. */
 export interface PseudopotentialMesh {
+  /** Grid type discriminator. */
+  gridType?: "logarithmic" | "linear" | "custom";
   /** Logarithmic grid spacing parameter dx. */
   dx?: number;
   /** Number of mesh points. */
@@ -119,6 +135,8 @@ export interface PseudopotentialNonlocal {
   qqq?: Array<[number, number, number]>;
   /** Augmentation functions r^2 q_ij(r). */
   qfunc?: Array<[number, number, number, Float64Array]>;
+  /** Augmentation data (USPP/PAW). */
+  augmentation?: AugmentationData;
 }
 
 /** Augmentation data from PP_AUGMENTATION section (USPP/PAW). */
@@ -237,12 +255,42 @@ export interface SpinOrbitData {
   }>;
 }
 
-/** Complete pseudopotential data parsed from a UPF v2.0.1 file. */
+/** GTH/HGH analytical pseudopotential parameters. */
+export interface GthData {
+  /** Valence electron configuration [s, p, d, ...]. */
+  nElec: number[];
+  /** Local potential Gaussian radius. */
+  rLoc: number;
+  /** Local potential Gaussian coefficients. */
+  cexpPpl: number[];
+  /** Non-local projector radii per angular momentum channel. */
+  rPs: number[];
+  /** h-matrix elements [channel][i][j]. */
+  hprj: number[][][];
+  /** k-matrix elements for spin-orbit [channel][i][j]. */
+  kprj?: number[][][];
+}
+
+/** Provenance metadata (PSML and others). */
+export interface Provenance {
+  /** Generator program name. */
+  creator: string;
+  /** Generation date. */
+  date?: string;
+  /** Embedded input files. */
+  inputFiles?: Array<{ name: string; content: string }>;
+}
+
+/** Complete pseudopotential data parsed from a pseudopotential file. */
 export interface Pseudopotential {
-  /** UPF format version. */
+  /** Source format. */
+  format?: PseudopotentialFormat;
+  /** UPF format version (for UPF formats). */
   version: UPFVersion;
   /** Human-readable info section. */
   info?: string;
+  /** Provenance metadata. */
+  provenance?: Provenance;
   /** Header with metadata. */
   header: PseudopotentialHeader;
   /** Radial mesh. */
@@ -259,7 +307,7 @@ export interface Pseudopotential {
   }>;
   /** Nonlocal projectors and D_ij. */
   nonlocal: PseudopotentialNonlocal;
-  /** Augmentation data (USPP/PAW). */
+  /** Augmentation data (USPP/PAW). DEPRECATED: prefer nonlocal.augmentation. */
   augmentation?: AugmentationData;
   /** Atomic pseudo-wavefunctions. */
   pswfc: PseudopotentialWfc[];
@@ -273,4 +321,6 @@ export interface Pseudopotential {
   gipaw?: GipawData;
   /** Spin-orbit coupling data. */
   spinOrbit?: SpinOrbitData;
+  /** GTH/HGH analytical parameters (when format is GTH or HGH). */
+  gth?: GthData;
 }

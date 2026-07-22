@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { fromUPF, toUPF } from "@/core/io/upf";
+import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
 
 import * as fixtures from "./teststrings/upf";
 

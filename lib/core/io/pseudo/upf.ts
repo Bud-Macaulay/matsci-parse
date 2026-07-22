@@ -15,7 +15,7 @@ import type {
   SpinOrbitData,
   PseudopotentialType,
   RelativisticType,
-} from "../pseudopotential/pseudopotential";
+} from "../../pseudopotential/pseudopotential";
 
 // ── Fortran helpers ─────────────────────────────────────────────────
 
@@ -212,27 +212,34 @@ function parseNonlocal(node: XmlNode): PseudopotentialNonlocal {
   const tokens = dijText.trim().split(/\s+/).filter(Boolean).map(parseFortranNumber);
   const dij: Array<[number, number, number]> = [];
 
-  if (tokens.length === 0) return { betas, dij };
+  if (tokens.length > 0) {
+    const nProj = betas.length;
 
-  const nProj = betas.length;
-  const sqrtLen = Math.round(Math.sqrt(tokens.length));
-
-  // Flat matrix format: tokens.length == nProj^2, row-major
-  if (nProj > 0 && tokens.length === nProj * nProj) {
-    for (let i = 0; i < nProj; i++) {
-      for (let j = 0; j < nProj; j++) {
-        dij.push([i + 1, j + 1, tokens[i * nProj + j]]);
+    // Flat matrix format: tokens.length == nProj^2, row-major
+    if (nProj > 0 && tokens.length === nProj * nProj) {
+      for (let i = 0; i < nProj; i++) {
+        for (let j = 0; j < nProj; j++) {
+          dij.push([i + 1, j + 1, tokens[i * nProj + j]]);
+        }
+      }
+    }
+    // Triplet format: tokens.length % 3 == 0, each triplet is (i, j, value)
+    else if (tokens.length % 3 === 0) {
+      for (let k = 0; k < tokens.length; k += 3) {
+        dij.push([tokens[k], tokens[k + 1], tokens[k + 2]]);
       }
     }
   }
-  // Triplet format: tokens.length % 3 == 0, each triplet is (i, j, value)
-  else if (tokens.length % 3 === 0) {
-    for (let k = 0; k < tokens.length; k += 3) {
-      dij.push([tokens[k], tokens[k + 1], tokens[k + 2]]);
-    }
-  }
 
-  return { betas, dij };
+  // PP_AUGMENTATION (optional, child of PP_NONLOCAL)
+  const augmentation = node["PP_AUGMENTATION"]
+    ? parseAugmentation(node["PP_AUGMENTATION"])
+    : undefined;
+
+  // nqf from PP_NONLOCAL or PP_AUGMENTATION attributes
+  const nqf = augmentation?.nqf ?? undefined;
+
+  return { betas, dij, nqf, augmentation };
 }
 
 function parseAugmentation(node: XmlNode): AugmentationData {
