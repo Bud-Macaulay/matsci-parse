@@ -318,9 +318,13 @@ export function toPSML(pp: Pseudopotential): string {
   xml += `<psml version="1.2" energy_unit="hartree" length_unit="bohr" uuid="matsci-parse">\n`;
 
   // Provenance
-  xml += `  <provenance creator="matsci-parse" date="${new Date().toISOString().split("T")[0]}">\n`;
-  xml += `    <annotation type="generated-by" value="matsci-parse pseudopotential library" />\n`;
-  xml += `  </provenance>\n`;
+  if (pp.provenance) {
+    const provCreator = pp.provenance.creator ?? "matsci-parse";
+    const provDate = pp.provenance.date ?? new Date().toISOString().split("T")[0];
+    xml += `  <provenance creator="${provCreator}" date="${provDate}">\n`;
+    xml += `    <annotation type="generated-by" value="matsci-parse pseudopotential library" />\n`;
+    xml += `  </provenance>\n`;
+  }
 
   // Pseudo-atom spec
   xml += `  <pseudo-atom-spec atomic-label="${pp.header.element}" atomic-number="${guessAtomicNumber(pp.header.element)}" z-pseudo="${pp.header.zValence}" relativity="${pp.header.relativistic}" core-corrections="${pp.header.coreCorrection ? "yes" : "no"}">\n`;

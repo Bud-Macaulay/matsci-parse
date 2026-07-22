@@ -47,6 +47,10 @@ function formatFortranNumber(n: number, width = 20): string {
   return d.padStart(width);
 }
 
+function escapeXmlAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function formatFortranBool(b: boolean): string {
   return b ? ".true." : ".false.";
 }
@@ -557,10 +561,10 @@ export function toUPF(pp: Pseudopotential): string {
 
   // PP_HEADER
   lines.push("<PP_HEADER");
-  lines.push(`  generated="${pp.header.generated ?? ""}"`);
-  lines.push(`  author="${pp.header.author ?? ""}"`);
-  lines.push(`  date="${pp.header.date ?? ""}"`);
-  lines.push(`  comment="${pp.header.comment ?? ""}"`);
+  lines.push(`  generated="${escapeXmlAttr(pp.header.generated ?? "")}"`);
+  lines.push(`  author="${escapeXmlAttr(pp.header.author ?? "")}"`);
+  lines.push(`  date="${escapeXmlAttr(pp.header.date ?? "")}"`);
+  lines.push(`  comment="${escapeXmlAttr(pp.header.comment ?? "")}"`);
   lines.push(`  element="${pp.header.element}"`);
   lines.push(`  pseudo_type="${pp.header.pseudoType}"`);
   lines.push(`  relativistic="${pp.header.relativistic}"`);
@@ -586,7 +590,13 @@ export function toUPF(pp: Pseudopotential): string {
   lines.push("");
 
   // PP_MESH
-  lines.push(`<PP_MESH dx="${pp.mesh.dx ?? 0}" mesh="${pp.mesh.mesh ?? pp.header.meshSize}" xmin="${pp.mesh.xmin ?? 0}" rmax="${pp.mesh.rmax}" zmesh="${pp.mesh.zmesh ?? 0}">`);
+  const meshAttrs: string[] = [];
+  if (pp.mesh.dx != null) meshAttrs.push(`dx="${pp.mesh.dx}"`);
+  if (pp.mesh.mesh != null) meshAttrs.push(`mesh="${pp.mesh.mesh}"`);
+  if (pp.mesh.xmin != null) meshAttrs.push(`xmin="${pp.mesh.xmin}"`);
+  meshAttrs.push(`rmax="${pp.mesh.rmax}"`);
+  if (pp.mesh.zmesh != null) meshAttrs.push(`zmesh="${pp.mesh.zmesh}"`);
+  lines.push(`<PP_MESH ${meshAttrs.join(" ")}>`);
   lines.push("<PP_R>");
   lines.push(formatDataArray(pp.mesh.r));
   lines.push("</PP_R>");
@@ -626,7 +636,15 @@ export function toUPF(pp: Pseudopotential): string {
   lines.push("<PP_NONLOCAL>");
   for (let i = 0; i < pp.nonlocal.betas.length; i++) {
     const beta = pp.nonlocal.betas[i];
-    lines.push(`<PP_BETA index="${i + 1}" angular_momentum="${beta.angularMomentum}" label="${beta.label}" ultrasoft_cutoff_radius="${formatFortranNumber(beta.ultrasoftCutoffRadius)}">`);
+    const betaAttrs = [
+      `index="${i + 1}"`,
+      `angular_momentum="${beta.angularMomentum}"`,
+      `label="${beta.label}"`,
+    ];
+    if (beta.cutoffRadiusIndex != null) betaAttrs.push(`cutoff_radius_index="${beta.cutoffRadiusIndex}"`);
+    if (beta.cutoffRadius != null) betaAttrs.push(`cutoff_radius="${formatFortranNumber(beta.cutoffRadius)}"`);
+    betaAttrs.push(`ultrasoft_cutoff_radius="${formatFortranNumber(beta.ultrasoftCutoffRadius)}"`);
+    lines.push(`<PP_BETA ${betaAttrs.join(" ")}>`);
     lines.push(formatDataArray(beta.beta));
     lines.push("</PP_BETA>");
   }
@@ -635,6 +653,41 @@ export function toUPF(pp: Pseudopotential): string {
     lines.push(`${nb}  ${mb}  ${formatFortranNumber(val)}`);
   }
   lines.push("</PP_DIJ>");
+
+  // PP_AUGMENTATION (optional, USPP/PAW)
+  if (pp.nonlocal.augmentation) {
+    const aug = pp.nonlocal.augmentation;
+    const augAttrs: string[] = [];
+    if (aug.qWithL != null) augAttrs.push(`q_with_l="${aug.qWithL ? "T" : "F"}"`);
+    if (aug.nqf != null) augAttrs.push(`nqf="${aug.nqf}"`);
+    if (aug.shape != null) augAttrs.push(`shape="${aug.shape}"`);
+    if (aug.rMatchAugfun != null) augAttrs.push(`r_match_augfun="${formatFortranNumber(aug.rMatchAugfun)}"`);
+    if (aug.irc != null) augAttrs.push(`irc="${aug.irc}"`);
+    if (aug.lmaxAug != null) augAttrs.push(`l_max_aug="${aug.lmaxAug}"`);
+    lines.push(`<PP_AUGMENTATION ${augAttrs.join(" ")}>`);
+    if (aug.q) {
+      lines.push("<PP_Q>");
+      lines.push(formatDataArray(aug.q));
+      lines.push("</PP_Q>");
+    }
+    if (aug.multipoles) {
+      lines.push("<PP_MULTIPOLES>");
+      lines.push(formatDataArray(aug.multipoles));
+      lines.push("</PP_MULTIPOLES>");
+    }
+    if (aug.qfcoeff) {
+      lines.push("<PP_QFCOEFF>");
+      lines.push(formatDataArray(aug.qfcoeff));
+      lines.push("</PP_QFCOEFF>");
+    }
+    if (aug.rinner) {
+      lines.push("<PP_RINNER>");
+      lines.push(formatDataArray(aug.rinner));
+      lines.push("</PP_RINNER>");
+    }
+    lines.push("</PP_AUGMENTATION>");
+  }
+
   lines.push("</PP_NONLOCAL>");
   lines.push("");
 
@@ -643,7 +696,17 @@ export function toUPF(pp: Pseudopotential): string {
     lines.push("<PP_PSWFC>");
     for (let i = 0; i < pp.pswfc.length; i++) {
       const wfc = pp.pswfc[i];
-      lines.push(`<PP_CHI index="${i + 1}" l="${wfc.l}" occupation="${formatFortranNumber(wfc.occupation)}" label="${wfc.label ?? ""}" n="${wfc.n ?? 0}" pseudo_energy="${formatFortranNumber(wfc.pseudoEnergy ?? 0)}" cutoff_radius="${formatFortranNumber(wfc.cutoffRadius ?? 0)}" ultrasoft_cutoff_radius="${formatFortranNumber(wfc.ultrasoftCutoffRadius ?? 0)}">`);
+      const chiAttrs = [
+        `index="${i + 1}"`,
+        `l="${wfc.l}"`,
+        `occupation="${formatFortranNumber(wfc.occupation)}"`,
+        `label="${wfc.label ?? ""}"`,
+      ];
+      if (wfc.n != null) chiAttrs.push(`n="${wfc.n}"`);
+      if (wfc.pseudoEnergy != null) chiAttrs.push(`pseudo_energy="${formatFortranNumber(wfc.pseudoEnergy)}"`);
+      if (wfc.cutoffRadius != null) chiAttrs.push(`cutoff_radius="${formatFortranNumber(wfc.cutoffRadius)}"`);
+      if (wfc.ultrasoftCutoffRadius != null) chiAttrs.push(`ultrasoft_cutoff_radius="${formatFortranNumber(wfc.ultrasoftCutoffRadius)}"`);
+      lines.push(`<PP_CHI ${chiAttrs.join(" ")}>`);
       lines.push(formatDataArray(wfc.chi));
       lines.push("</PP_CHI>");
     }
@@ -707,14 +770,14 @@ export function toUPF(pp: Pseudopotential): string {
 
   // PP_GIPAW (optional)
   if (pp.gipaw) {
-    lines.push("<PP_GIPAW>");
+    lines.push(`<PP_GIPAW gipaw_data_format="${pp.gipaw.gipawDataFormat}">`);
     if (pp.gipaw.coreOrbitals.length > 0) {
       lines.push(`<PP_GIPAW_CORE_ORBITALS number_of_core_orbitals="${pp.gipaw.coreOrbitals.length}">`);
       for (let i = 0; i < pp.gipaw.coreOrbitals.length; i++) {
         const co = pp.gipaw.coreOrbitals[i];
-        lines.push(`<PP_GIPAW_CORE_ORBITAL n="${co.n}" l="${co.l}">`);
+        lines.push(`<PP_GIPAW_CORE_ORBITAL.${i + 1} n="${co.n}" l="${co.l}">`);
         if (co.orbital.length > 0) lines.push(formatDataArray(co.orbital));
-        lines.push("</PP_GIPAW_CORE_ORBITAL>");
+        lines.push(`</PP_GIPAW_CORE_ORBITAL.${i + 1}>`);
       }
       lines.push("</PP_GIPAW_CORE_ORBITALS>");
     }
@@ -722,14 +785,14 @@ export function toUPF(pp: Pseudopotential): string {
       lines.push("<PP_GIPAW_ORBITALS>");
       for (let i = 0; i < pp.gipaw.orbitals.length; i++) {
         const orb = pp.gipaw.orbitals[i];
-        lines.push(`<PP_GIPAW_ORBITAL l="${orb.l}" label="${orb.label}">`);
+        lines.push(`<PP_GIPAW_ORBITAL.${i + 1} l="${orb.l}" label="${escapeXmlAttr(orb.label)}">`);
         lines.push("<PP_GIPAW_ORBITAL_AE>");
         lines.push(formatDataArray(orb.aeOrbital));
         lines.push("</PP_GIPAW_ORBITAL_AE>");
         lines.push("<PP_GIPAW_ORBITAL_PS>");
         lines.push(formatDataArray(orb.psOrbital));
         lines.push("</PP_GIPAW_ORBITAL_PS>");
-        lines.push("</PP_GIPAW_ORBITAL>");
+        lines.push(`</PP_GIPAW_ORBITAL.${i + 1}>`);
       }
       lines.push("</PP_GIPAW_ORBITALS>");
     }

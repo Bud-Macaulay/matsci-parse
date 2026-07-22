@@ -331,27 +331,30 @@ export function toPSP8(pp: Pseudopotential): string {
   }
 
   // Header
+  const zatom = elementToZ(pp.header.element);
   lines.push(`${pp.header.element} ${pp.header.functional} ${pp.header.generated ?? ""}`);
   lines.push(
-    `${pp.header.zValence.toFixed(4).padStart(12)} ${pp.header.zValence.toFixed(4).padStart(12)} ${pp.header.date ?? "000000".padStart(8)}`,
+    `${zatom.toFixed(4).padStart(12)} ${pp.header.zValence.toFixed(4).padStart(12)} ${pp.header.date ?? "000000".padStart(8)}`,
   );
   lines.push(
     `     8 ${pp.header.xcCode ?? 0} ${lmax} ${lloc} ${mmax}     0`,
   );
   lines.push(` 0.00000000  ${pp.nlcc ? "1.0" : "0.0"}  0.00000000`);
   lines.push(` ${nproj.join("  ")}`);
-  lines.push(`     0`);
+  lines.push(`     ${pp.header.extensionSwitch ?? 0}`);
 
   // Projector blocks
   const ekb = pp.nonlocal.dij;
+  let projOffset = 1;
   for (let l = 0; l <= lmax; l++) {
     if (l === lloc && lloc <= lmax) continue;
     if (nproj[l] === 0) continue;
 
-    // Find ekb values for this l channel
+    // Find ekb values for this l channel using global projector indices
     const lBetas = pp.nonlocal.betas.filter((b) => b.angularMomentum === l);
     const ekbValues = lBetas.map((_, i) => {
-      const entry = ekb.find(([nb]) => nb === i + 1);
+      const globalIdx = projOffset + i;
+      const entry = ekb.find(([nb, mb]) => nb === globalIdx && mb === globalIdx);
       return entry ? entry[2] : 1.0;
     });
 
@@ -367,6 +370,8 @@ export function toPSP8(pp: Pseudopotential): string {
       }
       lines.push(parts.join(" "));
     }
+
+    projOffset += lBetas.length;
   }
 
   // Local potential block
@@ -389,6 +394,17 @@ function guessElement(z: number): string {
   ];
   const idx = Math.round(z) - 1;
   return idx >= 0 && idx < elements.length ? elements[idx] : "X";
+}
+
+function elementToZ(element: string): number {
+  const elements = [
+    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
+    "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar",
+    "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+    "Ga", "Ge", "As", "Se", "Br", "Kr",
+  ];
+  const idx = elements.indexOf(element);
+  return idx >= 0 ? idx + 1 : 0;
 }
 
 function pspxcToFunctional(pspxc: number): string {

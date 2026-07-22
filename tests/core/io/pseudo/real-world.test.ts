@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { fromGTH, parseGTHFile } from "@/core/io/pseudo/gth";
+import { fromGTH, parseGTHFile, toGTH } from "@/core/io/pseudo/gth";
 import { fromPSP8, toPSP8 } from "@/core/io/pseudo/psp8";
-import { fromUPF } from "@/core/io/pseudo/upf";
+import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
 
 import * as rw from "./teststrings/real-world";
 
@@ -124,6 +124,20 @@ describe("Real-world GTH pseudopotentials", () => {
       expect(pp.header.element).toBe("H");
     });
   });
+
+  describe("round-trip", () => {
+    it("H GTH round-trips losslessly", () => {
+      const a = fromGTH(rw.realHGthPbe);
+      const c = fromGTH(toGTH(a));
+      expect(c).toEqual(a);
+    });
+
+    it("C GTH round-trips losslessly", () => {
+      const a = fromGTH(rw.realCGthPbe);
+      const c = fromGTH(toGTH(a));
+      expect(c).toEqual(a);
+    });
+  });
 });
 
 describe("Real-world PSP8 pseudopotentials", () => {
@@ -221,13 +235,16 @@ describe("Real-world PSP8 pseudopotentials", () => {
   });
 
   describe("round-trip", () => {
-    it("H PSP8 round-trips header data", () => {
+    it("H PSP8 round-trips losslessly", () => {
       const a = fromPSP8(rw.realHPsp8);
-      const text = toPSP8(a);
-      const b = fromPSP8(text);
-      expect(b.header.element).toBe(a.header.element);
-      expect(b.header.zValence).toBeCloseTo(a.header.zValence);
-      expect(b.header.lMax).toBe(a.header.lMax);
+      const c = fromPSP8(toPSP8(a));
+      expect(c).toEqual(a);
+    });
+
+    it("C PSP8 round-trips losslessly", () => {
+      const a = fromPSP8(rw.realCPsp8);
+      const c = fromPSP8(toPSP8(a));
+      expect(c).toEqual(a);
     });
   });
 });
@@ -296,6 +313,14 @@ describe("Real-world UPF v2 pseudopotentials (FHI origin)", () => {
     it("no wavefunctions stored", () => {
       const pp = fromUPF(rw.realMoUpfV2Fhi);
       expect(pp.pswfc.length).toBe(0);
+    });
+  });
+
+  describe("round-trip", () => {
+    it("Mo UPF v2 round-trips losslessly", () => {
+      const a = fromUPF(rw.realMoUpfV2Fhi);
+      const c = fromUPF(toUPF(a));
+      expect(c).toEqual(a);
     });
   });
 });
