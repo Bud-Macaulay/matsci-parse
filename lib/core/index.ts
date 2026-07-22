@@ -6,6 +6,7 @@ export * from "./species";
 export * from "./volumetric";
 
 export * from "./io";
+export * from "./pseudopotential";
 
 export * from "./units";
 

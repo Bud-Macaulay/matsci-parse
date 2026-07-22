@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@spglib/moyo-wasm": "^0.7.9",
+    "fast-xml-parser": "^5.10.1",
     "voro3d": "^0.0.7"
   }
 }
