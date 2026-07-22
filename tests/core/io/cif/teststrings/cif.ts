@@ -195,3 +195,23 @@ _atom_site_occupancy
 Fe Fe 0.5000 0.0000 0.0000 0.0072(4) Uiso d 1
 N N1 0.163(4) -0.346(4) -0.485(2) 0.0066(10) Uiso d 1
 N N2 0.065(3) -0.309(4) -0.861(2) 0.0068(10) Uiso d 1`;
+
+export const ionicSymbolCif = `
+data_NiO_ionic
+_symmetry_space_group_name_H-M   'F m -3 m'
+_cell_length_a   4.1769
+_cell_length_b   4.1769
+_cell_length_c   4.1769
+_cell_angle_alpha   90
+_cell_angle_beta    90
+_cell_angle_gamma   90
+
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Ni1 Ni2+ 0.0 0.0 0.0
+O1 O2- 0.5 0.5 0.5
+`;
