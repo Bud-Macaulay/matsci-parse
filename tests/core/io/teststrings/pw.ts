@@ -201,3 +201,59 @@ CELL_PARAMETERS angstrom
     -10.3005000000      17.8409893434       0.0000000000
       0.0000000000       0.0000000000      20.0000000000
 `;
+
+// ibrav=1 (simple cubic), ATOMIC_POSITIONS alat
+export const ibravSc = `
+&SYSTEM
+  ibrav = 1
+  nat = 1
+  celldm(1) = 10.0
+/
+ATOMIC_POSITIONS alat
+Na  0.0  0.0  0.0
+`;
+
+// ibrav=2 (fcc), ATOMIC_POSITIONS alat
+export const ibravFcc = `
+&SYSTEM
+  ibrav = 2
+  nat = 4
+  celldm(1) = 10.32
+/
+ATOMIC_POSITIONS alat
+Cu  0.0   0.0   0.0
+Cu  0.5   0.5   0.0
+Cu  0.5   0.0   0.5
+Cu  0.0   0.5   0.5
+`;
+
+// ibrav=0, ATOMIC_POSITIONS bohr
+export const bohrPositions = `
+&SYSTEM
+  ibrav = 0
+  nat = 2
+/
+CELL_PARAMETERS angstrom
+10.0  0.0   0.0
+0.0   10.0  0.0
+0.0   0.0   10.0
+ATOMIC_POSITIONS bohr
+Si  0.0   0.0   0.0
+Si  9.4335  9.4335  9.4335
+`;
+
+// ibrav=0, ATOMIC_POSITIONS crystal with Selective dynamics
+export const selectiveDynamics = `
+&SYSTEM
+  ibrav = 0
+  nat = 2
+/
+CELL_PARAMETERS angstrom
+5.0  0.0  0.0
+0.0  5.0  0.0
+0.0  0.0  5.0
+ATOMIC_POSITIONS crystal
+Selective dynamics
+Si  0.0  0.0  0.0  1  1  0
+Si  0.5  0.5  0.5  0  0  1
+`;
