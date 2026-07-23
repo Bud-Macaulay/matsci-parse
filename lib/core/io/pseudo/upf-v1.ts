@@ -16,36 +16,12 @@ import type {
   PseudopotentialWfc,
 } from "../../pseudopotential/pseudopotential";
 
-function parseFortranNumber(s: string): number {
-  return Number.parseFloat(s.replace(/[dD]/g, "e"));
-}
-
-function parseFloat64Array(text: string): Float64Array {
-  const tokens = text.trim().split(/\s+/).filter(Boolean);
-  const arr = new Float64Array(tokens.length);
-  for (let i = 0; i < tokens.length; i++) {
-    arr[i] = parseFortranNumber(tokens[i]);
-  }
-  return arr;
-}
-
-function formatFortranNumber(n: number, width = 20): string {
-  const s = n.toExponential(15);
-  const d = s.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
-  return d.padStart(width);
-}
-
-function formatDataArray(arr: Float64Array, columns = 4): string {
-  const lines: string[] = [];
-  for (let i = 0; i < arr.length; i += columns) {
-    const row: string[] = [];
-    for (let j = 0; j < columns && i + j < arr.length; j++) {
-      row.push(formatFortranNumber(arr[i + j]));
-    }
-    lines.push(row.join(" "));
-  }
-  return lines.join("\n");
-}
+import {
+  parseFortranNumber,
+  parseFloat64Array,
+  formatFortranNumber,
+  formatDataArray,
+} from "./fortran-helpers";
 
 function extractSection(text: string, tag: string): string | null {
   const open = `<${tag}>`;

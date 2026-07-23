@@ -22,64 +22,23 @@ import type {
   Provenance,
 } from "../../pseudopotential/pseudopotential";
 
-type XmlNode = Record<string, any>;
+import {
+  parseFortranNumber,
+  parseFloat64Array,
+  formatFortranNumber,
+  formatDataArray,
+} from "./fortran-helpers";
 
-function parseFortranNumber(s: string): number {
-  return Number.parseFloat(s.replace(/[dD]/g, "e"));
-}
+import {
+  type XmlNode,
+  attr,
+  attrNum,
+  attrInt,
+  textOf,
+  toArray,
+} from "./xml-helpers";
 
-function parseFloat64Array(text: string): Float64Array {
-  const tokens = text.trim().split(/\s+/).filter(Boolean);
-  const arr = new Float64Array(tokens.length);
-  for (let i = 0; i < tokens.length; i++) {
-    arr[i] = parseFortranNumber(tokens[i]);
-  }
-  return arr;
-}
-
-function formatFortranNumber(n: number, width = 20): string {
-  const s = n.toExponential(15);
-  const d = s.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
-  return d.padStart(width);
-}
-
-function formatDataArray(arr: Float64Array, columns = 4): string {
-  const lines: string[] = [];
-  for (let i = 0; i < arr.length; i += columns) {
-    const row: string[] = [];
-    for (let j = 0; j < columns && i + j < arr.length; j++) {
-      row.push(formatFortranNumber(arr[i + j]));
-    }
-    lines.push(row.join(" "));
-  }
-  return lines.join("\n");
-}
-
-function textOf(node: XmlNode | string | undefined): string {
-  if (typeof node === "string") return node;
-  if (node && "#text" in node) return String(node["#text"]);
-  return "";
-}
-
-function toArray<T>(v: T | T[] | undefined | null): T[] {
-  if (Array.isArray(v)) return v;
-  if (v == null) return [];
-  return [v];
-}
-
-function attr(node: XmlNode | undefined, name: string): string {
-  return node?.[`@_${name}`] ?? "";
-}
-
-function attrNum(node: XmlNode | undefined, name: string, fallback = 0): number {
-  const v = attr(node, name);
-  return v ? parseFortranNumber(v) : fallback;
-}
-
-function attrInt(node: XmlNode | undefined, name: string, fallback = 0): number {
-  const v = attr(node, name);
-  return v ? Number.parseInt(v, 10) : fallback;
-}
+import { guessElement, elementToZ } from "./elements";
 
 const PSML_NS = "http://esl.cecam.org/PSML/ns/1.2";
 const PSML_NS_11 = "http://esl.cecam.org/PSML/ns/1.1";
@@ -327,7 +286,7 @@ export function toPSML(pp: Pseudopotential): string {
   }
 
   // Pseudo-atom spec
-  xml += `  <pseudo-atom-spec atomic-label="${pp.header.element}" atomic-number="${guessAtomicNumber(pp.header.element)}" z-pseudo="${pp.header.zValence}" relativity="${pp.header.relativistic}" core-corrections="${pp.header.coreCorrection ? "yes" : "no"}">\n`;
+  xml += `  <pseudo-atom-spec atomic-label="${pp.header.element}" atomic-number="${elementToZ(pp.header.element)}" z-pseudo="${pp.header.zValence}" relativity="${pp.header.relativistic}" core-corrections="${pp.header.coreCorrection ? "yes" : "no"}">\n`;
   if (pp.header.functional) {
     xml += `    <exchange-correlation>\n`;
     xml += `      <libxc-info number-of-functionals="0">\n`;
@@ -427,24 +386,4 @@ function lToLetter(l: number): string {
   return String.fromCharCode(115 + l); // 115 = 's'
 }
 
-function guessElement(z: number): string {
-  const elements = [
-    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
-    "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar",
-    "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
-    "Ga", "Ge", "As", "Se", "Br", "Kr",
-  ];
-  const idx = Math.round(z) - 1;
-  return idx >= 0 && idx < elements.length ? elements[idx] : "X";
-}
 
-function guessAtomicNumber(element: string): number {
-  const elements = [
-    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
-    "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar",
-    "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
-    "Ga", "Ge", "As", "Se", "Br", "Kr",
-  ];
-  const idx = elements.indexOf(element);
-  return idx >= 0 ? idx + 1 : 1;
-}

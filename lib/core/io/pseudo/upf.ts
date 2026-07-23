@@ -17,89 +17,26 @@ import type {
   RelativisticType,
 } from "../../pseudopotential/pseudopotential";
 
-// ── Fortran helpers ─────────────────────────────────────────────────
+import {
+  parseFortranNumber,
+  parseFortranBool,
+  parseFloat64Array,
+  parseIntSafe,
+  formatFortranNumber,
+  formatFortranBool,
+  escapeXmlAttr,
+  formatDataArray,
+} from "./fortran-helpers";
 
-function parseFortranNumber(s: string): number {
-  return Number.parseFloat(s.replace(/[dD]/g, "e"));
-}
-
-function parseFortranBool(s: string): boolean {
-  const v = s.trim().toLowerCase();
-  return v === ".true." || v === "true" || v === "t";
-}
-
-function parseFloat64Array(text: string): Float64Array {
-  const tokens = text.trim().split(/\s+/).filter(Boolean);
-  const arr = new Float64Array(tokens.length);
-  for (let i = 0; i < tokens.length; i++) {
-    arr[i] = parseFortranNumber(tokens[i]);
-  }
-  return arr;
-}
-
-function parseIntSafe(s: string): number {
-  return Number.parseInt(s.trim(), 10);
-}
-
-function formatFortranNumber(n: number, width = 20): string {
-  const s = n.toExponential(15);
-  const d = s.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
-  return d.padStart(width);
-}
-
-function escapeXmlAttr(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function formatFortranBool(b: boolean): string {
-  return b ? ".true." : ".false.";
-}
-
-function formatDataArray(arr: Float64Array, columns = 4): string {
-  const lines: string[] = [];
-  for (let i = 0; i < arr.length; i += columns) {
-    const row: string[] = [];
-    for (let j = 0; j < columns && i + j < arr.length; j++) {
-      row.push(formatFortranNumber(arr[i + j]));
-    }
-    lines.push(row.join(" "));
-  }
-  return lines.join("\n");
-}
-
-// ── XML node helpers ────────────────────────────────────────────────
-
-type XmlNode = Record<string, any>;
-
-function attr(node: XmlNode | undefined, name: string): string {
-  return node?.[`@_${name}`] ?? "";
-}
-
-function attrNum(node: XmlNode | undefined, name: string, fallback = 0): number {
-  const v = attr(node, name);
-  return v ? parseFortranNumber(v) : fallback;
-}
-
-function attrInt(node: XmlNode | undefined, name: string, fallback = 0): number {
-  const v = attr(node, name);
-  return v ? parseIntSafe(v) : fallback;
-}
-
-function attrBool(node: XmlNode | undefined, name: string): boolean {
-  return parseFortranBool(attr(node, name) || ".false.");
-}
-
-function textOf(node: XmlNode | string | undefined): string {
-  if (typeof node === "string") return node;
-  if (node && "#text" in node) return String(node["#text"]);
-  return "";
-}
-
-function toArray<T>(v: T | T[] | undefined | null): T[] {
-  if (Array.isArray(v)) return v;
-  if (v == null) return [];
-  return [v];
-}
+import {
+  type XmlNode,
+  attr,
+  attrNum,
+  attrInt,
+  attrBool,
+  textOf,
+  toArray,
+} from "./xml-helpers";
 
 function parseData(text: string): Float64Array {
   return parseFloat64Array(text);

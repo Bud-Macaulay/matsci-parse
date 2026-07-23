@@ -22,27 +22,11 @@ import type {
   GthData,
 } from "../../pseudopotential/pseudopotential";
 
-function parseFortranNumber(s: string): number {
-  return Number.parseFloat(s.replace(/[dD]/g, "e"));
-}
-
-function formatFortranNumber(n: number, width = 20): string {
-  const s = n.toExponential(15);
-  const d = s.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
-  return d.padStart(width);
-}
-
-function formatDataArray(arr: Float64Array, columns = 4): string {
-  const lines: string[] = [];
-  for (let i = 0; i < arr.length; i += columns) {
-    const row: string[] = [];
-    for (let j = 0; j < columns && i + j < arr.length; j++) {
-      row.push(formatFortranNumber(arr[i + j]));
-    }
-    lines.push(row.join(" "));
-  }
-  return lines.join("\n");
-}
+import {
+  parseFortranNumber,
+  formatFortranNumber,
+  formatDataArray,
+} from "./fortran-helpers";
 
 interface GthParsedEntry {
   element: string;

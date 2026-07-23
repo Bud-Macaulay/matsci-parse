@@ -20,40 +20,15 @@ import type {
   PseudopotentialWfc,
 } from "../../pseudopotential/pseudopotential";
 
-function parseFortranNumber(s: string): number {
-  return Number.parseFloat(s.replace(/[dD]/g, "e"));
-}
+import {
+  parseFortranNumber,
+  parseFloat64Array,
+  formatFortranNumber,
+  formatDataArray,
+  parseIntSafe,
+} from "./fortran-helpers";
 
-function parseFloat64Array(text: string): Float64Array {
-  const tokens = text.trim().split(/\s+/).filter(Boolean);
-  const arr = new Float64Array(tokens.length);
-  for (let i = 0; i < tokens.length; i++) {
-    arr[i] = parseFortranNumber(tokens[i]);
-  }
-  return arr;
-}
-
-function formatFortranNumber(n: number, width = 20): string {
-  const s = n.toExponential(15);
-  const d = s.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
-  return d.padStart(width);
-}
-
-function formatDataArray(arr: Float64Array, columns = 4): string {
-  const lines: string[] = [];
-  for (let i = 0; i < arr.length; i += columns) {
-    const row: string[] = [];
-    for (let j = 0; j < columns && i + j < arr.length; j++) {
-      row.push(formatFortranNumber(arr[i + j]));
-    }
-    lines.push(row.join(" "));
-  }
-  return lines.join("\n");
-}
-
-function parseIntSafe(s: string): number {
-  return Number.parseInt(s.trim(), 10);
-}
+import { guessElement, elementToZ } from "./elements";
 
 /**
  * Parse a PSP8 pseudopotential file.
@@ -385,27 +360,7 @@ export function toPSP8(pp: Pseudopotential): string {
   return lines.join("\n");
 }
 
-function guessElement(z: number): string {
-  const elements = [
-    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
-    "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar",
-    "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
-    "Ga", "Ge", "As", "Se", "Br", "Kr",
-  ];
-  const idx = Math.round(z) - 1;
-  return idx >= 0 && idx < elements.length ? elements[idx] : "X";
-}
 
-function elementToZ(element: string): number {
-  const elements = [
-    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
-    "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar",
-    "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
-    "Ga", "Ge", "As", "Se", "Br", "Kr",
-  ];
-  const idx = elements.indexOf(element);
-  return idx >= 0 ? idx + 1 : 0;
-}
 
 function pspxcToFunctional(pspxc: number): string {
   const map: Record<number, string> = {
