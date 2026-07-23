@@ -8,6 +8,7 @@ export * from "./volumetric";
 export * from "./io";
 export * from "./pseudopotential";
 
+export * from "./math";
 export * from "./units";
 
 export * from "./data";

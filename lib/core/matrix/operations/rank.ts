@@ -1,6 +1,6 @@
 import { Matrix, clone } from "../matrix";
 
-const EPS = 1e-12;
+import { EPSILON } from "../../math/constants";
 
 /** Compute the rank of a matrix using Gaussian elimination.
  * @param m - Input matrix.
@@ -18,7 +18,7 @@ export function rank(m: Matrix): number {
     let pivotRow = row;
 
     // find pivot
-    while (pivotRow < rows && Math.abs(A[pivotRow * cols + leadCol]) < EPS) {
+    while (pivotRow < rows && Math.abs(A[pivotRow * cols + leadCol]) < EPSILON) {
       pivotRow++;
     }
 
@@ -43,7 +43,7 @@ export function rank(m: Matrix): number {
     for (let i = row + 1; i < rows; i++) {
       const factor = A[i * cols + leadCol] / pivotVal;
 
-      if (Math.abs(factor) > EPS) {
+      if (Math.abs(factor) > EPSILON) {
         for (let j = leadCol; j < cols; j++) {
           A[i * cols + j] -= factor * A[row * cols + j];
         }

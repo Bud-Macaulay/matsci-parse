@@ -1,15 +1,11 @@
 import { Structure } from "../../structure/structure";
 import { sortSites } from "./sortSites";
-
-const EPS = 1e-12;
+import { EPSILON } from "../../math/constants";
+import { clean } from "../../math/numeric";
 
 function wrap(x: number): number {
   const v = x - Math.floor(x);
-  return Math.abs(v) < EPS ? 0 : v;
-}
-
-function clean(x: number): number {
-  return Math.abs(x) < EPS ? 0 : x;
+  return Math.abs(v) < EPSILON ? 0 : v;
 }
 
 /** Return a copy with fractional coordinates wrapped to [0, 1), near-zero values cleaned, and sites sorted by species then coordinates. */

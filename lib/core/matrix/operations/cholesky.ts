@@ -1,6 +1,5 @@
 import { Matrix, createMatrix } from "../matrix";
-
-const EPSILON = 1e-12;
+import { EPSILON } from "../../math/constants";
 
 /** Compute the Cholesky decomposition of a symmetric positive-definite matrix (A = L Lᵀ).
  * @param A - Symmetric positive-definite matrix.

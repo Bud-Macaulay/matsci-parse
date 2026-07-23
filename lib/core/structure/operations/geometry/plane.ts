@@ -5,6 +5,7 @@ import { norm } from "../../../matrix/operations/vector/norm";
 import { cartesian } from "../../../site/cartesian";
 
 import { reciprocalLattice } from "../../../lattice/reciprocalLattice";
+import { EPSILON } from "../../../math/constants";
 
 /** A plane defined by a unit normal and a point on the plane (Cartesian). */
 export interface Plane {
@@ -34,7 +35,7 @@ export function planeFromSites(
   const n = cross(r1, r2);
   const nNorm = norm(n);
 
-  if (nNorm < 1e-12) {
+  if (nNorm < EPSILON) {
     throw new Error("Cannot construct plane from collinear sites");
   }
 
@@ -73,7 +74,7 @@ export function distanceFromPlane(
 
   const denominator = Math.sqrt(a * a + b * b + c * c);
 
-  if (denominator < 1e-12) {
+  if (denominator < EPSILON) {
     throw new Error("Invalid plane normal");
   }
 
@@ -116,7 +117,7 @@ export function planeFromMillerIndex(
 
   const length = norm(normal);
 
-  if (length < 1e-12) {
+  if (length < EPSILON) {
     throw new Error("Invalid Miller index");
   }
 

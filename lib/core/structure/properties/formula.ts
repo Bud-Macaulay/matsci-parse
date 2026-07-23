@@ -1,12 +1,5 @@
 import { Structure } from "../structure";
-
-function gcd(a: number, b: number): number {
-  while (b !== 0) {
-    [a, b] = [b, a % b];
-  }
-
-  return Math.abs(a);
-}
+import { gcd } from "../../math/numeric";
 
 /**
  * Count each element's occurrences in the structure.

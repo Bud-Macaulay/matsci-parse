@@ -2,7 +2,7 @@ import { Vector } from "../../vector";
 import { dot } from "./dot";
 import { norm } from "./norm";
 
-const EPS = 1e-12;
+import { EPSILON } from "../../../math/constants";
 
 /** Compute the scalar projection of a onto b.
  * @param a - Vector to project.
@@ -11,7 +11,7 @@ const EPS = 1e-12;
 export function projection(a: Vector, b: Vector): Vector {
   const denom = dot(b, b);
 
-  if (denom < EPS) {
+  if (denom < EPSILON) {
     throw new Error("Cannot project onto zero vector");
   }
 

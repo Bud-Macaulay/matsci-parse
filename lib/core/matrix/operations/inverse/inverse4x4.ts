@@ -1,4 +1,5 @@
 import { Matrix, createMatrix } from "../../matrix";
+import { EPSILON } from "../../../math/constants";
 
 /** Compute the inverse of a 4x4 matrix using the adjugate formula.
  * @param m - A 4x4 matrix.
@@ -43,7 +44,7 @@ export function inverse4x4(m: Matrix): Matrix {
   const det =
     b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
-  if (Math.abs(det) < 1e-12) {
+  if (Math.abs(det) < EPSILON) {
     throw new Error("Singular matrix");
   }
 

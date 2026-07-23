@@ -2,6 +2,7 @@ import { createMatrix } from "@/core/matrix/matrix";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { applyTransformationBasis } from "../applyTransformationBasis";
 import type { Structure } from "../../structure";
+import { EPSILON } from "@/core/math/constants";
 
 /**
  * Add vacuum along the c-axis by stretching the c-vector.
@@ -17,7 +18,7 @@ export function addVacuum(structure: Structure, thickness: number): Structure {
   const cVec = new Float64Array([b[6], b[7], b[8]]);
   const cLength = norm(cVec);
 
-  if (cLength < 1e-12) {
+  if (cLength < EPSILON) {
     throw new Error("c-vector has zero length");
   }
 

@@ -1,4 +1,5 @@
 import { Matrix, createMatrix } from "../../matrix";
+import { EPSILON } from "../../../math/constants";
 
 /** Compute the inverse of a 2x2 matrix using the closed-form formula.
  * @param m - A 2x2 matrix.
@@ -15,7 +16,7 @@ export function inverse2x2(m: Matrix): Matrix {
 
   const det = a * d - b * c;
 
-  if (Math.abs(det) < 1e-12) {
+  if (Math.abs(det) < EPSILON) {
     throw new Error("Singular matrix");
   }
 

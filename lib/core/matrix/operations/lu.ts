@@ -1,6 +1,6 @@
 import { Matrix, clone } from "../matrix";
 
-export const EPSILON = 1e-12;
+import { EPSILON } from "../../math/constants";
 
 export interface LUDecomposition {
   readonly LU: Matrix;

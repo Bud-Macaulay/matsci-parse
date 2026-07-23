@@ -1,7 +1,7 @@
 import { Vector } from "../../vector";
 import { dot } from "./dot";
 
-const EPS = 1e-12;
+import { EPSILON } from "../../../math/constants";
 
 /** Reflect vector v across the normal n.
  * @param v - Vector to reflect.
@@ -10,7 +10,7 @@ const EPS = 1e-12;
 export function reflect(v: Vector, n: Vector): Vector {
   const nn = dot(n, n);
 
-  if (nn < EPS) {
+  if (nn < EPSILON) {
     throw new Error("Cannot reflect across zero vector");
   }
 

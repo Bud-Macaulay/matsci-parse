@@ -4,19 +4,8 @@ import { dot } from "@/core/matrix/operations/vector/dot";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import type { Lattice } from "@/core/lattice/lattice";
-
-function gcd(a: number, b: number): number {
-  a = Math.abs(Math.round(a));
-  b = Math.abs(Math.round(b));
-  while (b) {
-    [a, b] = [b, a % b];
-  }
-  return a;
-}
-
-function lcm(a: number, b: number): number {
-  return Math.abs(Math.round(a) * Math.round(b)) / gcd(a, b);
-}
+import { EPSILON } from "@/core/math/constants";
+import { gcd, lcm } from "@/core/math/numeric";
 
 function reduceVector(v: number[]): number[] {
   let g = 0;
@@ -57,7 +46,7 @@ export function calculateScaleFactor(
     h * rb[2] + k * rb[5] + l * rb[8],
   ]);
   const normalLen = norm(normalRaw);
-  if (normalLen < 1e-12) {
+  if (normalLen < EPSILON) {
     throw new Error("Miller index [0,0,0] is invalid");
   }
   const normal = new Float64Array(normalRaw.map((x) => x / normalLen));

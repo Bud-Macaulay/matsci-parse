@@ -1,11 +1,8 @@
 import { createLattice } from "../lattice";
+import { EPSILON } from "../../math/constants";
+import { clean } from "../../math/numeric";
 
 const DEG2RAD = Math.PI / 180;
-const EPS = 1e-12;
-
-function clean(x: number) {
-  return Math.abs(x) < EPS ? 0 : x;
-}
 
 /** Create a Lattice from conventional cell parameters (angles in degrees). */
 export function fromParameters(
@@ -31,7 +28,7 @@ export function fromParameters(
   const v2 = [b * cosG, b * sinG, 0];
 
   // guard against degenerate gamma
-  if (Math.abs(sinG) < EPS) {
+  if (Math.abs(sinG) < EPSILON) {
     throw new Error("Invalid lattice: gamma too close to 0 or 180 degrees");
   }
 

@@ -2,7 +2,7 @@ import { Vector } from "../../vector";
 import { dot } from "./dot";
 import { norm } from "./norm";
 
-const EPS = 1e-12;
+import { EPSILON } from "../../../math/constants";
 
 /** Compute the angle in radians between two vectors.
  * @param a - First vector.
@@ -12,7 +12,7 @@ export function angleBetween(a: Vector, b: Vector): number {
   const na = norm(a);
   const nb = norm(b);
 
-  if (na < EPS || nb < EPS) {
+  if (na < EPSILON || nb < EPSILON) {
     throw new Error("Cannot compute angle with zero vector");
   }
 

@@ -1,10 +1,5 @@
 import { createMatrix, Matrix } from "../matrix/matrix";
-
-const EPS = 1e-12;
-
-function clean(x: number): number {
-  return Math.abs(x) < EPS ? 0 : x;
-}
+import { clean } from "../math/numeric";
 
 /** A lattice defined by a 3x3 basis matrix (row vectors). */
 export interface Lattice {

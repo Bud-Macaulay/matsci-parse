@@ -1,6 +1,5 @@
 import { Matrix } from "../matrix";
-
-const EPSILON = 1e-12;
+import { EPSILON } from "../../math/constants";
 
 /** Check whether the matrix is square. */
 export function isSquare(m: Matrix): boolean {

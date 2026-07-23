@@ -1,4 +1,5 @@
 import { Matrix, createMatrix, clone, index } from "../../matrix";
+import { EPSILON } from "../../../math/constants";
 
 /** Compute the inverse of a square matrix using Gauss-Jordan elimination with partial pivoting.
  * @param m - A square matrix.
@@ -23,10 +24,10 @@ export function gjInverse(m: Matrix): Matrix {
     let pivotIdx = i * n + i;
 
     // Pivoting
-    if (Math.abs(Adata[pivotIdx]) < 1e-12) {
+    if (Math.abs(Adata[pivotIdx]) < EPSILON) {
       let swapRow = -1;
       for (let r = i + 1; r < n; r++) {
-        if (Math.abs(Adata[r * n + i]) > 1e-12) {
+        if (Math.abs(Adata[r * n + i]) > EPSILON) {
           swapRow = r;
           break;
         }
@@ -66,7 +67,7 @@ export function gjInverse(m: Matrix): Matrix {
       if (r === i) continue;
 
       const factor = Adata[r * n + i];
-      if (Math.abs(factor) < 1e-12) continue;
+      if (Math.abs(factor) < EPSILON) continue;
 
       const rOffset = r * n;
       for (let c = 0; c < n; c++) {

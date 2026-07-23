@@ -1,4 +1,5 @@
 import { Matrix, createMatrix } from "../../matrix";
+import { EPSILON } from "../../../math/constants";
 
 /** Compute the inverse of a 3x3 matrix using cofactors.
  * @param m - A 3x3 matrix.
@@ -32,7 +33,7 @@ export function inverse3x3(m: Matrix): Matrix {
 
   const det = a00 * c00 + a01 * c01 + a02 * c02;
 
-  if (Math.abs(det) < 1e-12) {
+  if (Math.abs(det) < EPSILON) {
     throw new Error("Singular matrix");
   }
 

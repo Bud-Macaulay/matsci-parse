@@ -1,7 +1,7 @@
 import { Vector } from "../../vector";
 import { norm } from "./norm";
 
-const EPS = 1e-12;
+import { EPSILON } from "../../../math/constants";
 
 /** Return a unit vector in the direction of v.
  * @param v - Input vector.
@@ -9,7 +9,7 @@ const EPS = 1e-12;
 export function normalize(v: Vector): Vector {
   const n = norm(v);
 
-  if (n < EPS) {
+  if (n < EPSILON) {
     throw new Error("Cannot normalize zero vector");
   }
 

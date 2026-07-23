@@ -5,6 +5,7 @@ import { dot } from "../../../matrix/operations/vector/dot";
 import { norm } from "../../../matrix/operations/vector/norm";
 
 import { cartesian } from "../../../site/cartesian";
+import { EPSILON } from "../../../math/constants";
 
 const RAD2DEG = 180 / Math.PI;
 
@@ -46,7 +47,7 @@ export function getDihedral(
   const n2Norm = norm(n2);
   const b2Norm = norm(b2);
 
-  if (n1Norm < 1e-12 || n2Norm < 1e-12 || b2Norm < 1e-12) {
+  if (n1Norm < EPSILON || n2Norm < EPSILON || b2Norm < EPSILON) {
     return 0;
   }
 

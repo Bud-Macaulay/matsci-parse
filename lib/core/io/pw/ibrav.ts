@@ -10,13 +10,10 @@
 import { createLattice } from "../../lattice";
 import type { Lattice } from "../../lattice";
 import { fromParameters } from "../../lattice/create/fromParameters";
+import { clean } from "../../math/numeric";
 
 const SQRT3 = Math.sqrt(3);
 const SQRT2 = Math.sqrt(2);
-
-function clean(x: number): number {
-  return Math.abs(x) < 1e-12 ? 0 : x;
-}
 
 /**
  * Construct a Lattice from QE ibrav index and crystal parameters.

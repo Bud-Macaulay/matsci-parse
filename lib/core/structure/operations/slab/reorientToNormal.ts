@@ -3,8 +3,7 @@ import { cross } from "@/core/matrix/operations/vector/cross";
 import { normalize } from "@/core/matrix/operations/vector/normalize";
 import { applyTransformationBasis } from "../applyTransformationBasis";
 import type { Structure } from "../../structure";
-
-const EPS = 1e-12;
+import { EPSILON } from "@/core/math/constants";
 
 /**
  * Rotate the lattice so that the given Cartesian direction maps to the new c-axis
@@ -27,7 +26,7 @@ export function reorientToNormal(
   let e1: Float64Array;
   const ref = new Float64Array([1, 0, 0]);
 
-  if (Math.abs(Math.abs(n[0]) - 1) < EPS) {
+  if (Math.abs(Math.abs(n[0]) - 1) < EPSILON) {
     e1 = normalize(cross(n, new Float64Array([0, 1, 0])));
   } else {
     e1 = normalize(cross(n, ref));
