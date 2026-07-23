@@ -131,8 +131,8 @@ export function fromUPFv1(text: string): Pseudopotential {
   if (meshSection) {
     const rSection = extractSubSection(meshSection, "PP_R");
     const rabSection = extractSubSection(meshSection, "PP_RAB");
-    if (rSection) r = parseFloat64Array(rSection) as Float64Array<ArrayBuffer>;
-    if (rabSection) rab = parseFloat64Array(rabSection) as Float64Array<ArrayBuffer>;
+    if (rSection) r = parseFloat64Array(rSection);
+    if (rabSection) rab = parseFloat64Array(rabSection);
   }
 
   if (r.length === 0) throw new Error("Empty or missing PP_R section");
@@ -148,7 +148,7 @@ export function fromUPFv1(text: string): Pseudopotential {
   // Parse PP_LOCAL section
   const localSection = extractSection(text, "PP_LOCAL");
   if (!localSection) throw new Error("Missing PP_LOCAL section");
-  const local: PseudopotentialLocal = { vloc: parseFloat64Array(localSection) as Float64Array<ArrayBuffer> };
+  const local: PseudopotentialLocal = { vloc: parseFloat64Array(localSection) };
 
   // Parse PP_NONLOCAL section
   const nonlocalSection = extractSection(text, "PP_NONLOCAL");
@@ -174,7 +174,7 @@ export function fromUPFv1(text: string): Pseudopotential {
 
           // Remaining lines: projector data
           const dataText = innerLines.slice(1).join("\n");
-          const betaData = parseFloat64Array(dataText.replace(/^\s*\d+\s+/gm, "")) as Float64Array<ArrayBuffer>;
+          const betaData = parseFloat64Array(dataText.replace(/^\s*\d+\s+/gm, ""));
 
           betas.push({
             angularMomentum: l,
@@ -229,7 +229,7 @@ export function fromUPFv1(text: string): Pseudopotential {
           dataLines.push(pswfcLines[i]);
           i++;
         }
-        const chi = parseFloat64Array(dataLines.join("\n")) as Float64Array<ArrayBuffer>;
+        const chi = parseFloat64Array(dataLines.join("\n"));
         pswfc.push({ l, occupation, label, chi });
       } else {
         i++;
@@ -239,7 +239,7 @@ export function fromUPFv1(text: string): Pseudopotential {
 
   // Parse PP_RHOATOM section
   const rhoatomSection = extractSection(text, "PP_RHOATOM");
-  const rhoatom = rhoatomSection ? parseFloat64Array(rhoatomSection) as Float64Array<ArrayBuffer> : new Float64Array(meshSize);
+  const rhoatom = rhoatomSection ? parseFloat64Array(rhoatomSection) : new Float64Array(meshSize);
 
   return {
     format: "UPF1",

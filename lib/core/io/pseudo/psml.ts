@@ -115,7 +115,7 @@ export function fromPSML(text: string): Pseudopotential {
   let r = new Float64Array(0);
   if (gridNode) {
     const gridData = gridNode["grid-data"];
-    if (gridData) r = parseFloat64Array(textOf(gridData)) as Float64Array<ArrayBuffer>;
+    if (gridData) r = parseFloat64Array(textOf(gridData));
   }
   if (r.length === 0) throw new Error("Missing or empty grid in PSML file");
 
@@ -138,7 +138,7 @@ export function fromPSML(text: string): Pseudopotential {
   let localVloc = new Float64Array(r.length);
   if (localNode) {
     const dataNode = localNode["radfunc"]?.["data"];
-    if (dataNode) localVloc = parseFloat64Array(textOf(dataNode)) as Float64Array<ArrayBuffer>;
+    if (dataNode) localVloc = parseFloat64Array(textOf(dataNode));
   }
 
   // Semilocal potentials
@@ -213,7 +213,7 @@ export function fromPSML(text: string): Pseudopotential {
   let rhoatom = new Float64Array(r.length);
   if (vcNode) {
     const dataNode = vcNode["radfunc"]?.["data"];
-    if (dataNode) rhoatom = parseFloat64Array(textOf(dataNode)) as Float64Array<ArrayBuffer>;
+    if (dataNode) rhoatom = parseFloat64Array(textOf(dataNode));
   }
 
   // Core charge (NLCC)
