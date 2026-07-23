@@ -235,6 +235,76 @@ describe("UPF parser", () => {
     });
   });
 
+  describe("Mo UPF v2 from FHI98PP", () => {
+    it("parses correctly", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.header.element).toBe("Mo");
+      expect(pp.header.zValence).toBeCloseTo(6.0);
+    });
+
+    it("has 3 projectors (s, d, f)", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.nonlocal.betas.length).toBe(3);
+      expect(pp.nonlocal.betas[0].angularMomentum).toBe(0);
+      expect(pp.nonlocal.betas[1].angularMomentum).toBe(2);
+      expect(pp.nonlocal.betas[2].angularMomentum).toBe(3);
+    });
+
+    it("has lMax=3 (includes f channel)", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.header.lMax).toBe(3);
+    });
+
+    it("has correct mesh size", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.mesh.r.length).toBe(20);
+      expect(pp.local.vloc.length).toBe(20);
+    });
+
+    it("local potential values are physical", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.local.vloc[0]).toBeGreaterThan(0);
+      expect(pp.local.vloc[0]).toBeGreaterThan(pp.local.vloc[19]);
+    });
+
+    it("s-projector is non-zero near origin", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(Math.abs(pp.nonlocal.betas[0].beta[0])).toBeGreaterThan(1);
+    });
+
+    it("d-projector is non-zero", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(Math.abs(pp.nonlocal.betas[1].beta[0])).toBeGreaterThan(1);
+    });
+
+    it("f-projector is non-zero near origin", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(Math.abs(pp.nonlocal.betas[2].beta[0])).toBeGreaterThan(0.1);
+    });
+
+    it("rhoatom is populated", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.rhoatom.length).toBe(20);
+      expect(pp.rhoatom[0]).toBeGreaterThan(0);
+    });
+
+    it("D_ij has correct structure for 3 projectors", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.nonlocal.dij.length).toBe(9);
+    });
+
+    it("no wavefunctions stored", () => {
+      const pp = fromUPF(fixtures.realMoUpfV2Fhi);
+      expect(pp.pswfc.length).toBe(0);
+    });
+
+    it("round-trips losslessly", () => {
+      const a = fromUPF(fixtures.realMoUpfV2Fhi);
+      const c = fromUPF(toUPF(a));
+      expect(c).toEqual(a);
+    });
+  });
+
   describe("error handling", () => {
     it("throws on missing UPF tag", () => {
       expect(() => fromUPF("not a upf file")).toThrow("Not a UPF file");
