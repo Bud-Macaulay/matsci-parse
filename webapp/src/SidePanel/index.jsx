@@ -55,7 +55,7 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
 
     for (const file of files) {
       try {
-        await actions.importFile(file);
+        await actions.importFile(file, { saveOnly: true });
       } catch (err) {
         console.error(err);
         showToast(`${file.name} failed to parse, see console for details`);

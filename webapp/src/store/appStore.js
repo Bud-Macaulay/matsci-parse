@@ -71,7 +71,7 @@ export const actions = {
     }));
   },
 
-  async importFile(file) {
+  async importFile(file, { saveOnly = false } = {}) {
     const text = await file.text();
 
     const { structure } = parseFileText(text);
@@ -81,10 +81,12 @@ export const actions = {
       source: "file",
     };
 
-    actions.createTab(structure, meta);
-
-    if (appStore.state.autosave) {
+    if (saveOnly || appStore.state.autosave) {
       actions.saveStructure(structure, meta.name);
+    }
+
+    if (!saveOnly) {
+      actions.createTab(structure, meta);
     }
 
     return structure;
