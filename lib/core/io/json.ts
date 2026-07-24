@@ -4,7 +4,7 @@ import { createLattice } from "../lattice/lattice";
 /** Serializes a Structure to a JSON-serializable object. */
 export function toJSON(structure: Structure) {
   return {
-    lattice: structure.lattice.basis.data,
+    lattice: Array.from(structure.lattice.basis.data),
     sites: structure.sites.map((s) => ({
       species: s.species,
       frac: Array.from(s.frac),

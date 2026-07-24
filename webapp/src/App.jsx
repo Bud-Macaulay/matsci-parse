@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { toCIF, fromCIF } from "matsci-parse";
 
 import { useHotkey } from "@tanstack/react-hotkeys";
 
 import SidePanel from "./SidePanel";
 import MainPanel from "./MainPanel";
-
-import { parseFileText } from "./common/formats";
+import ToastContainer from "./common/Toast";
+import { showToast } from "./common/toastStore";
 
 import { useStore } from "@tanstack/react-store";
 import { appStore, actions } from "./store/appStore";
@@ -23,15 +22,16 @@ export default function App() {
     e.preventDefault();
     setDragging(false);
 
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+    const files = e.dataTransfer.files;
+    if (!files?.length) return;
 
-    try {
-      const text = await file.text();
-      const { structure: parsed } = parseFileText(text);
-      actions.createTab(parsed, { name: file.name, source: "file" });
-    } catch (err) {
-      console.error("Drop parse failed:", err);
+    for (const file of files) {
+      try {
+        await actions.importFile(file);
+      } catch (err) {
+        console.error(err);
+        showToast(`${file.name} failed to parse, see console for details`);
+      }
     }
   };
 
@@ -77,7 +77,7 @@ export default function App() {
       {dragging && (
         <div className="absolute inset-0 z-50 bg-blue-500/10 border-2 border-dashed border-blue-400 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-lg shadow-lg px-8 py-5 text-sm font-medium text-blue-700">
-            Drop structure file here
+            Drop structure files here
           </div>
         </div>
       )}
@@ -86,8 +86,6 @@ export default function App() {
         autosave={autosave}
         setAutosave={actions.setAutosave}
         structure={activeTab?.structure ?? null}
-        toCIF={toCIF}
-        fromCIF={fromCIF}
         onLoadStructure={(parsed, meta) => actions.createTab(parsed, meta)}
       />
 
@@ -96,7 +94,7 @@ export default function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`flex items-center border-r hover:bg-gray-50 ${
+              className={`flex items-center shrink-0 border-r hover:bg-gray-50 ${
                 tab.id === activeTabId ? "bg-blue-200" : ""
               }`}
             >
@@ -122,6 +120,8 @@ export default function App() {
           updateTab={(fn) => actions.updateTab(activeTabId, fn)}
         />
       </main>
+
+      <ToastContainer />
     </div>
   );
 }

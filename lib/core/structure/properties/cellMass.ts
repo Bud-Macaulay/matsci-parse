@@ -18,7 +18,7 @@ function siteMass(site: Site): number {
   const element = getElement(site.species.symbol);
 
   if (!element) {
-    throw new Error(`Unknown element: ${site.species.symbol}`);
+    return 0;
   }
 
   return element.mass;

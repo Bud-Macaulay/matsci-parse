@@ -1,34 +1,25 @@
 import { useState } from "react";
-import { loadSavedStructures, saveSavedStructures } from "../storage/storage";
+import { useStore } from "@tanstack/react-store";
+import { appStore, actions } from "../store/appStore";
+import { fromJSON } from "matsci-parse";
+import BulkSpeciesModal from "./BulkSpeciesModal";
+import { showToast } from "../common/toastStore";
 
-import { parseFileText } from "../common/formats";
-
-export default function SidePanel({
-  autosave,
-  setAutosave,
-  structure,
-  toCIF,
-  fromCIF,
-  onLoadStructure,
-}) {
-  const [error, setError] = useState("");
+export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
+  const autosave = useStore(appStore, (s) => s.autosave);
   const [flashId, setFlashId] = useState(null);
+  const [bulkModal, setBulkModal] = useState({ open: false, mode: null });
 
-  const [savedList, setSavedList] = useState(() => loadSavedStructures());
+  const savedList = useStore(appStore, (s) => s.savedStructures);
 
   const saveCurrent = () => {
     if (!structure) return;
 
-    const newItem = {
-      id: crypto.randomUUID(),
-      name: `Structure ${savedList.length + 1}`,
-      cif: toCIF(structure),
-    };
+    const name = `Structure ${savedList.length + 1}`;
 
-    const updated = [...savedList, newItem];
+    actions.saveStructure(structure, name);
 
-    saveSavedStructures(updated);
-    setSavedList(updated);
+    const newItem = appStore.state.savedStructures.at(-1);
 
     setFlashId(newItem.id);
 
@@ -38,57 +29,40 @@ export default function SidePanel({
   };
 
   const deleteSaved = (id) => {
-    const updated = savedList.filter((x) => x.id !== id);
-
-    saveSavedStructures(updated);
-    setSavedList(updated);
+    actions.deleteSaved(id);
   };
 
   const renameSaved = (id, name) => {
-    const updated = savedList.map((x) => (x.id === id ? { ...x, name } : x));
-
-    saveSavedStructures(updated);
-    setSavedList(updated);
+    actions.renameSaved(id, name);
   };
 
-  const loadStructure = (cif, name) => {
-    const parsed = fromCIF(cif);
-    onLoadStructure(parsed, {
-      name,
-      source: "saved",
-    });
+  const loadStructure = (structure, name) => {
+    try {
+      const parsed = fromJSON(structure);
+      onLoadStructure(parsed, {
+        name,
+        source: "saved",
+      });
+    } catch (err) {
+      console.error(err);
+      showToast(`${name} failed to load, see console for details`);
+    }
   };
 
   const handleFile = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files?.length) return;
 
-    try {
-      const text = await file.text();
-
-      const { structure: parsed } = parseFileText(text);
-
-      onLoadStructure(parsed, {
-        name: `Imported ${new Date().toLocaleString()}`,
-        source: "file",
-      });
-
-      if (autosave) {
-        const updated = [
-          ...savedList,
-          {
-            id: crypto.randomUUID(),
-            name: `Imported ${new Date().toLocaleString()}`,
-            cif: toCIF(parsed),
-          },
-        ];
-
-        saveSavedStructures(updated);
-        setSavedList(updated);
+    for (const file of files) {
+      try {
+        await actions.importFile(file);
+      } catch (err) {
+        console.error(err);
+        showToast(`${file.name} failed to parse, see console for details`);
       }
-    } catch (err) {
-      console.error(err);
     }
+
+    event.target.value = "";
   };
 
   return (
@@ -101,12 +75,22 @@ export default function SidePanel({
 
       <div className="p-4 flex items-center gap-4 flex-wrap">
         {/* File upload */}
-        <label title="Import a CIF, XYZ, XSF, or POSCAR file" className="px-1 py-2 text-sm border rounded-md cursor-pointer bg-gray-100 hover:bg-gray-200 transition">
-          Choose File
-          <input type="file" onChange={handleFile} className="hidden" />
+        <label
+          title="Import CIF, XYZ, XSF, POSCAR, or other structure files"
+          className="px-1 py-2 text-sm border rounded-md cursor-pointer bg-gray-100 hover:bg-gray-200 transition"
+        >
+          Choose Files
+          <input
+            type="file"
+            multiple
+            onChange={handleFile}
+            className="hidden"
+          />
         </label>
 
-        <span className="text-xs text-gray-500">CIF, XYZ, XSF, POSCAR</span>
+        <span className="text-xs text-gray-500">
+          CIF, XYZ, XSF, POSCAR and more
+        </span>
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -118,8 +102,6 @@ export default function SidePanel({
         </label>
       </div>
 
-      {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-
       <div className="p-4 space-y-4 overflow-y-auto flex-1">
         {/* Save button */}
         <button
@@ -130,6 +112,29 @@ export default function SidePanel({
         >
           Save current
         </button>
+
+        {/* Bulk operations */}
+        {savedList.length > 0 && (
+          <div className="pt-2 border-t">
+            <p className="text-xs text-gray-500 mb-2">Bulk Operations</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBulkModal({ open: true, mode: "replace" })}
+                title="Replace species in all saved structures"
+                className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200 transition"
+              >
+                Replace Species
+              </button>
+              <button
+                onClick={() => setBulkModal({ open: true, mode: "remove" })}
+                title="Remove species from all saved structures"
+                className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition"
+              >
+                Remove Species
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* List */}
         <div className="space-y-2 pt-2">
@@ -152,7 +157,7 @@ export default function SidePanel({
 
               <div className="flex gap-2 mt-2 text-xs">
                 <button
-                  onClick={() => loadStructure(item.cif, item.name)}
+                  onClick={() => loadStructure(item.structure, item.name)}
                   title="Load this saved structure"
                   className="buttonSimple gray flex-1"
                 >
@@ -171,6 +176,12 @@ export default function SidePanel({
           ))}
         </div>
       </div>
+
+      <BulkSpeciesModal
+        open={bulkModal.open}
+        mode={bulkModal.mode}
+        onClose={() => setBulkModal({ open: false, mode: null })}
+      />
     </aside>
   );
 }

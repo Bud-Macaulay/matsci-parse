@@ -39,7 +39,14 @@ export default function VisualizerPane({ structure, setStructure, pushUndo }) {
         </span>
         <span className="text-gray-400 mx-1.5">&middot;</span>
         <span className="text-gray-500">
-          {density(structure).toFixed(3)} amu/&#197;&#179;
+          {(() => {
+            try {
+              const d = density(structure);
+              return d > 0 ? `${d.toFixed(3)} amu/&#197;&#179;` : "-";
+            } catch {
+              return "-";
+            }
+          })()}
         </span>
       </div>
     </div>
