@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { getSymmetry } from "matsci-parse";
+import { getSymmetry, supercell } from "matsci-parse";
 
 import Modal from "../../common/Modal";
 import { formatSpaceGroupSymbol } from "../../common/textFormatting";
@@ -12,7 +12,13 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
   const runAnalysis = useCallback(async () => {
     setAnalyzing(true);
     try {
-      const result = await getSymmetry(structure);
+      let result;
+      try {
+        result = await getSymmetry(structure);
+      } catch {
+        const sc = supercell(structure, [2, 2, 2]);
+        result = await getSymmetry(sc);
+      }
       setAnalysis(result);
     } catch (e) {
       console.error("analyzeCrystal failed:", e);

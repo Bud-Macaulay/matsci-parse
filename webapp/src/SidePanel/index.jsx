@@ -3,12 +3,14 @@ import { useStore } from "@tanstack/react-store";
 import { appStore, actions } from "../store/appStore";
 import { fromJSON } from "matsci-parse";
 import BulkSpeciesModal from "./BulkSpeciesModal";
+import BulkSymmetryModal from "./BulkSymmetryModal";
 import { showToast } from "../common/toastStore";
 
 export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
   const autosave = useStore(appStore, (s) => s.autosave);
   const [flashId, setFlashId] = useState(null);
   const [bulkModal, setBulkModal] = useState({ open: false, mode: null });
+  const [symmetryOpen, setSymmetryOpen] = useState(false);
 
   const savedList = useStore(appStore, (s) => s.savedStructures);
 
@@ -117,6 +119,9 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
         {savedList.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs text-gray-500 mb-2">Bulk Operations</p>
+            <p className="text-[10px] text-gray-400 mb-2">
+              Bulk operations do not modify open tabs.
+            </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setBulkModal({ open: true, mode: "replace" })}
@@ -131,6 +136,15 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
                 className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition"
               >
                 Remove Species
+              </button>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => setSymmetryOpen(true)}
+                title="Symmetrize all saved structures"
+                className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
+              >
+                Symmetrize
               </button>
             </div>
           </div>
@@ -181,6 +195,11 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
         open={bulkModal.open}
         mode={bulkModal.mode}
         onClose={() => setBulkModal({ open: false, mode: null })}
+      />
+
+      <BulkSymmetryModal
+        open={symmetryOpen}
+        onClose={() => setSymmetryOpen(false)}
       />
     </aside>
   );
