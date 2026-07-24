@@ -10,6 +10,7 @@ import {
 } from "matsci-parse";
 import { parseFileText } from "../common/formats";
 import { showToast } from "../common/toastStore";
+import JSZip from "jszip";
 
 export const appStore = new Store({
   tabs: [],
@@ -72,6 +73,35 @@ export const actions = {
   },
 
   async importFile(file, { saveOnly = false } = {}) {
+    if (file.name.endsWith(".zip")) {
+      const buffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(buffer);
+      let imported = 0;
+
+      for (const [name, zipEntry] of Object.entries(zip.files)) {
+        if (zipEntry.dir) continue;
+        try {
+          const text = await zipEntry.async("text");
+          const { structure } = parseFileText(text);
+          const meta = {
+            name: name.replace(/\.[^.]+$/, ""),
+            source: "file",
+          };
+          if (saveOnly || appStore.state.autosave) {
+            actions.saveStructure(structure, meta.name);
+          }
+          if (!saveOnly) {
+            actions.createTab(structure, meta);
+          }
+          imported++;
+        } catch {
+          console.error(`Skipping ${name} in zip: failed to parse`);
+        }
+      }
+
+      return imported;
+    }
+
     const text = await file.text();
 
     const { structure } = parseFileText(text);

@@ -4,6 +4,7 @@ import { appStore, actions } from "../store/appStore";
 import { fromJSON } from "matsci-parse";
 import BulkSpeciesModal from "./BulkSpeciesModal";
 import BulkSymmetryModal from "./BulkSymmetryModal";
+import BulkExportModal from "./BulkExportModal";
 import { showToast } from "../common/toastStore";
 
 export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
@@ -11,6 +12,7 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
   const [flashId, setFlashId] = useState(null);
   const [bulkModal, setBulkModal] = useState({ open: false, mode: null });
   const [symmetryOpen, setSymmetryOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const savedList = useStore(appStore, (s) => s.savedStructures);
 
@@ -78,7 +80,7 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
       <div className="p-4 flex items-center gap-4 flex-wrap">
         {/* File upload */}
         <label
-          title="Import CIF, XYZ, XSF, POSCAR, or other structure files"
+          title="Import CIF, XYZ, XSF, POSCAR, or zip files containing structure files"
           className="px-1 py-2 text-sm border rounded-md cursor-pointer bg-gray-100 hover:bg-gray-200 transition"
         >
           Choose Files
@@ -86,12 +88,13 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
             type="file"
             multiple
             onChange={handleFile}
+            accept=".cif,.xyz,.xsf,.vasp,.poscar,.json,.zip"
             className="hidden"
           />
         </label>
 
         <span className="text-xs text-gray-500">
-          CIF, XYZ, XSF, POSCAR and more
+          CIF, XYZ, XSF, POSCAR, zip
         </span>
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
           <input
@@ -145,6 +148,13 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
                 className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
               >
                 Symmetrize
+              </button>
+              <button
+                onClick={() => setExportOpen(true)}
+                title="Export all saved structures as a zip file"
+                className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition"
+              >
+                Export All
               </button>
             </div>
           </div>
@@ -200,6 +210,11 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
       <BulkSymmetryModal
         open={symmetryOpen}
         onClose={() => setSymmetryOpen(false)}
+      />
+
+      <BulkExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
       />
     </aside>
   );

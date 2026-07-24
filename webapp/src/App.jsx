@@ -77,7 +77,7 @@ export default function App() {
       {dragging && (
         <div className="absolute inset-0 z-50 bg-blue-500/10 border-2 border-dashed border-blue-400 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-lg shadow-lg px-8 py-5 text-sm font-medium text-blue-700">
-            Drop structure files here
+            Drop structure files or zip here
           </div>
         </div>
       )}
