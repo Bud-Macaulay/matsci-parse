@@ -20,6 +20,7 @@ import TransformLatticePanel from "./TransformLatticePanel";
 import AddAtomPanel from "./AddAtomPanel";
 import DistanceMatrixPanel from "./DistanceMatrixPanel";
 import SlabModal from "./SlabModal";
+import QEInputModal from "../common/QEInputModal";
 
 export default function MainPanel({ tab, updateTab }) {
   const [speciesModal, setSpeciesModal] = useState({ open: false, mode: null });
@@ -236,6 +237,7 @@ export default function MainPanel({ tab, updateTab }) {
           />
 
           <div className="grid grid-cols-3 gap-2">
+            <QEInputModal structure={structure} />
             <SymmetryPanel
               structure={structure}
               setStructure={setStructure}
