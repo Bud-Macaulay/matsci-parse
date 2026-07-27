@@ -235,7 +235,6 @@ export default function MainPanel({ tab, updateTab }) {
             setStructure={setStructure}
             pushUndo={pushUndo}
           />
-
           <div className="grid grid-cols-3 gap-2">
             <SymmetryPanel
               structure={structure}

@@ -9,4 +9,6 @@ export * from "./reciprocalLattice";
 export * from "./reciprocalLatticeCrystallographic";
 // export * from "./volume"; -- dont export this to avoid conflicts
 
+export * from "./kspacingToGrid";
+
 export * from "./create";
