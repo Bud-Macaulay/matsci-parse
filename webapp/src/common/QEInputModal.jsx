@@ -106,7 +106,7 @@ export default function QEInputModal({ structure }) {
       <button
         onClick={() => setOpen(true)}
         title="Generate Quantum ESPRESSO PW input file"
-        className="buttonSimple blue"
+        className="buttonSimple border border-green-400 bg-green-200! text-green-700!"
       >
         QE Input
       </button>

@@ -237,7 +237,6 @@ export default function MainPanel({ tab, updateTab }) {
           />
 
           <div className="grid grid-cols-3 gap-2">
-            <QEInputModal structure={structure} />
             <SymmetryPanel
               structure={structure}
               setStructure={setStructure}
@@ -250,10 +249,15 @@ export default function MainPanel({ tab, updateTab }) {
               pushUndo={pushUndo}
             />
           </div>
+          <QEInputModal structure={structure} />
         </div>
 
         {/* RIGHT: VISUALIZER */}
-        <VisualizerPane structure={structure} setStructure={setStructure} pushUndo={pushUndo} />
+        <VisualizerPane
+          structure={structure}
+          setStructure={setStructure}
+          pushUndo={pushUndo}
+        />
       </div>
 
       <SpeciesModal
