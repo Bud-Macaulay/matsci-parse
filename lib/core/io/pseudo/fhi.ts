@@ -163,7 +163,7 @@ function parseCpi(text: string): Pseudopotential {
     format: "CPI",
     version: "2.0.1",
     header: {
-      element: guessElement(zValence),
+      element: "",
       pseudoType: "NC",
       relativistic: "scalar",
       isUltrasoft: false,

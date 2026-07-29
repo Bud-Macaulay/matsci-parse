@@ -18,9 +18,8 @@ function loadFile(...segments: string[]): string {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function checkRoundtripSup(parsed: unknown, serialized: string, reparsed: unknown) {
+function checkRoundtrip<T>(parsed: T, reparsed: T) {
   expect(parsed).toBeDefined();
-  expect(serialized).toBeTruthy();
   expect(reparsed).toBeDefined();
 }
 
@@ -42,9 +41,10 @@ fhiDirs.forEach((dir) => {
         const parsed = fromFHI(text);
         const cpi = toFHI(parsed);
         const reparsed = fromFHI(cpi);
-        checkRoundtripSup(parsed, cpi, reparsed);
+        checkRoundtrip(parsed, reparsed);
         expect(reparsed.mesh.r.length).toBe(parsed.mesh.r.length);
         expect(reparsed.header.zValence).toBeCloseTo(parsed.header.zValence);
+        expect(reparsed.header.element).toBe("");
       });
     });
   });
@@ -65,7 +65,7 @@ if (existsSync(upfDir)) {
         const parsed = fromUPF(text);
         const serialized = toUPF(parsed);
         const reparsed = fromUPF(serialized);
-        checkRoundtripSup(parsed, serialized, reparsed);
+        checkRoundtrip(parsed, reparsed);
         expect(reparsed.header.element).toBe(parsed.header.element);
       });
     });
@@ -87,8 +87,8 @@ if (existsSync(psp8Dir)) {
         const parsed = fromPSP8(text);
         const serialized = toPSP8(parsed);
         const reparsed = fromPSP8(serialized);
-        checkRoundtripSup(parsed, serialized, reparsed);
-        expect(reparsed.header.lMax).toBe(parsed.header.lMax);
+        checkRoundtrip(parsed, reparsed);
+        expect(reparsed).toEqual(parsed);
       });
     });
   });
@@ -109,7 +109,7 @@ if (existsSync(gthDir)) {
         const parsed = fromGTH(text);
         const serialized = toGTH(parsed);
         const reparsed = fromGTH(serialized);
-        checkRoundtripSup(parsed, serialized, reparsed);
+        checkRoundtrip(parsed, reparsed);
         expect(reparsed.header.zValence).toBeCloseTo(parsed.header.zValence);
       });
     });
@@ -131,7 +131,7 @@ if (existsSync(psmlDir)) {
         const parsed = fromPSML(text);
         const serialized = toPSML(parsed);
         const reparsed = fromPSML(serialized);
-        checkRoundtripSup(parsed, serialized, reparsed);
+        checkRoundtrip(parsed, reparsed);
         expect(reparsed.header.element).toBe(parsed.header.element);
       });
     });

@@ -132,6 +132,23 @@ describe("FHI parser", () => {
     });
   });
 
+  describe("element handling", () => {
+    it("parses element from .fhi ABINIT header line 2", () => {
+      expect(fromFHI(realHFhi).header.element).toBe("H");
+      expect(fromFHI(realCFhi).header.element).toBe("C");
+      expect(fromFHI(realNFhi).header.element).toBe("N");
+      expect(fromFHI(realOFhi).header.element).toBe("O");
+      expect(fromFHI(realLiFhi).header.element).toBe("Li");
+    });
+
+    it("does not guess element from zValence for .cpi content", () => {
+      // CPI format has no element info; element should be empty
+      const cpi = toFHI(fromFHI(realCFhi));
+      const reparsed = fromFHI(cpi);
+      expect(reparsed.header.element).toBe("");
+    });
+  });
+
   describe("serialization", () => {
     it("round-trips real H .fhi → .cpi", () => {
       const a = fromFHI(realHFhi);

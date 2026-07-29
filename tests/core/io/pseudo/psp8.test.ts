@@ -45,6 +45,13 @@ describe("PSP8 parser", () => {
       expect(pp.nonlocal.betas[2].angularMomentum).toBe(1);
     });
 
+    it("uses correct projector labels (s/p/d/f, not s/t/u/v)", () => {
+      const pp = fromPSP8(realHPsp8);
+      expect(pp.nonlocal.betas[0].label).toBe("0s");
+      expect(pp.nonlocal.betas[1].label).toBe("0s");
+      expect(pp.nonlocal.betas[2].label).toBe("1p");
+    });
+
     it("has local potential at end (lloc=4 > lmax=1)", () => {
       const pp = fromPSP8(realHPsp8);
       expect(pp.local.vloc.length).toBe(300);
@@ -107,6 +114,60 @@ describe("PSP8 parser", () => {
       const s0 = pp.nonlocal.betas[0].beta;
       expect(s0[0]).toBeCloseTo(-8.0352424713936e-10);
       expect(s0[5]).toBeGreaterThan(s0[0]);
+    });
+  });
+
+  describe("D_ij matrix", () => {
+    it("H: uses correct ekb per channel (l=0: 2 s-projectors, l=1: 1 p-projector)", () => {
+      const pp = fromPSP8(realHPsp8);
+      // H has 3 projectors: 2 at l=0, 1 at l=1
+      // l=0 ekb: index 0: -7.9059420149595, index 1: -0.86523006113677
+      // l=1 ekb: index 2: -6.8530453025529
+      expect(pp.nonlocal.dij[0]).toEqual([1, 1, -7.9059420149595]);
+      expect(pp.nonlocal.dij[3]).toEqual([2, 2, -0.86523006113677]);
+      expect(pp.nonlocal.dij[4]).toEqual([3, 3, -6.8530453025529]);
+    });
+
+    it("C: uses correct ekb per channel (l=0: 2 s-projectors, l=1: 2 p-projectors)", () => {
+      const pp = fromPSP8(realCPsp8);
+      // C has 4 projectors: 2 at l=0, 2 at l=1
+      // l=0 ekb: 6.4422858783765, 0.40708983382477
+      // l=1 ekb: -4.6758921437176, -1.1206181429326
+      expect(pp.nonlocal.dij[0]).toEqual([1, 1, 6.4422858783765]);
+      expect(pp.nonlocal.dij[3]).toEqual([2, 2, 0.40708983382477]);
+      expect(pp.nonlocal.dij[4]).toEqual([3, 3, -4.6758921437176]);
+      expect(pp.nonlocal.dij[7]).toEqual([4, 4, -1.1206181429326]);
+    });
+  });
+
+  describe("NLCC (non-linear core correction)", () => {
+    it("C PSP8 has NLCC data (fchrg=4.0)", () => {
+      const pp = fromPSP8(realCPsp8);
+      expect(pp.header.coreCorrection).toBe(true);
+      expect(pp.nlcc).toBeDefined();
+      expect(pp.nlcc!.length).toBe(600);
+      // NLCC values are non-zero (read from file, not zero-filled)
+      expect(pp.nlcc![0]).not.toBe(0);
+    });
+
+    it("H PSP8 has no NLCC (fchrg=0)", () => {
+      const pp = fromPSP8(realHPsp8);
+      expect(pp.header.coreCorrection).toBe(false);
+    });
+  });
+
+  describe("rhoatom (pseudo valence charge)", () => {
+    it("C PSP8 has non-zero rhoatom (extension_switch=1)", () => {
+      const pp = fromPSP8(realCPsp8);
+      expect(pp.rhoatom).toBeDefined();
+      expect(pp.rhoatom.length).toBe(600);
+      expect(pp.rhoatom[0]).not.toBe(0);
+    });
+
+    it("H PSP8 has non-zero rhoatom (extension_switch=1)", () => {
+      const pp = fromPSP8(realHPsp8);
+      expect(pp.rhoatom).toBeDefined();
+      expect(pp.rhoatom[0]).not.toBe(0);
     });
   });
 

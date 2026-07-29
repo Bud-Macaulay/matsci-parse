@@ -64,6 +64,7 @@ export function fromPSP8(text: string): Pseudopotential {
   const line2 = allLines[lineIdx++].trim().split(/\s+/);
   const zatom = parseFortranNumber(line2[0]);
   const zion = parseFortranNumber(line2[1]);
+  const pspd = line2.length > 2 ? line2[2] : "";
 
   // Line 3: pspcod, pspxc, lmax, lloc, mmax, r2well
   const line3 = allLines[lineIdx++].trim().split(/\s+/);
@@ -80,6 +81,7 @@ export function fromPSP8(text: string): Pseudopotential {
   const line4 = allLines[lineIdx++].trim().split(/\s+/);
   const rchrg = parseFortranNumber(line4[0]);
   const fchrg = parseFortranNumber(line4[1]);
+  const qchrg = line4.length > 2 ? parseFortranNumber(line4[2]) : 0;
 
   // Line 5: nproj(0..lmax)
   const line5 = allLines[lineIdx++].trim().split(/\s+/);
@@ -164,7 +166,7 @@ export function fromPSP8(text: string): Pseudopotential {
         betas.push({
           angularMomentum: l,
           ultrasoftCutoffRadius: 0,
-          label: `${l}${String.fromCharCode(115 + l)}`,
+          label: `${l}${"spdf"[l] ?? l}`,
           beta: projectorData[p],
         });
       }
@@ -189,26 +191,62 @@ export function fromPSP8(text: string): Pseudopotential {
     localVloc = vlocValues;
   }
 
-  // Skip SO projector blocks (extension_switch == 2 or 3)
+  // Parse SO projector blocks (extension_switch == 2 or 3)
   if (extensionSwitch === 2 || extensionSwitch === 3) {
     for (let l = 1; l <= lmax; l++) {
       if (nprojso[l - 1] > 0) {
-        // Header line
-        lineIdx++;
-        // Data lines
-        for (let i = 0; i < mmax; i++) lineIdx++;
+        // Header line: l ekbso(1) ekbso(2) ...
+        const soHeaderParts = allLines[lineIdx++].trim().split(/\s+/);
+        const soEkb: number[] = [];
+        for (let p = 1; p < soHeaderParts.length; p++) {
+          soEkb.push(parseFortranNumber(soHeaderParts[p]));
+        }
+        // Data: mmax lines of (index, r, beta_so_1, beta_so_2, ...)
+        const nProjSo = nprojso[l - 1];
+        const soProjectorData: Float64Array[] = [];
+        for (let p = 0; p < nProjSo; p++) {
+          soProjectorData.push(new Float64Array(mmax));
+        }
+        for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
+          const parts = allLines[lineIdx++].trim().split(/\s+/);
+          for (let p = 0; p < nProjSo && p + 2 < parts.length; p++) {
+            soProjectorData[p][i] = parseFortranNumber(parts[p + 2]);
+          }
+        }
+        // Add SO projectors with "so" label suffix
+        for (let p = 0; p < nProjSo; p++) {
+          betas.push({
+            angularMomentum: l,
+            ultrasoftCutoffRadius: 0,
+            label: `${l}${"spdf"[l] ?? l}-so`,
+            beta: soProjectorData[p],
+          });
+        }
       }
     }
   }
 
-  // Skip NLCC block if present
+  // Parse NLCC block if present
+  let nlcc: Float64Array | undefined;
   if (fchrg > 0) {
-    for (let i = 0; i < mmax; i++) lineIdx++;
+    nlcc = new Float64Array(mmax);
+    for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
+      const parts = allLines[lineIdx++].trim().split(/\s+/);
+      if (parts.length >= 3) {
+        nlcc[i] = parseFortranNumber(parts[2]);
+      }
+    }
   }
 
-  // Skip pseudo valence charge block if extension_switch == 1 or 3
+  // Parse pseudo valence charge block if extension_switch == 1 or 3
+  const rhoatom = new Float64Array(mmax);
   if (extensionSwitch === 1 || extensionSwitch === 3) {
-    for (let i = 0; i < mmax; i++) lineIdx++;
+    for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
+      const parts = allLines[lineIdx++].trim().split(/\s+/);
+      if (parts.length >= 3) {
+        rhoatom[i] = parseFortranNumber(parts[2]);
+      }
+    }
   }
 
   // Build mesh
@@ -228,11 +266,12 @@ export function fromPSP8(text: string): Pseudopotential {
   // For multiple projectors: dij is block-diagonal
   const dij: Array<[number, number, number]> = [];
   let projIdx = 1;
+  let ekbIdx = 0;
   for (let l = 0; l <= lmax; l++) {
     if (l === lloc && lloc <= lmax) continue;
     if (nproj[l] > 0) {
       const nProjL = nproj[l];
-      const ekbL = ekbValues.find(() => true) ?? []; // simplified
+      const ekbL = ekbValues[ekbIdx++] ?? [];
       for (let i = 0; i < nProjL; i++) {
         for (let j = 0; j < nProjL; j++) {
           const val = i === j ? (ekbL[i] ?? 1.0) : 0;
@@ -254,6 +293,8 @@ export function fromPSP8(text: string): Pseudopotential {
     version: "2.0.1",
     header: {
       element,
+      generated: title,
+      date: pspd,
       pseudoType: "NC",
       relativistic: "scalar",
       isUltrasoft: false,
@@ -282,8 +323,8 @@ export function fromPSP8(text: string): Pseudopotential {
     local: { vloc: localVloc },
     nonlocal: { betas, dij },
     pswfc: [],
-    rhoatom: new Float64Array(mmax),
-    nlcc: fchrg > 0 ? new Float64Array(mmax) : undefined,
+    rhoatom,
+    nlcc: nlcc,
   };
 }
 
@@ -307,14 +348,18 @@ export function toPSP8(pp: Pseudopotential): string {
 
   // Header
   const zatom = elementToZ(pp.header.element);
-  lines.push(`${pp.header.element} ${pp.header.functional} ${pp.header.generated ?? ""}`);
+  lines.push(pp.header.generated ?? `${pp.header.element} ${pp.header.functional}`);
+  const pspd = pp.header.date ?? "000000";
   lines.push(
-    `${zatom.toFixed(4).padStart(12)} ${pp.header.zValence.toFixed(4).padStart(12)} ${pp.header.date ?? "000000".padStart(8)}`,
+    `${zatom.toFixed(4).padStart(12)} ${pp.header.zValence.toFixed(4).padStart(12)} ${pspd.padStart(8)}`,
   );
   lines.push(
     `     8 ${pp.header.xcCode ?? 0} ${lmax} ${lloc} ${mmax}     0`,
   );
-  lines.push(` 0.00000000  ${pp.nlcc ? "1.0" : "0.0"}  0.00000000`);
+  const rchrg = 0;
+  const fchrg = pp.header.coreCorrection ? 1.0 : 0.0;
+  const qchrg = 0;
+  lines.push(`${rchrg.toFixed(4).padStart(12)} ${fchrg.toFixed(4).padStart(12)} ${qchrg.toFixed(4).padStart(12)}`);
   lines.push(` ${nproj.join("  ")}`);
   lines.push(`     ${pp.header.extensionSwitch ?? 0}`);
 
@@ -355,6 +400,24 @@ export function toPSP8(pp: Pseudopotential): string {
     lines.push(
       `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.local.vloc[i])}`,
     );
+  }
+
+  // NLCC block
+  if (pp.nlcc) {
+    for (let i = 0; i < mmax; i++) {
+      lines.push(
+        `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.nlcc[i])}`,
+      );
+    }
+  }
+
+  // Pseudo valence charge block (if extension_switch == 1 or 3)
+  if (pp.header.extensionSwitch === 1 || pp.header.extensionSwitch === 3) {
+    for (let i = 0; i < mmax; i++) {
+      lines.push(
+        `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.rhoatom[i])}`,
+      );
+    }
   }
 
   return lines.join("\n");
