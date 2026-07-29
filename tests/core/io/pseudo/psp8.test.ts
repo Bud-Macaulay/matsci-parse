@@ -29,7 +29,7 @@ describe("PSP8 parser", () => {
       expect(pp.header.zValence).toBeCloseTo(1.0);
       expect(pp.header.lMax).toBe(1);
       expect(pp.header.lLocal).toBe(4);
-      expect(pp.header.meshSize).toBe(10);
+      expect(pp.header.meshSize).toBe(300);
     });
 
     it("has correct xc code", () => {
@@ -47,7 +47,7 @@ describe("PSP8 parser", () => {
 
     it("has local potential at end (lloc=4 > lmax=1)", () => {
       const pp = fromPSP8(realHPsp8);
-      expect(pp.local.vloc.length).toBe(10);
+      expect(pp.local.vloc.length).toBe(300);
       expect(pp.local.vloc[0]).toBeCloseTo(-3.151120944933);
       expect(pp.local.vloc[1]).toBeCloseTo(-3.1502630770291);
     });
@@ -68,7 +68,7 @@ describe("PSP8 parser", () => {
     it("p-projector data matches PseudoDojo values", () => {
       const pp = fromPSP8(realHPsp8);
       expect(pp.nonlocal.betas[2].beta[0]).toBeCloseTo(-2.7904952299984e-6);
-      expect(pp.nonlocal.betas[2].beta[5]).toBeCloseTo(-0.15146972560029);
+      expect(pp.nonlocal.betas[2].beta[5]).toBeCloseTo(-0.17133980226378);
     });
 
     it("nonlinear core corrections are absent", () => {
@@ -99,7 +99,7 @@ describe("PSP8 parser", () => {
     it("local potential matches ONCVPSP values", () => {
       const pp = fromPSP8(realCPsp8);
       expect(pp.local.vloc[0]).toBeCloseTo(-6.8386740285773);
-      expect(pp.local.vloc[9]).toBeCloseTo(-6.8037930112455);
+      expect(pp.local.vloc[9]).toBeCloseTo(-6.8033589342187);
     });
 
     it("s-projector radial dependence decays correctly", () => {

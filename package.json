@@ -21,7 +21,8 @@
     "bench:compare": "vitest bench --compare=benchmarks/results.json",
     "test:run": "vitest run",
     "coverage": "vitest run --coverage",
-    "docs": "typedoc --skipErrorChecking"
+    "docs": "typedoc --skipErrorChecking",
+    "roundtrip:external": "vitest run tests/core/io/pseudo/roundtrip-external.test.ts --reporter=verbose"
   },
   "packageManager": "pnpm@11.5.3",
   "devDependencies": {

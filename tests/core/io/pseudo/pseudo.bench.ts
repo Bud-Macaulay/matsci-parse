@@ -2,9 +2,9 @@ import { bench, describe } from "vitest";
 
 import { fromGTH, toGTH } from "@/core/io/pseudo/gth";
 import { fromPSP8, toPSP8 } from "@/core/io/pseudo/psp8";
-import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
-import { fromFHIFhi, toFHI } from "@/core/io/pseudo/fhi";
 import { fromPSML, toPSML } from "@/core/io/pseudo/psml";
+import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
+import { fromFHI, toFHI } from "@/core/io/pseudo/fhi";
 
 import {
   realHGthPbe,
@@ -13,12 +13,15 @@ import {
   realNGthPbe,
   realOGthPbe,
   realMultiGth,
-  realHPsp8,
-  realCPsp8,
-  realMoUpfV2Fhi,
-} from "./teststrings/real-world";
+} from "./teststrings/gth";
 
-import { heNcUpf } from "./teststrings/upf";
+import { realHPsp8, realCPsp8 } from "./teststrings/psp8";
+
+import { realMoUpfV2Fhi, heNcUpf } from "./teststrings/upf";
+
+import { realHPsml, realCPsml, realOPsml } from "./teststrings/psml";
+
+import { realHFhi, realCFhi } from "./teststrings/fhi";
 
 // ---------------------------------------------------------------------------
 // GTH
@@ -88,11 +91,11 @@ toPSP8(psp8H);
 toPSP8(psp8C);
 
 describe("pseudo parse: PSP8", () => {
-  bench("fromPSP8 (H, 10 mesh, 2s+1p projectors)", () => {
+  bench("fromPSP8 (H, 300 mesh, 2s+1p projectors)", () => {
     fromPSP8(realHPsp8);
   });
 
-  bench("fromPSP8 (C, 10 mesh, 2s+2p projectors)", () => {
+  bench("fromPSP8 (C, 600 mesh, 2s+2p projectors)", () => {
     fromPSP8(realCPsp8);
   });
 });
@@ -159,58 +162,85 @@ describe("pseudo round-trip: UPF v2", () => {
 });
 
 // ---------------------------------------------------------------------------
-// FHI (stub — implement when fixtures are added)
+// FHI
 // ---------------------------------------------------------------------------
 
-// const fhiH = fromFHIFhi(realHFhi);
-// const fhiC = fromFHIFhi(realCFhi);
-//
-// describe("pseudo parse: FHI", () => {
-//   bench.skip("fromFHIFhi (H)", () => {
-//     fromFHIFhi(realHFhi);
-//   });
-//
-//   bench.skip("fromFHIFhi (C, with NLCC)", () => {
-//     fromFHIFhi(realCFhi);
-//   });
-// });
-//
-// describe("pseudo serialize: FHI", () => {
-//   bench.skip("toFHI (H)", () => {
-//     toFHI(fhiH);
-//   });
-//
-//   bench.skip("toFHI (C)", () => {
-//     toFHI(fhiC);
-//   });
-// });
-//
-// describe("pseudo round-trip: FHI", () => {
-//   bench.skip("fromFHIFhi → toFHI (C)", () => {
-//     toFHI(fromFHIFhi(realCFhi));
-//   });
-// });
+const fhiH = fromFHI(realHFhi);
+const fhiC = fromFHI(realCFhi);
+
+describe("pseudo parse: FHI", () => {
+  bench("fromFHI (H, 387 mesh, s+p+d+f)", () => {
+    fromFHI(realHFhi);
+  });
+
+  bench("fromFHI (C, 461 mesh, s+p+d+f)", () => {
+    fromFHI(realCFhi);
+  });
+});
+
+describe("pseudo serialize: FHI", () => {
+  bench("toFHI (H)", () => {
+    toFHI(fhiH);
+  });
+
+  bench("toFHI (C)", () => {
+    toFHI(fhiC);
+  });
+});
+
+describe("pseudo round-trip: FHI", () => {
+  bench("fromFHI → toFHI (C)", () => {
+    toFHI(fromFHI(realCFhi));
+  });
+});
 
 // ---------------------------------------------------------------------------
-// PSML (stub — implement when fixtures are added)
+// ---------------------------------------------------------------------------
+// PSML
 // ---------------------------------------------------------------------------
 
-// const psmlSi = fromPSML(realSiPsml);
-//
-// describe("pseudo parse: PSML", () => {
-//   bench.skip("fromPSML (Si oncv)", () => {
-//     fromPSML(realSiPsml);
-//   });
-// });
-//
-// describe("pseudo serialize: PSML", () => {
-//   bench.skip("toPSML (Si)", () => {
-//     toPSML(psmlSi);
-//   });
-// });
-//
-// describe("pseudo round-trip: PSML", () => {
-//   bench.skip("fromPSML → toPSML (Si)", () => {
-//     toPSML(fromPSML(realSiPsml));
-//   });
-// });
+const psmlH = fromPSML(realHPsml);
+const psmlC = fromPSML(realCPsml);
+const psmlO = fromPSML(realOPsml);
+
+describe("pseudo parse: PSML", () => {
+  bench("fromPSML (H, 457 mesh, NC)", () => {
+    fromPSML(realHPsml);
+  });
+
+  bench("fromPSML (C, 457 mesh, NC)", () => {
+    fromPSML(realCPsml);
+  });
+
+  bench("fromPSML (O, 457 mesh, NC)", () => {
+    fromPSML(realOPsml);
+  });
+});
+
+describe("pseudo serialize: PSML", () => {
+  bench("toPSML (H)", () => {
+    toPSML(psmlH);
+  });
+
+  bench("toPSML (C)", () => {
+    toPSML(psmlC);
+  });
+
+  bench("toPSML (O)", () => {
+    toPSML(psmlO);
+  });
+});
+
+describe("pseudo round-trip: PSML", () => {
+  bench("fromPSML → toPSML (H)", () => {
+    toPSML(fromPSML(realHPsml));
+  });
+
+  bench("fromPSML → toPSML (C)", () => {
+    toPSML(fromPSML(realCPsml));
+  });
+
+  bench("fromPSML → toPSML (O)", () => {
+    toPSML(fromPSML(realOPsml));
+  });
+});

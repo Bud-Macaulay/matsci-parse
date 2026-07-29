@@ -31,17 +31,38 @@ import {
 import { guessElement } from "./elements";
 
 /**
- * Parse an FHI98PP .cpi file.
+ * Parse an FHI98PP pseudopotential file — auto-detects format.
+ *
+ * - `.fhi` format (ABINIT format 6): 7 ABINIT header lines + .cpi content
+ * - `.cpi` format: starts directly with valence data
+ *
+ * Detection: if the first non-empty line starts with a digit → `.cpi`;
+ * otherwise → `.fhi`.
+ */
+export function fromFHI(text: string): Pseudopotential {
+  const allLines = text.split("\n");
+  const firstNonEmpty = allLines.find((l) => l.trim().length > 0);
+  if (!firstNonEmpty) throw new Error("FHI file too short to parse");
+
+  // .fhi format (ABINIT format 6) starts with a text description.
+  // .cpi format starts with a number (Z_val).
+  if (/^\s*\d/.test(firstNonEmpty)) {
+    return parseCpi(text);
+  }
+  return parseFhiHeader(text);
+}
+
+/**
+ * Parse a raw .cpi body (without ABINIT header).
  *
  * Format:
  * Line 1: Z_val n_components
- * Lines 2-10: 9 lines of zeros (legacy header)
- * Line 11: mesh_max dx_parameter
- * Lines 12+: index r(i) V_0(i) V_1(i) ... V_{lmax}(i) [f_core f_core' f_core'']
+ * Lines 2+: legacy zero-header (variable length, scanned for the mesh line)
+ * Then: index r(i) V_0(i) V_1(i) ... V_{lmax}(i) [f_core f_core' f_core'']
  */
-export function fromFHI(text: string): Pseudopotential {
+function parseCpi(text: string): Pseudopotential {
   const allLines = text.split("\n").filter((l) => l.trim().length > 0);
-  if (allLines.length < 12) {
+  if (allLines.length < 4) {
     throw new Error("FHI file too short to parse");
   }
 
@@ -51,13 +72,22 @@ export function fromFHI(text: string): Pseudopotential {
   const nComponents = parseIntSafe(line1[1]);
   const lMax = nComponents - 1;
 
-  // Lines 2-10: legacy header (skip)
-  // Line 11 (index 10): mesh_max, dx
-  const line11 = allLines[10].trim().split(/\s+/);
-  const meshMax = parseIntSafe(line11[0]);
-  const dx = parseFortranNumber(line11[1]);
+  // Lines 2+: legacy header (variable number of zero lines).
+  // Scan for the mesh line: first token is a positive integer (mesh_max),
+  // second token is a floating-point number (dx).
+  let meshLineIdx = 1;
+  for (; meshLineIdx < allLines.length; meshLineIdx++) {
+    const parts = allLines[meshLineIdx].trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const firstInt = parseIntSafe(parts[0]);
+      if (firstInt > 0) break;
+    }
+  }
+  const meshParts = allLines[meshLineIdx].trim().split(/\s+/).filter(Boolean);
+  const meshMax = parseIntSafe(meshParts[0]);
+  const dx = parseFortranNumber(meshParts[1]);
 
-  // Parse data block (lines 12+)
+  // Parse data block (lines after mesh line)
   // Columns: index, r(i), V_0(i), V_1(i), ... [, f_core, f_core', f_core'']
   const rValues: number[] = [];
   const semilocal: Float64Array[] = [];
@@ -67,7 +97,7 @@ export function fromFHI(text: string): Pseudopotential {
   let hasNlcc = false;
   const nlccData: number[] = [];
 
-  for (let i = 11; i < allLines.length && rValues.length < meshMax; i++) {
+  for (let i = meshLineIdx + 1; i < allLines.length && rValues.length < meshMax; i++) {
     const parts = allLines[i].trim().split(/\s+/).filter(Boolean);
     if (parts.length < 3) continue;
 
@@ -168,13 +198,13 @@ export function fromFHI(text: string): Pseudopotential {
 
 /**
  * Parse an FHI .fhi file (ABINIT format 6).
- * This is a .cpi file with 7 ABINIT header lines prepended.
+ * Skips the 7 ABINIT header lines, then parses the .cpi body.
  */
-export function fromFHIFhi(text: string): Pseudopotential {
+function parseFhiHeader(text: string): Pseudopotential {
   // Skip 7 ABINIT header lines, then parse as .cpi
   const allLines = text.split("\n");
   const cpiContent = allLines.slice(7).join("\n");
-  const pp = fromFHI(cpiContent);
+  const pp = parseCpi(cpiContent);
 
   // Extract metadata from ABINIT header
   if (allLines.length >= 3) {

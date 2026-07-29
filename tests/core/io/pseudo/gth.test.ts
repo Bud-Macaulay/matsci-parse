@@ -18,11 +18,13 @@ describe("GTH parser", () => {
     });
 
     it("handles comment-only input gracefully", () => {
-      expect(() => fromGTH("# just comments\n# more comments")).toThrow("No GTH entries found");
+      expect(() => fromGTH("# just comments\n# more comments")).toThrow(
+        "No GTH entries found",
+      );
     });
   });
 
-  describe("real-world H GTH-PBE from CP2K", () => {
+  describe("real-world H GTH-PBE from submodule", () => {
     it("parses correctly", () => {
       const pp = fromGTH(realHGthPbe);
       expect(pp.header.element).toBe("H");
@@ -36,8 +38,8 @@ describe("GTH parser", () => {
       expect(pp.gth).toBeDefined();
       expect(pp.gth!.rLoc).toBeCloseTo(0.2);
       expect(pp.gth!.cexpPpl.length).toBe(2);
-      expect(pp.gth!.cexpPpl[0]).toBeCloseTo(-4.17890044);
-      expect(pp.gth!.cexpPpl[1]).toBeCloseTo(0.72446331);
+      expect(pp.gth!.cexpPpl[0]).toBeCloseTo(-4.04797008);
+      expect(pp.gth!.cexpPpl[1]).toBeCloseTo(0.66965815);
     });
 
     it("has no non-local projectors", () => {
@@ -58,17 +60,17 @@ describe("GTH parser", () => {
     });
   });
 
-  describe("real-world He GTH-PBE from CP2K", () => {
+  describe("real-world He GTH-PBE from submodule", () => {
     it("parses correctly", () => {
       const pp = fromGTH(realHeGthPbe);
       expect(pp.header.element).toBe("He");
       expect(pp.header.zValence).toBeCloseTo(2.0);
       expect(pp.gth!.rLoc).toBeCloseTo(0.2);
-      expect(pp.gth!.cexpPpl).toEqual([-9.12214383, 1.7027077]);
+      expect(pp.gth!.cexpPpl).toEqual([-9.06984697, 1.67662166]);
     });
   });
 
-  describe("real-world C GTH-PBE from CP2K", () => {
+  describe("real-world C GTH-PBE from submodule", () => {
     it("parses correctly", () => {
       const pp = fromGTH(realCGthPbe);
       expect(pp.header.element).toBe("C");
@@ -76,50 +78,52 @@ describe("GTH parser", () => {
       expect(pp.header.functional).toBe("GTH-PBE-q4");
     });
 
-    it("has one beta projector (s-channel only; p has nprjPpnl=0)", () => {
+    it("has 2 beta projectors (s and p)", () => {
       const pp = fromGTH(realCGthPbe);
-      expect(pp.nonlocal.betas.length).toBe(1);
+      expect(pp.nonlocal.betas.length).toBe(2);
       expect(pp.nonlocal.betas[0].angularMomentum).toBe(0);
+      expect(pp.nonlocal.betas[1].angularMomentum).toBe(1);
     });
 
     it("has correct GTH parameters", () => {
       const pp = fromGTH(realCGthPbe);
-      expect(pp.gth!.rLoc).toBeCloseTo(0.33847124);
+      expect(pp.gth!.rLoc).toBeCloseTo(0.33);
       expect(pp.gth!.cexpPpl.length).toBe(2);
       expect(pp.gth!.rPs.length).toBe(2);
-      expect(pp.gth!.rPs[0]).toBeCloseTo(0.30257575);
-      expect(pp.gth!.rPs[1]).toBeCloseTo(0.29150694);
+      expect(pp.gth!.rPs[0]).toBeCloseTo(0.29798008);
+      expect(pp.gth!.rPs[1]).toBeCloseTo(0.35634007);
     });
 
-    it("h-matrix elements match CP2K data", () => {
+    it("h-matrix elements match submodule data", () => {
       const pp = fromGTH(realCGthPbe);
-      expect(pp.gth!.hprj[0]).toEqual([[9.62248665]]);
-      expect(pp.gth!.hprj[1]).toEqual([]);
+      expect(pp.gth!.hprj[0]).toEqual([[9.86073638]]);
+      expect(pp.gth!.hprj[1]).toEqual([[-0.08162373]]);
     });
 
     it("D_ij entries are correct", () => {
       const pp = fromGTH(realCGthPbe);
-      expect(pp.nonlocal.dij.length).toBe(1);
-      expect(pp.nonlocal.dij[0][2]).toBeCloseTo(9.62248665);
+      expect(pp.nonlocal.dij.length).toBe(2);
+      expect(pp.nonlocal.dij[0][2]).toBeCloseTo(9.86073638);
+      expect(pp.nonlocal.dij[1][2]).toBeCloseTo(-0.08162373);
     });
   });
 
-  describe("real-world N GTH-PBE from CP2K", () => {
+  describe("real-world N GTH-PBE from submodule", () => {
     it("parses correctly", () => {
       const pp = fromGTH(realNGthPbe);
       expect(pp.header.element).toBe("N");
       expect(pp.header.zValence).toBeCloseTo(5.0);
-      expect(pp.nonlocal.betas.length).toBe(1);
-      expect(pp.gth!.rLoc).toBeCloseTo(0.28379051);
+      expect(pp.nonlocal.betas.length).toBe(2);
+      expect(pp.gth!.rLoc).toBeCloseTo(0.38);
     });
   });
 
-  describe("real-world O GTH-PBE from CP2K", () => {
+  describe("real-world O GTH-PBE from submodule", () => {
     it("parses correctly", () => {
       const pp = fromGTH(realOGthPbe);
       expect(pp.header.element).toBe("O");
       expect(pp.header.zValence).toBeCloseTo(6.0);
-      expect(pp.nonlocal.betas.length).toBe(1);
+      expect(pp.nonlocal.betas.length).toBe(2);
     });
   });
 
