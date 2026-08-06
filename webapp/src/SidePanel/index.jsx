@@ -3,16 +3,11 @@ import { useStore } from "@tanstack/react-store";
 import { appStore, actions } from "../store/appStore";
 import { fromJSON } from "matsci-parse";
 import BulkSpeciesModal from "./BulkSpeciesModal";
-import BulkSymmetryModal from "./BulkSymmetryModal";
-import BulkExportModal from "./BulkExportModal";
-import { showToast } from "../common/toastStore";
 
 export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
   const autosave = useStore(appStore, (s) => s.autosave);
   const [flashId, setFlashId] = useState(null);
   const [bulkModal, setBulkModal] = useState({ open: false, mode: null });
-  const [symmetryOpen, setSymmetryOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
 
   const savedList = useStore(appStore, (s) => s.savedStructures);
 
@@ -57,13 +52,12 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
     const files = event.target.files;
     if (!files?.length) return;
 
-    for (const file of files) {
-      try {
-        await actions.importFile(file, { saveOnly: true });
-      } catch (err) {
-        console.error(err);
-        showToast(`${file.name} failed to parse, see console for details`);
+    try {
+      for (const file of files) {
+        await actions.importFile(file);
       }
+    } catch (err) {
+      console.error(err);
     }
 
     event.target.value = "";
@@ -80,7 +74,7 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
       <div className="p-4 flex items-center gap-4 flex-wrap">
         {/* File upload */}
         <label
-          title="Import CIF, XYZ, XSF, POSCAR, or zip files containing structure files"
+          title="Import CIF, XYZ, XSF, POSCAR, or other structure files"
           className="px-1 py-2 text-sm border rounded-md cursor-pointer bg-gray-100 hover:bg-gray-200 transition"
         >
           Choose Files
@@ -88,7 +82,6 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
             type="file"
             multiple
             onChange={handleFile}
-            accept=".cif,.xyz,.xsf,.vasp,.poscar,.json,.zip"
             className="hidden"
           />
         </label>
@@ -122,9 +115,6 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
         {savedList.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs text-gray-500 mb-2">Bulk Operations</p>
-            <p className="text-[10px] text-gray-400 mb-2">
-              Bulk operations do not modify open tabs.
-            </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setBulkModal({ open: true, mode: "replace" })}
@@ -139,22 +129,6 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
                 className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition"
               >
                 Remove Species
-              </button>
-            </div>
-            <div className="flex gap-2 mt-2">
-              <button
-                onClick={() => setSymmetryOpen(true)}
-                title="Symmetrize all saved structures"
-                className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
-              >
-                Symmetrize
-              </button>
-              <button
-                onClick={() => setExportOpen(true)}
-                title="Export all saved structures as a zip file"
-                className="flex-1 px-2 py-1.5 text-xs font-medium rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition"
-              >
-                Export All
               </button>
             </div>
           </div>
@@ -205,16 +179,6 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
         open={bulkModal.open}
         mode={bulkModal.mode}
         onClose={() => setBulkModal({ open: false, mode: null })}
-      />
-
-      <BulkSymmetryModal
-        open={symmetryOpen}
-        onClose={() => setSymmetryOpen(false)}
-      />
-
-      <BulkExportModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
       />
     </aside>
   );

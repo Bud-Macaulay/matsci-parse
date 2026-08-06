@@ -25,13 +25,12 @@ export default function App() {
     const files = e.dataTransfer.files;
     if (!files?.length) return;
 
-    for (const file of files) {
-      try {
-        await actions.importFile(file, { saveOnly: true });
-      } catch (err) {
-        console.error(err);
-        showToast(`${file.name} failed to parse, see console for details`);
+    try {
+      for (const file of files) {
+        await actions.importFile(file);
       }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -77,7 +76,7 @@ export default function App() {
       {dragging && (
         <div className="absolute inset-0 z-50 bg-blue-500/10 border-2 border-dashed border-blue-400 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-lg shadow-lg px-8 py-5 text-sm font-medium text-blue-700">
-            Drop structure files or zip here
+            Drop structure files here
           </div>
         </div>
       )}

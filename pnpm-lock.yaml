@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@spglib/moyo-wasm':
-        specifier: ^0.7.9
-        version: 0.7.9
       fast-xml-parser:
         specifier: ^5.10.1
         version: 5.10.1
@@ -668,9 +665,6 @@ packages:
 
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
-
-  '@spglib/moyo-wasm@0.7.9':
-    resolution: {integrity: sha512-OTutVoqRkInR+ZrBuwS3z/yolCRsNGEMm87tz822NxiajGmXnU+7L9bVlqHCPck7+CeCCR3H60Mzr94W20vu6w==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2267,8 +2261,6 @@ snapshots:
       '@types/hast': 3.0.4
 
   '@shikijs/vscode-textmate@10.0.2': {}
-
-  '@spglib/moyo-wasm@0.7.9': {}
 
   '@standard-schema/spec@1.1.0': {}
 

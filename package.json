@@ -22,7 +22,8 @@
     "test:run": "vitest run",
     "coverage": "vitest run --coverage",
     "docs": "typedoc --skipErrorChecking",
-    "roundtrip:external": "vitest run tests/core/io/pseudo/roundtrip-external.test.ts --reporter=verbose"
+    "roundtrip:external": "vitest run tests/core/io/pseudo/roundtrip-external.test.ts --reporter=verbose",
+    "build:wasm": "node scripts/build-spglib-wasm.mjs"
   },
   "packageManager": "pnpm@11.5.3",
   "devDependencies": {
@@ -44,7 +45,6 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
-    "@spglib/moyo-wasm": "^0.7.9",
     "fast-xml-parser": "^5.10.1",
     "voro3d": "^0.0.7"
   }

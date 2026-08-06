@@ -1,3 +1,8 @@
 [submodule "tests/external"]
 	path = tests/external
 	url = https://github.com/Bud-Macaulay/matsci-parse-testfiles.git
+
+[submodule "vendor/spglib"]
+	path = vendor/spglib
+	url = https://github.com/spglib/spglib.git
+	branch = v2.6.0

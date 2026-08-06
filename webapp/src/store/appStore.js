@@ -144,55 +144,37 @@ export const actions = {
   },
 
   bulkReplaceSpecies(oldSp, newSp) {
-    let skipped = 0;
     updateSavedStructures((saved) =>
       saved.map((item) => {
-        try {
-          const structure = fromJSON(item.structure);
-          const species = structure.sites.find(
-            (s) => s.species.symbol === oldSp,
-          )?.species;
-          if (!species) return item;
-          const indices = findSitesBySpecies(structure, species);
-          if (!indices.length) return item;
-          const newStructure = replaceSites(
-            structure,
-            indices.map((i) => ({
-              index: i,
-              site: { ...structure.sites[i], species: { symbol: newSp } },
-            })),
-          );
-          return { ...item, structure: toJSON(newStructure) };
-        } catch {
-          skipped++;
-          return item;
-        }
+        const structure = fromJSON(item.structure);
+        const species = structure.sites.find(
+          (s) => s.species.symbol === oldSp,
+        )?.species;
+        if (!species) return item;
+        const indices = findSitesBySpecies(structure, species);
+        if (!indices.length) return item;
+        const newStructure = replaceSites(
+          structure,
+          indices.map((i) => ({
+            index: i,
+            site: { ...structure.sites[i], species: { symbol: newSp } },
+          })),
+        );
+        return { ...item, structure: toJSON(newStructure) };
       }),
     );
-    if (skipped) {
-      showToast(`${skipped} structure(s) skipped (unparseable)`, "warning");
-    }
   },
 
   bulkRemoveSpecies(sp) {
-    let skipped = 0;
     updateSavedStructures((saved) =>
       saved.map((item) => {
-        try {
-          const structure = fromJSON(item.structure);
-          const indices = findSitesBySpecies(structure, { symbol: sp });
-          if (!indices.length) return item;
-          const newStructure = removeSites(structure, indices);
-          return { ...item, structure: toJSON(newStructure) };
-        } catch {
-          skipped++;
-          return item;
-        }
+        const structure = fromJSON(item.structure);
+        const indices = findSitesBySpecies(structure, { symbol: sp });
+        if (!indices.length) return item;
+        const newStructure = removeSites(structure, indices);
+        return { ...item, structure: toJSON(newStructure) };
       }),
     );
-    if (skipped) {
-      showToast(`${skipped} structure(s) skipped (unparseable)`, "warning");
-    }
   },
 };
 

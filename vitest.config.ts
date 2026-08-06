@@ -20,8 +20,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Mock the ?url import in tests
-      "moyo-wasm/moyo_wasm_bg.wasm?url": "moyo-wasm/moyo_wasm_bg.wasm",
       "@": path.resolve(__dirname, "lib"),
     },
   },

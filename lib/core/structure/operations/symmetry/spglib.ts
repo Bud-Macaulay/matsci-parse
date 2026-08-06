@@ -1,41 +1,11 @@
-import init, { analyze_cell, type MoyoDataset } from "@spglib/moyo-wasm";
+import { init, analyze_cell } from "./spglib-wasm";
 
 import { createLattice } from "@/core/lattice";
 import { Structure } from "../../structure";
 
-let ready: Promise<void> | null = null;
-
-/** Ensure the Moyo WASM module is loaded (idempotent). */
+/** Ensure the WASM module is loaded (idempotent). */
 export function initMoyo() {
-  if (!ready) {
-    ready = (async () => {
-      // In Node.js (tests), load from filesystem
-      if (typeof process !== "undefined" && process.versions?.node) {
-        try {
-          const { readFileSync } = await import("fs");
-          const { join } = await import("path");
-          const wasmPath = join(
-            process.cwd(),
-            "node_modules/@spglib/moyo-wasm/moyo_wasm_bg.wasm",
-          );
-          const wasmBuffer = readFileSync(wasmPath);
-          await init(wasmBuffer);
-        } catch (e) {
-          console.error("Failed to load WASM in Node:", e);
-          throw e;
-        }
-      } else {
-        // In browser, use dynamic import to get the URL
-        const wasmUrl = new URL(
-          "@spglib/moyo-wasm/moyo_wasm_bg.wasm",
-          import.meta.url,
-        ).toString();
-
-        await init(wasmUrl);
-      }
-    })();
-  }
-  return ready;
+  return init();
 }
 
 /** Compute primitive and conventional structures plus calculation results via Moyo/SPGLIB. */
