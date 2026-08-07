@@ -1,268 +1,44 @@
-import { generateBZVertices } from "./generateBZVertices";
-import { getSymmetry } from "../spglib";
 import { Structure } from "../../../structure";
-
+import { getSymmetry } from "../spglib";
+import { MoyoDataset } from "../spglib-wasm";
 import { spgroup_data } from "../spgData";
 
 import { parameters } from "../../../../lattice/parameters";
-import { niggli_reduce } from "../spglib-wasm";
 
-import { Matrix, createMatrix } from "../../../../matrix/matrix";
-import { transpose } from "../../../../matrix/operations/transpose";
-import { mul } from "../../../../matrix/operations/mul";
-import { scale } from "../../../../matrix/operations/scale";
-import { gjInverse } from "../../../../matrix/operations/inverse/gaussJordan";
+import { determinant } from "@/core/matrix/operations/determinant";
 
-const TWO_PI = 2 * Math.PI;
+import { transformAP, determineExtBravais, determineAP } from "./bravais";
+import {
+  cellParams,
+  evalExpr,
+  evalExprSimple,
+  extendKparam,
+  getPmatrix,
+  getPrimitive,
+  getReciprocalCellRows,
+  matrixFromRowMajor,
+  vecMulMat,
+} from "./seekpathTools";
+import { bandPathData } from "./bandPathData";
 
-function matrixFromRowMajor(data: ArrayLike<number>): Matrix {
+const RAD2DEG = 180 / Math.PI;
+
+function rowsFromFlat(data: ArrayLike<number>): number[][] {
   if (data.length !== 9) throw new Error("Expected 9 lattice values");
-  return createMatrix(
-    3,
-    3,
-    Array.from(data).map((x) => x),
-  );
-}
-
-function cellParams(lattice: Matrix): number[] {
-  const d = lattice.data;
-  const v1 = [d[0], d[1], d[2]];
-  const v2 = [d[3], d[4], d[5]];
-  const v3 = [d[6], d[7], d[8]];
-  const a = Math.hypot(v1[0], v1[1], v1[2]);
-  const b = Math.hypot(v2[0], v2[1], v2[2]);
-  const c = Math.hypot(v3[0], v3[1], v3[2]);
-  const dot = (u: number[], v: number[]) =>
-    u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-  const cosalpha = dot(v2, v3) / b / c;
-  const cosbeta = dot(v1, v3) / a / c;
-  const cosgamma = dot(v1, v2) / a / b;
-  return [a, b, c, cosalpha, cosbeta, cosgamma];
-}
-
-/** Reciprocal-space cell rows, such that dot(real, recip.T) = 2π I. */
-function getReciprocalCellRows(real: Matrix): Matrix {
-  return transpose(scale(gjInverse(real), TWO_PI));
-}
-
-function getRealCellFromReciprocalRows(recip: Matrix): Matrix {
-  return transpose(scale(gjInverse(recip), TWO_PI));
-}
-
-const M2_MATRICES = [
-  [
-    [0, 0, 1],
-    [1, 0, 0],
-    [0, 1, 0],
-  ],
-  [
-    [0, 1, 0],
-    [0, 0, 1],
-    [1, 0, 0],
-  ],
-  [
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1],
-  ],
-];
-
-/** Determine the aP label (aP2 all-obtuse / aP3 all-acute) as in HPKOT. */
-const M3_I = [
-  [1, 0, 0],
-  [0, 1, 0],
-  [0, 0, 1],
-];
-const M3_XX = [
-  [1, 0, 0],
-  [0, -1, 0],
-  [0, 0, -1],
-];
-const M3_YY = [
-  [-1, 0, 0],
-  [0, 1, 0],
-  [0, 0, -1],
-];
-const M3_ZZ = [
-  [-1, 0, 0],
-  [0, -1, 0],
-  [0, 0, 1],
-];
-
-async function determineAP(convLattice: Matrix): Promise<string> {
-  const reciprocalCellOrig = getReciprocalCellRows(convLattice);
-  const reduced = await niggli_reduce(Array.from(reciprocalCellOrig.data));
-  if (!reduced) throw new Error("Niggli reduction failed for aP lattice");
-  const reciprocalCell2 = matrixFromRowMajor(reduced);
-  const realCell2 = getRealCellFromReciprocalRows(reciprocalCell2);
-
-  const [ka2, kb2, kc2, coskalpha2, coskbeta2, coskgamma2] =
-    cellParams(reciprocalCell2);
-  const conditions = [
-    Math.abs(kb2 * kc2 * coskalpha2),
-    Math.abs(kc2 * ka2 * coskbeta2),
-    Math.abs(ka2 * kb2 * coskgamma2),
+  return [
+    [data[0], data[1], data[2]],
+    [data[3], data[4], data[5]],
+    [data[6], data[7], data[8]],
   ];
-
-  let smallest = 0;
-  if (conditions[1] < conditions[smallest]) smallest = 1;
-  if (conditions[2] < conditions[smallest]) smallest = 2;
-  const M2 = matrixFromRowMajor(M2_MATRICES[smallest].flat());
-  const realCell3 = mul(transpose(M2), realCell2);
-
-  const reciprocalCell3 = getReciprocalCellRows(realCell3);
-  const [, , , ca3, cb3, cg3] = cellParams(reciprocalCell3);
-
-  let M3: number[][];
-  if ((ca3 > 0 && cb3 > 0 && cg3 > 0) || (ca3 <= 0 && cb3 <= 0 && cg3 <= 0))
-    M3 = M3_I;
-  else if (
-    (ca3 > 0 && cb3 <= 0 && cg3 <= 0) ||
-    (ca3 <= 0 && cb3 > 0 && cg3 > 0)
-  )
-    M3 = M3_XX;
-  else if (
-    (ca3 <= 0 && cb3 > 0 && cg3 <= 0) ||
-    (ca3 > 0 && cb3 <= 0 && cg3 > 0)
-  )
-    M3 = M3_YY;
-  else if (
-    (ca3 <= 0 && cb3 <= 0 && cg3 > 0) ||
-    (ca3 > 0 && cb3 > 0 && cg3 <= 0)
-  )
-    M3 = M3_ZZ;
-  else
-    throw new Error(
-      "Problem identifying M3 matrix in aP lattice: sign pattern of cosines ambiguous",
-    );
-
-  const M3mat = matrixFromRowMajor(M3.flat());
-  const realCellFinal = mul(transpose(M3mat), realCell3);
-  const reciprocalCellFinal = getReciprocalCellRows(realCellFinal);
-  const [, , , ca, cb, cg] = cellParams(reciprocalCellFinal);
-
-  if (ca <= 0 && cb <= 0 && cg <= 0) return "aP2";
-  if (ca >= 0 && cb >= 0 && cg >= 0) return "aP3";
-  throw new Error(
-    "Unexpected aP lattice, neither all-obtuse nor all-acute in reciprocal space",
-  );
 }
 
-function determineExtBravais(
-  bL: string,
-  spgN: number,
-  a: number,
-  b: number,
-  c: number,
-  alpha: number,
-  beta: number,
-  gamma: number,
-): string {
-  const threshold = 1e-7;
-
-  switch (bL) {
-    case "cP":
-      if (spgN < 195 || spgN > 230)
-        throw new Error("cP requires spacegroup number in [195, 230]");
-      return spgN <= 206 ? "cP1" : "cP2";
-
-    case "cF":
-      if (spgN < 195 || spgN > 230)
-        throw new Error("cF requires spacegroup number in [195, 230]");
-      return spgN <= 206 ? "cF1" : "cF2";
-
-    case "cI":
-      return "cI1";
-
-    case "tP":
-      return "tP1";
-
-    case "tI":
-      if (c - a < threshold) {
-        console.warn("tI lattice, a ≈ c");
-      }
-      return c <= a ? "tI1" : "tI2";
-
-    case "oP":
-      return "oP1";
-
-    case "oF": {
-      const A = 1.0 / a ** 2;
-      const B = 1.0 / b ** 2;
-      const C = 1.0 / c ** 2;
-
-      if (A > B + C) {
-        return "oF1";
-      }
-
-      if (C > A + B) {
-        return "oF2";
-      } else return "oF3";
-    }
-
-    case "oI": {
-      const sorted = [
-        { v: c, id: 1 },
-        { v: b, id: 3 },
-        { v: a, id: 2 },
-      ]
-        .sort((x, y) => x.v - y.v || x.id - y.id)
-        .reverse();
-
-      if (Math.abs(sorted[0].v - sorted[1].v) < threshold) {
-        console.warn("oI near-degeneracy");
-      }
-
-      return `${bL}${sorted[0].id}`;
-    }
-
-    case "oC":
-      return a <= b ? "oC1" : "oC2";
-
-    case "oA":
-      return b <= c ? "oA1" : "oA2";
-
-    case "hP":
-      return [
-        143, 144, 145, 146, 147, 148, 149, 151, 153, 157, 159, 160, 161, 162,
-        163,
-      ].includes(spgN)
-        ? "hP1"
-        : "hP2";
-
-    case "hR":
-      return Math.sqrt(3) * a <= Math.sqrt(2) * c ? "hR1" : "hR2";
-
-    case "mP":
-      return "mP1";
-
-    case "mC": {
-      const rad = Math.PI / 180;
-      const cosbeta = Math.cos(beta * rad);
-      const sinbeta = Math.sin(beta * rad);
-
-      const term1 = b - a * Math.sqrt(1 - cosbeta ** 2);
-
-      if (Math.abs(term1) < threshold) {
-        console.warn("mC near-degeneracy");
-      }
-
-      if (b < a * sinbeta) return "mC1";
-
-      const expr = (-a * cosbeta) / c + (a ** 2 * (1 - cosbeta ** 2)) / b ** 2;
-      if (Math.abs(expr - 1.0) < threshold) {
-        console.warn("mC second degeneracy");
-      }
-
-      return expr <= 1 ? "mC2" : "mC3";
-    }
-
-    case "aP":
-      throw new Error("aP must be handled by determineAP");
-
-    default:
-      throw new Error(`Unknown bravais lattice: ${bL}`);
-  }
+/** Compute [a, b, c, alphaDeg, betaDeg, gammaDeg] from a row-major 3x3 lattice. */
+function cellParamsDegrees(data: ArrayLike<number>): number[] {
+  const [a, b, c, cosalpha, cosbeta, cosgamma] = cellParams(
+    matrixFromRowMajor(data),
+  );
+  const acos = (x: number) => Math.acos(Math.max(-1, Math.min(1, x))) * RAD2DEG;
+  return [a, b, c, acos(cosalpha), acos(cosbeta), acos(cosgamma)];
 }
 
 /** Determine the Seekpath extended Bravais lattice from symmetry data. */
@@ -286,3 +62,325 @@ export async function getSeekPathHighSymPath(
 
   return determineExtBravais(bL, spgN, a, b, c, alpha, beta, gamma);
 }
+
+export interface GetPathOptions {
+  withTimeReversal?: boolean;
+  threshold?: number;
+  symprec?: number;
+}
+
+export interface SeekPathResult {
+  point_coords: Record<string, [number, number, number]>;
+  path: [string, string][];
+  has_inversion_symmetry: boolean;
+  augmented_path: boolean;
+  bravais_lattice: string;
+  bravais_lattice_extended: string;
+  conv_lattice: number[][];
+  conv_positions: number[][];
+  conv_types: number[];
+  primitive_lattice: number[][];
+  primitive_positions: number[][];
+  primitive_types: number[];
+  reciprocal_primitive_lattice: number[][];
+  inverse_primitive_transformation_matrix: number[][];
+  primitive_transformation_matrix: number[][];
+  volume_original_wrt_conv: number;
+  volume_original_wrt_prim: number;
+  spacegroup_number: number;
+  spacegroup_international: string;
+  rotation_matrix: number[][];
+}
+
+/**
+ * Return the k-point path information for a band structure, following the
+ * HPKOT recipe. Mirrors `seekpath.get_path`.
+ */
+export async function getPath(
+  structure: Structure,
+  opts: GetPathOptions = {},
+): Promise<SeekPathResult> {
+  const {
+    withTimeReversal = true,
+    threshold = 1e-7,
+    symprec = 1e-5,
+  } = opts;
+
+  const symData = await getSymmetry(structure, symprec);
+  const calcResults: MoyoDataset = symData.calculationResults;
+
+  const stdCell = calcResults.std_cell;
+  const convLatticeFlat = stdCell.lattice.basis;
+  const convPositions = stdCell.positions.map((p) => Array.from(p));
+  const convTypes = Array.from(stdCell.numbers);
+
+  const spgrpNum = calcResults.number;
+  const properties = spgroup_data[spgrpNum];
+  if (!properties) {
+    throw new Error(`No space group data for SG ${spgrpNum}`);
+  }
+  const bravaisLattice = `${properties[0]}${properties[1]}`;
+  const hasInv = properties[2];
+
+  const [a, b, c, alphaDeg, betaDeg, gammaDeg] = cellParamsDegrees(
+    convLatticeFlat,
+  );
+
+  // Implement all different extended Bravais lattices
+  let extBravais: string;
+  let convLattice: number[][];
+  let convPositionsFinal: number[][];
+
+  if (bravaisLattice === "aP") {
+    const ap = await transformAP(rowsFromFlat(convLatticeFlat), convPositions);
+    extBravais = ap.extBravais;
+    convLattice = ap.lattice;
+    convPositionsFinal = ap.positions;
+  } else {
+    extBravais = determineExtBravais(
+      bravaisLattice,
+      spgrpNum,
+      a,
+      b,
+      c,
+      alphaDeg,
+      betaDeg,
+      gammaDeg,
+    );
+    convLattice = rowsFromFlat(convLatticeFlat);
+    convPositionsFinal = convPositions;
+  }
+
+  // Primitive cell from the conventional cell via the HPKOT P matrix
+  const primitive = getPrimitive(
+    convLattice,
+    convPositionsFinal,
+    convTypes,
+    bravaisLattice,
+  );
+  const { P, invP } = getPmatrix(bravaisLattice);
+
+  // Get the path data (k-parameters definitions, point definitions, path)
+  const data = bandPathData[extBravais];
+  if (!data) throw new Error(`No band path data for extended Bravais ${extBravais}`);
+
+  const [kparamDef, pointsDef, basePath] = [
+    data.kparam,
+    data.points,
+    data.path,
+  ];
+
+  const cosalpha = Math.cos(alphaDeg * Math.PI / 180);
+  const cosbeta = Math.cos(betaDeg * Math.PI / 180);
+  const cosgamma = Math.cos(gammaDeg * Math.PI / 180);
+
+  const kparam: Record<string, number> = {};
+  for (const [kparamName, kparamExpr] of kparamDef) {
+    kparam[kparamName] = evalExpr(
+      kparamExpr,
+      a,
+      b,
+      c,
+      cosalpha,
+      cosbeta,
+      cosgamma,
+      kparam,
+    );
+  }
+  const kparamExtended = extendKparam(kparam);
+
+  const points: Record<string, [number, number, number]> = {};
+  for (const [pointName, coordsDef] of Object.entries(pointsDef)) {
+    points[pointName] = coordsDef.map((e) =>
+      evalExprSimple(e, kparamExtended),
+    ) as [number, number, number];
+  }
+
+  // If there is no inversion symmetry nor time-reversal symmetry, add
+  // additional -k points
+  const augmentedPath = !hasInv && !withTimeReversal;
+
+  let path: [string, string][] = basePath;
+  if (augmentedPath) {
+    const negPoints: Record<string, [number, number, number]> = {};
+    for (const [pointName, coords] of Object.entries(points)) {
+      if (pointName === "GAMMA") continue;
+      negPoints[`${pointName}'`] = [-coords[0], -coords[1], -coords[2]];
+    }
+    Object.assign(points, negPoints);
+
+    const oldPath = basePath;
+    const newSegments: [string, string][] = [];
+    for (const [startP, endP] of oldPath) {
+      newSegments.push([
+        startP === "GAMMA" ? startP : `${startP}'`,
+        endP === "GAMMA" ? endP : `${endP}'`,
+      ]);
+    }
+    path = [...basePath, ...newSegments];
+  }
+
+  const primitiveMatrix = matrixFromRowMajor(primitive.lattice.flat());
+  const reciprocalPrimitive = getReciprocalCellRows(primitiveMatrix);
+
+  const origDet = Math.abs(
+    determinant(matrixFromRowMajor(Array.from(structure.lattice.basis.data))),
+  );
+  const convDet = Math.abs(determinant(matrixFromRowMajor(convLattice.flat())));
+  const primDet = Math.abs(determinant(primitiveMatrix));
+
+  return {
+    point_coords: points,
+    path,
+    has_inversion_symmetry: hasInv,
+    augmented_path: augmentedPath,
+    bravais_lattice: bravaisLattice,
+    bravais_lattice_extended: extBravais,
+    conv_lattice: convLattice,
+    conv_positions: convPositionsFinal,
+    conv_types: convTypes,
+    primitive_lattice: primitive.lattice,
+    primitive_positions: primitive.positions,
+    primitive_types: primitive.types,
+    reciprocal_primitive_lattice: Array.from(reciprocalPrimitive.data).reduce<
+      number[][]
+    >(
+      (acc, x, i) => {
+        acc[Math.floor(i / 3)][i % 3] = x;
+        return acc;
+      },
+      [
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0],
+      ],
+    ),
+    inverse_primitive_transformation_matrix: invP,
+    primitive_transformation_matrix: P,
+    volume_original_wrt_conv: origDet / convDet,
+    volume_original_wrt_prim: origDet / primDet,
+    spacegroup_number: spgrpNum,
+    spacegroup_international: calcResults.hm_symbol,
+    rotation_matrix: rowsFromFlat(calcResults.std_rotation_matrix),
+  };
+}
+
+export interface ExplicitKPathResult extends SeekPathResult {
+  explicit_kpoints_abs: number[][];
+  explicit_kpoints_rel: number[][];
+  explicit_kpoints_labels: string[];
+  explicit_kpoints_linearcoord: number[];
+  explicit_segments: [number, number][];
+}
+
+function vecAdd(a: number[], b: number[]): number[] {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function vecSub(a: number[], b: number[]): number[] {
+  return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function vecScale(a: number[], k: number): number[] {
+  return [a[0] * k, a[1] * k, a[2] * k];
+}
+
+function vecNorm(a: number[]): number {
+  return Math.hypot(a[0], a[1], a[2]);
+}
+
+/**
+ * Given the output of `getPath`, compute an "explicit" path, i.e. a full list
+ * of k-points along each segment. Mirrors `seekpath.get_explicit_from_implicit`.
+ */
+export function getExplicitFromImplicit(
+  result: Pick<
+    SeekPathResult,
+    "path" | "point_coords" | "reciprocal_primitive_lattice"
+  >,
+  referenceDistance = 0.025,
+): {
+  kpoints_rel: number[][];
+  kpoints_abs: number[][];
+  kpoints_labels: string[];
+  kpoints_linearcoord: number[];
+  segments: [number, number][];
+} {
+  const recip = result.reciprocal_primitive_lattice;
+
+  const kpointsRel: number[][] = [];
+  const kpointsLabels: string[] = [];
+  const kpointsLinearcoord: number[] = [];
+  const segments: [number, number][] = [];
+  let previousLinearcoord = 0;
+
+  for (const [startLabel, stopLabel] of result.path) {
+    const startCoord = result.point_coords[startLabel];
+    const stopCoord = result.point_coords[stopLabel];
+    const startCoordAbs = vecMulMat(startCoord, recip);
+    const stopCoordAbs = vecMulMat(stopCoord, recip);
+    const segmentLength = vecNorm(vecSub(stopCoordAbs, startCoordAbs));
+    const numPoints = Math.max(2, Math.floor(segmentLength / referenceDistance));
+
+    let segmentStart = kpointsLabels.length;
+    for (let i = 0; i < numPoints; i++) {
+      // Skip the first point if it's the same as the last one of the
+      // previous segment
+      if (i === 0) {
+        if (
+          kpointsLabels.length &&
+          kpointsLabels[kpointsLabels.length - 1] === startLabel
+        ) {
+          segmentStart -= 1;
+          continue;
+        }
+      }
+
+      kpointsRel.push(
+        vecAdd(startCoord, vecScale(vecSub(stopCoord, startCoord), i / (numPoints - 1))),
+      );
+      if (i === 0) kpointsLabels.push(startLabel);
+      else if (i === numPoints - 1) kpointsLabels.push(stopLabel);
+      else kpointsLabels.push("");
+      kpointsLinearcoord.push(
+        previousLinearcoord + (segmentLength * i) / (numPoints - 1),
+      );
+    }
+    previousLinearcoord += segmentLength;
+    segments.push([segmentStart, kpointsLabels.length]);
+  }
+
+  return {
+    kpoints_rel: kpointsRel,
+    kpoints_abs: kpointsRel.map((p) => vecMulMat(p, recip)),
+    kpoints_labels: kpointsLabels,
+    kpoints_linearcoord: kpointsLinearcoord,
+    segments,
+  };
+}
+
+/**
+ * Return the k-point path for a band structure in scaled and absolute
+ * coordinates, following the HPKOT recipe. Mirrors
+ * `seekpath.get_explicit_k_path`.
+ */
+export async function getExplicitKPath(
+  structure: Structure,
+  opts: GetPathOptions & { referenceDistance?: number } = {},
+): Promise<ExplicitKPathResult> {
+  const { referenceDistance = 0.025, ...rest } = opts;
+  const res = await getPath(structure, rest);
+  const explicit = getExplicitFromImplicit(res, referenceDistance);
+
+  return {
+    ...res,
+    explicit_kpoints_abs: explicit.kpoints_abs,
+    explicit_kpoints_rel: explicit.kpoints_rel,
+    explicit_kpoints_labels: explicit.kpoints_labels,
+    explicit_kpoints_linearcoord: explicit.kpoints_linearcoord,
+    explicit_segments: explicit.segments,
+  };
+}
+
+// re-export for convenience
+export { bandPathData } from "./bandPathData";
