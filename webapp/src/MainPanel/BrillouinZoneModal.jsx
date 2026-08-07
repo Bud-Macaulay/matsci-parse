@@ -57,9 +57,7 @@ export default function BrillouinZoneModal({ structure }) {
   }, [open, data]);
 
   const pathSummary = data
-    ? data.path
-        .map(([a, b]) => `${prettify(a)}\u2013${prettify(b)}`)
-        .join(", ")
+    ? data.path.map(([a, b]) => `${prettify(a)}\u2013${prettify(b)}`).join(", ")
     : "";
 
   return (
@@ -79,6 +77,11 @@ export default function BrillouinZoneModal({ structure }) {
         maxWidth="max-w-4xl"
       >
         <div className="space-y-3">
+          <div className="px-1.5 py-1.5 italic bg-amber-100 border border-amber-200 rounded text-gray-800 align-justify text-sm">
+            <span className="not-italic">⚠️</span> This module first calculates
+            the primitive cell and as such if you want to run a new simulation
+            with this path, please use the primitive cell.{" "}
+          </div>
           {data && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
               <span>
