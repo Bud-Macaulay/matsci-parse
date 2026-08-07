@@ -21,6 +21,7 @@ import AddAtomPanel from "./AddAtomPanel";
 import DistanceMatrixPanel from "./DistanceMatrixPanel";
 import SlabModal from "./SlabModal";
 import QEInputModal from "../common/QEInputModal";
+import BrillouinZoneModal from "./BrillouinZoneModal";
 
 export default function MainPanel({ tab, updateTab }) {
   const [speciesModal, setSpeciesModal] = useState({ open: false, mode: null });
@@ -249,6 +250,7 @@ export default function MainPanel({ tab, updateTab }) {
             />
           </div>
           <QEInputModal structure={structure} />
+          <BrillouinZoneModal structure={structure} />
         </div>
 
         {/* RIGHT: VISUALIZER */}
