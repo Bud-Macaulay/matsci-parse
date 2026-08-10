@@ -12,24 +12,42 @@ const prettify = (label) =>
     .replace(/-/g, "\u2013")
     .replace(/_/g, "\u2081");
 
+const DEFAULT_REFERENCE_DISTANCE = 0.025;
+const MIN_KPOINTS = 40;
+const MAX_KPOINTS = 1000;
+
+/** Approximate reference distance needed to hit a total k-point count. */
+function totalToReferenceDistance(data, targetTotal) {
+  if (!data) return DEFAULT_REFERENCE_DISTANCE;
+  const linear = data.explicit_kpoints_linearcoord;
+  if (!linear || linear.length < 2) return DEFAULT_REFERENCE_DISTANCE;
+  const totalLength = linear[linear.length - 1];
+  return Math.max(1e-4, totalLength / Math.max(1, targetTotal - 1));
+}
+
 export default function BrillouinZoneModal({ structure }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [withTimeReversal, setWithTimeReversal] = useState(true);
+  const [referenceDistance, setReferenceDistance] = useState(
+    DEFAULT_REFERENCE_DISTANCE,
+  );
+  const [targetTotal, setTargetTotal] = useState(200);
 
   const containerRef = useRef(null);
   const vizRef = useRef(null);
 
   const compute = useCallback(
-    async (wtr) => {
+    async (wtr, refDist) => {
       setLoading(true);
       setError(null);
       setData(null);
       try {
         const bzData = await getBrillouinZoneData(structure, {
           withTimeReversal: wtr,
+          referenceDistance: refDist,
         });
         setData(bzData);
       } catch (e) {
@@ -44,22 +62,34 @@ export default function BrillouinZoneModal({ structure }) {
 
   const handleOpen = useCallback(() => {
     setOpen(true);
-    compute(withTimeReversal);
-  }, [compute, withTimeReversal]);
+    compute(withTimeReversal, referenceDistance);
+  }, [compute, withTimeReversal, referenceDistance]);
 
   const handleToggleTimeReversal = useCallback(
     (e) => {
       const wtr = e.target.checked;
       setWithTimeReversal(wtr);
-      compute(wtr);
+      compute(wtr, referenceDistance);
     },
-    [compute],
+    [compute, referenceDistance],
   );
+
+  const handleRecalculate = useCallback(() => {
+    const refDist = totalToReferenceDistance(data, targetTotal);
+    setReferenceDistance(refDist);
+    compute(withTimeReversal, refDist);
+  }, [data, targetTotal, withTimeReversal, compute]);
 
   const handleClose = useCallback(() => {
     setOpen(false);
     setData(null);
   }, []);
+
+  const pathSummary = data
+    ? data.path.map(([a, b]) => `${prettify(a)}\u2013${prettify(b)}`).join(", ")
+    : "";
+
+  const proposedSpacing = totalToReferenceDistance(data, targetTotal);
 
   useEffect(() => {
     if (!open || !data || !containerRef.current) return;
@@ -77,10 +107,6 @@ export default function BrillouinZoneModal({ structure }) {
       if (container) container.innerHTML = "";
     };
   }, [open, data]);
-
-  const pathSummary = data
-    ? data.path.map(([a, b]) => `${prettify(a)}\u2013${prettify(b)}`).join(", ")
-    : "";
 
   return (
     <>
@@ -152,6 +178,50 @@ export default function BrillouinZoneModal({ structure }) {
             <div className="px-1.5 py-1 italic bg-gray-50 border border-gray-200 rounded text-gray-500 text-xs">
               Path unaffected by the time-reversal toggle: this structure has
               inversion symmetry, so k and -k are already equivalent.
+            </div>
+          )}
+
+          {data && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+              <label className="flex items-center gap-2 select-none">
+                <span className="text-gray-400 whitespace-nowrap">
+                  K-points
+                </span>
+                <input
+                  type="range"
+                  min={MIN_KPOINTS}
+                  max={MAX_KPOINTS}
+                  step={1}
+                  value={targetTotal}
+                  onChange={(e) =>
+                    setTargetTotal(parseInt(e.target.value, 10) || 0)
+                  }
+                  className="accent-blue-600 w-48"
+                />
+                <span className="font-mono w-12 text-right">{targetTotal}</span>
+              </label>
+              <span>
+                <span className="text-gray-400">actual </span>
+                <span className="font-mono">
+                  {data.explicit_kpoints_rel.length}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-400">spacing </span>
+                <span className="font-mono">{proposedSpacing.toFixed(4)}</span>
+                <span className="text-gray-400"> Å⁻¹</span>
+                {targetTotal !== data.explicit_kpoints_rel.length && (
+                  <span className="ml-1 text-gray-400">
+                    (recalculate to apply)
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={handleRecalculate}
+                className="buttonSimple border border-indigo-400 bg-indigo-200! text-indigo-700!"
+              >
+                Recalculate
+              </button>
             </div>
           )}
 
