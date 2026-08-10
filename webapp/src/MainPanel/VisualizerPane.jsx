@@ -39,7 +39,7 @@ export default function VisualizerPane({ structure, setStructure, pushUndo }) {
           {(() => {
             try {
               const d = density(structure);
-              return d > 0 ? `${d.toFixed(3)} amu/&#197;&#179;` : "-";
+              return d > 0 ? `${d.toFixed(3)} amu/Å³` : "-";
             } catch {
               return "-";
             }

@@ -8,6 +8,7 @@ import { formatSpaceGroupSymbol } from "../common/textFormatting";
 const prettify = (label) =>
   label
     .replace(/GAMMA/g, "\u0393")
+    .replace(/SIGMA_0/g, "\u03A3")
     .replace(/-/g, "\u2013")
     .replace(/_/g, "\u2081");
 
@@ -16,25 +17,44 @@ export default function BrillouinZoneModal({ structure }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [withTimeReversal, setWithTimeReversal] = useState(true);
 
   const containerRef = useRef(null);
   const vizRef = useRef(null);
 
-  const handleOpen = useCallback(async () => {
+  const compute = useCallback(
+    async (wtr) => {
+      setLoading(true);
+      setError(null);
+      setData(null);
+      try {
+        const bzData = await getBrillouinZoneData(structure, {
+          withTimeReversal: wtr,
+        });
+        setData(bzData);
+      } catch (e) {
+        console.error("BrillouinZoneModal:", e);
+        setError(e?.message ?? String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [structure],
+  );
+
+  const handleOpen = useCallback(() => {
     setOpen(true);
-    setLoading(true);
-    setError(null);
-    setData(null);
-    try {
-      const bzData = await getBrillouinZoneData(structure);
-      setData(bzData);
-    } catch (e) {
-      console.error("BrillouinZoneModal:", e);
-      setError(e?.message ?? String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [structure]);
+    compute(withTimeReversal);
+  }, [compute, withTimeReversal]);
+
+  const handleToggleTimeReversal = useCallback(
+    (e) => {
+      const wtr = e.target.checked;
+      setWithTimeReversal(wtr);
+      compute(wtr);
+    },
+    [compute],
+  );
 
   const handleClose = useCallback(() => {
     setOpen(false);
@@ -44,7 +64,8 @@ export default function BrillouinZoneModal({ structure }) {
   useEffect(() => {
     if (!open || !data || !containerRef.current) return;
 
-    const viz = createBZVisualizer(containerRef.current, data, {
+    const container = containerRef.current;
+    const viz = createBZVisualizer(container, data, {
       showPathpoints: true,
       disableInteractOverlay: true,
     });
@@ -53,6 +74,7 @@ export default function BrillouinZoneModal({ structure }) {
     return () => {
       window.removeEventListener("resize", viz.resizeRenderer);
       vizRef.current = null;
+      if (container) container.innerHTML = "";
     };
   }, [open, data]);
 
@@ -103,10 +125,33 @@ export default function BrillouinZoneModal({ structure }) {
                   {data.has_inversion_symmetry ? "yes" : "no"}
                 </span>
               </span>
+              <label
+                className="flex items-center gap-1.5 cursor-pointer select-none"
+                title="When off, and the structure has no inversion symmetry, the path is augmented with -k segments (HPKOT)"
+              >
+                <input
+                  type="checkbox"
+                  checked={withTimeReversal}
+                  onChange={handleToggleTimeReversal}
+                  className="accent-blue-600"
+                />
+                <span>Time-reversal symmetry</span>
+              </label>
               <span>
                 <span className="text-gray-400">Path </span>
                 <span className="font-mono">{pathSummary}</span>
+                {data.augmented_path && (
+                  <span className="ml-1.5 inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">
+                    augmented
+                  </span>
+                )}
               </span>
+            </div>
+          )}
+          {!withTimeReversal && data && !data.augmented_path && (
+            <div className="px-1.5 py-1 italic bg-gray-50 border border-gray-200 rounded text-gray-500 text-xs">
+              Path unaffected by the time-reversal toggle: this structure has
+              inversion symmetry, so k and -k are already equivalent.
             </div>
           )}
 
