@@ -163,7 +163,15 @@ export function getBZPolyhedron(
       on.reduce((s, v) => s + v[1], 0) / on.length,
       on.reduce((s, v) => s + v[2], 0) / on.length,
     ];
-    const ref = Math.abs(p.g[0]) < 0.9 ? new Float64Array([1, 0, 0]) : new Float64Array([0, 1, 0]);
+    const gx = Math.abs(p.g[0]);
+    const gy = Math.abs(p.g[1]);
+    const gz = Math.abs(p.g[2]);
+    const ref =
+      gx <= gy && gx <= gz
+        ? new Float64Array([1, 0, 0])
+        : gy <= gz
+          ? new Float64Array([0, 1, 0])
+          : new Float64Array([0, 0, 1]);
     let e1 = cross(p.g, ref);
     const e1Norm = norm(e1);
     e1 = new Float64Array([e1[0] / e1Norm, e1[1] / e1Norm, e1[2] / e1Norm]);
