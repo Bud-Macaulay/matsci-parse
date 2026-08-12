@@ -46,8 +46,9 @@ export async function getBrillouinZoneData(
   const faces_data = getBZPolyhedron(b1, b2, b3);
 
   const kpoints: Record<string, number[]> = {};
-  const kpoints_rel: Record<string, number[]> = res.point_coords;
-  for (const [label, rel] of Object.entries(kpoints_rel)) {
+  const kpoints_rel: Record<string, number[]> = {};
+  for (const [label, rel] of Object.entries(res.kpath.points)) {
+    kpoints_rel[label] = Array.from(rel);
     kpoints[label] = vecMulMat(rel, res.reciprocal_primitive_lattice);
   }
 

@@ -3,6 +3,9 @@ export * from "./site";
 export * from "./lattice";
 export * from "./species";
 
+export * as kpoints from "./kpoints";
+export type { KPath, KPoint, KPointSet, KGrid } from "./kpoints";
+
 export * from "./volumetric";
 
 export * from "./io";

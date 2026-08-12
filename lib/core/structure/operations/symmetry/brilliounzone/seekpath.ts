@@ -6,6 +6,7 @@ import { spgroup_data } from "../spgData";
 import { parameters } from "../../../../lattice/parameters";
 
 import { determinant } from "@/core/matrix/operations/determinant";
+import type { KPath } from "@/core/kpoints";
 
 import { transformAP, determineExtBravais, determineAP } from "./bravais";
 import {
@@ -70,6 +71,7 @@ export interface GetPathOptions {
 }
 
 export interface SeekPathResult {
+  readonly kpath: KPath;
   point_coords: Record<string, [number, number, number]>;
   path: [string, string][];
   has_inversion_symmetry: boolean;
@@ -230,6 +232,7 @@ export async function getPath(
   const primDet = Math.abs(determinant(primitiveMatrix));
 
   return {
+    kpath: { points, segments: path },
     point_coords: points,
     path,
     has_inversion_symmetry: hasInv,
@@ -273,19 +276,19 @@ export interface ExplicitKPathResult extends SeekPathResult {
   explicit_segments: [number, number][];
 }
 
-function vecAdd(a: number[], b: number[]): number[] {
+function vecAdd(a: readonly number[], b: readonly number[]): number[] {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
-function vecSub(a: number[], b: number[]): number[] {
+function vecSub(a: readonly number[], b: readonly number[]): number[] {
   return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
 
-function vecScale(a: number[], k: number): number[] {
+function vecScale(a: readonly number[], k: number): number[] {
   return [a[0] * k, a[1] * k, a[2] * k];
 }
 
-function vecNorm(a: number[]): number {
+function vecNorm(a: readonly number[]): number {
   return Math.hypot(a[0], a[1], a[2]);
 }
 
@@ -294,10 +297,7 @@ function vecNorm(a: number[]): number {
  * of k-points along each segment. Mirrors `seekpath.get_explicit_from_implicit`.
  */
 export function getExplicitFromImplicit(
-  result: Pick<
-    SeekPathResult,
-    "path" | "point_coords" | "reciprocal_primitive_lattice"
-  >,
+  result: Pick<SeekPathResult, "kpath" | "reciprocal_primitive_lattice">,
   referenceDistance = 0.025,
 ): {
   kpoints_rel: number[][];
@@ -314,9 +314,9 @@ export function getExplicitFromImplicit(
   const segments: [number, number][] = [];
   let previousLinearcoord = 0;
 
-  for (const [startLabel, stopLabel] of result.path) {
-    const startCoord = result.point_coords[startLabel];
-    const stopCoord = result.point_coords[stopLabel];
+  for (const [startLabel, stopLabel] of result.kpath.segments) {
+    const startCoord = result.kpath.points[startLabel];
+    const stopCoord = result.kpath.points[stopLabel];
     const startCoordAbs = vecMulMat(startCoord, recip);
     const stopCoordAbs = vecMulMat(stopCoord, recip);
     const segmentLength = vecNorm(vecSub(stopCoordAbs, startCoordAbs));

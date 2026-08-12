@@ -459,7 +459,7 @@ export function toMatrix(rows: number[][]): Matrix {
 }
 
 /** Row-vector times matrix: x_abs[i] = v . col_i(m). */
-export function vecMulMat(v: number[], m: number[][]): number[] {
+export function vecMulMat(v: readonly number[], m: number[][]): number[] {
   return [
     v[0] * m[0][0] + v[1] * m[1][0] + v[2] * m[2][0],
     v[0] * m[0][1] + v[1] * m[1][1] + v[2] * m[2][1],

@@ -57,6 +57,19 @@ describe("getPath integration over all POSCARs", () => {
     }
   });
 
+  it.each(cases)("$key kpath is a well-formed KPath", async ({ poscar, key }) => {
+    const result = await getPath(fromPOSCAR(poscar));
+
+    // The first-class KPath mirrors the seekpath point_coords / path fields
+    expect(result.kpath.points, `${key}`).toEqual(result.point_coords);
+    expect(result.kpath.segments, `${key}`).toEqual(result.path);
+
+    for (const [start, stop] of result.kpath.segments) {
+      expect(result.kpath.points[start], `${key}: missing ${start}`).toBeDefined();
+      expect(result.kpath.points[stop], `${key}: missing ${stop}`).toBeDefined();
+    }
+  });
+
   it.each(cases)(
     "$key cell volumes and atom counts are consistent",
     async ({ poscar, key }) => {
@@ -225,10 +238,12 @@ describe("getExplicitFromImplicit", () => {
   it("splits a short segment into at least two points", () => {
     const result = getExplicitFromImplicit(
       {
-        path: [["GAMMA", "X"]],
-        point_coords: {
-          GAMMA: [0, 0, 0],
-          X: [0.5, 0, 0],
+        kpath: {
+          points: {
+            GAMMA: [0, 0, 0],
+            X: [0.5, 0, 0],
+          },
+          segments: [["GAMMA", "X"]],
         },
         reciprocal_primitive_lattice: [
           [1, 0, 0],
@@ -249,14 +264,16 @@ describe("getExplicitFromImplicit", () => {
   it("shares the joint k-point between consecutive segments", () => {
     const result = getExplicitFromImplicit(
       {
-        path: [
-          ["GAMMA", "X"],
-          ["X", "Y"],
-        ],
-        point_coords: {
-          GAMMA: [0, 0, 0],
-          X: [0.5, 0, 0],
-          Y: [0.5, 0.5, 0],
+        kpath: {
+          points: {
+            GAMMA: [0, 0, 0],
+            X: [0.5, 0, 0],
+            Y: [0.5, 0.5, 0],
+          },
+          segments: [
+            ["GAMMA", "X"],
+            ["X", "Y"],
+          ],
         },
         reciprocal_primitive_lattice: [
           [1, 0, 0],
