@@ -1,4 +1,4 @@
-import { Matrix, createMatrix, index } from "../matrix";
+import { Matrix, createMatrix } from "../matrix";
 
 /** Multiply two matrices (matrix product).
  * @param a - Left matrix.
@@ -15,15 +15,23 @@ export function mul(a: Matrix, b: Matrix): Matrix {
   const aCols = a.cols;
   const bCols = b.cols;
 
+  const ad = a.data;
+  const bd = b.data;
+  const od = out.data;
+
+  // Iterate row → k → col so B and the output are accessed sequentially
+  // in their row-major layout, improving cache locality.
   for (let row = 0; row < aRows; row++) {
-    for (let col = 0; col < bCols; col++) {
-      let sum = 0;
+    const aOffset = row * aCols;
+    const outOffset = row * bCols;
 
-      for (let k = 0; k < aCols; k++) {
-        sum += a.data[index(a.cols, row, k)] * b.data[index(b.cols, k, col)];
+    for (let k = 0; k < aCols; k++) {
+      const aik = ad[aOffset + k];
+      const bOffset = k * bCols;
+
+      for (let col = 0; col < bCols; col++) {
+        od[outOffset + col] += aik * bd[bOffset + col];
       }
-
-      out.data[index(out.cols, row, col)] = sum;
     }
   }
 
