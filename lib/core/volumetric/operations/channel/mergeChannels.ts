@@ -36,11 +36,28 @@ export function mergeChannels(volumes: VolumetricData[]): VolumetricData {
 
   const data = new Float64Array(voxels * channels);
 
-  let j = 0;
+  const srcs = volumes.map((v) => v.data);
 
-  for (let i = 0; i < voxels; i++) {
-    for (let c = 0; c < channels; c++) {
-      data[j++] = volumes[c].data[i];
+  if (channels === 4) {
+    const s0 = srcs[0];
+    const s1 = srcs[1];
+    const s2 = srcs[2];
+    const s3 = srcs[3];
+    let j = 0;
+
+    for (let i = 0; i < voxels; i++) {
+      data[j++] = s0[i];
+      data[j++] = s1[i];
+      data[j++] = s2[i];
+      data[j++] = s3[i];
+    }
+  } else {
+    let j = 0;
+
+    for (let i = 0; i < voxels; i++) {
+      for (let c = 0; c < channels; c++) {
+        data[j++] = srcs[c][i];
+      }
     }
   }
 
