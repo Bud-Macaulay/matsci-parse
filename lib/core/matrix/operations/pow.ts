@@ -28,8 +28,11 @@ export function pow(A: Matrix, p: number): Matrix {
       result = mul(result, base);
     }
 
-    base = mul(base, base);
     exp >>= 1;
+
+    if (exp > 0) {
+      base = mul(base, base);
+    }
   }
 
   return result;
