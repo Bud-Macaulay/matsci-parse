@@ -11,41 +11,43 @@ export function cholesky(A: Matrix): Matrix {
 
   const n = A.rows;
   const L = createMatrix(n, n);
+
+  const ad = A.data;
   const ld = L.data;
 
   for (let j = 0; j < n; j++) {
+    const jOffset = j * n;
+
     let sum = 0;
 
     for (let k = 0; k < j; k++) {
-      sum += ld[j * n + k] * ld[j * n + k];
+      const ljk = ld[jOffset + k];
+      sum += ljk * ljk;
     }
 
-    const val = A.data[j * n + j] - sum;
+    const val = ad[jOffset + j] - sum;
 
     if (val < -EPSILON) {
       throw new Error("Matrix is not positive definite");
     }
 
-    if (val < EPSILON) {
-      ld[j * n + j] = 0;
-    } else {
-      ld[j * n + j] = Math.sqrt(val);
-    }
-
-    const diag = ld[j * n + j];
+    const diag = val < EPSILON ? 0 : Math.sqrt(val);
 
     if (diag <= 0) {
       throw new Error("Matrix is not positive definite");
     }
 
+    ld[jOffset + j] = diag;
+
     for (let i = j + 1; i < n; i++) {
+      const iOffset = i * n;
       let sum2 = 0;
 
       for (let k = 0; k < j; k++) {
-        sum2 += ld[i * n + k] * ld[j * n + k];
+        sum2 += ld[iOffset + k] * ld[jOffset + k];
       }
 
-      ld[i * n + j] = (A.data[i * n + j] - sum2) / diag;
+      ld[iOffset + j] = (ad[iOffset + j] - sum2) / diag;
     }
   }
 

@@ -18,7 +18,10 @@ export function rank(m: Matrix): number {
     let pivotRow = row;
 
     // find pivot
-    while (pivotRow < rows && Math.abs(A[pivotRow * cols + leadCol]) < EPSILON) {
+    while (
+      pivotRow < rows &&
+      Math.abs(A[pivotRow * cols + leadCol]) < EPSILON
+    ) {
       pivotRow++;
     }
 

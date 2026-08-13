@@ -4,12 +4,18 @@ import { Matrix, createMatrix, index } from "../matrix";
  * @param matrix - Input matrix.
  * @returns A new transposed Matrix. */
 export function transpose(matrix: Matrix): Matrix {
-  const out = createMatrix(matrix.cols, matrix.rows);
+  const rows = matrix.rows;
+  const cols = matrix.cols;
 
-  for (let row = 0; row < matrix.rows; row++) {
-    for (let col = 0; col < matrix.cols; col++) {
-      out.data[index(out.cols, col, row)] =
-        matrix.data[index(matrix.cols, row, col)];
+  const data = matrix.data;
+  const out = createMatrix(cols, rows);
+  const od = out.data;
+
+  for (let row = 0; row < rows; row++) {
+    const rowOffset = row * cols;
+
+    for (let col = 0; col < cols; col++) {
+      od[col * rows + row] = data[rowOffset + col];
     }
   }
 

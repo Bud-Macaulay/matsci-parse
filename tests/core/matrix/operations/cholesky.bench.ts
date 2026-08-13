@@ -3,7 +3,7 @@ import { createMatrix } from "@/core/matrix/matrix";
 import { cholesky } from "@/core/matrix/operations/cholesky";
 import { makePDMatrix } from "../../../helpers/matrix";
 
-const sizes = [8, 16, 32, 64, 128];
+const sizes = [8, 16, 32, 64, 128, 512];
 
 describe("cholesky scaling", () => {
   for (const n of sizes) {
