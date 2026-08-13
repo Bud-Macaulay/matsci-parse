@@ -26,19 +26,19 @@ export function pad(
 
   out.fill(fill);
 
-  const inIndex = (x: number, y: number, z: number, c: number) =>
-    ((z * H + y) * W + x) * channels + c;
-
-  const outIndex = (x: number, y: number, z: number, c: number) =>
-    ((z * newH + y) * newW + x) * channels + c;
+  const ch = channels;
+  const inRowStride = W * ch;
+  const outRowStride = newW * ch;
 
   for (let z = 0; z < D; z++) {
+    const inZOffset = z * H * inRowStride;
+    const outZOffset = (z + pz) * newH * outRowStride + py * outRowStride + px * ch;
+
     for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        for (let c = 0; c < channels; c++) {
-          out[outIndex(x + px, y + py, z + pz, c)] = data[inIndex(x, y, z, c)];
-        }
-      }
+      const srcOffset = inZOffset + y * inRowStride;
+      const dstOffset = outZOffset + y * outRowStride;
+
+      out.set(data.subarray(srcOffset, srcOffset + W * ch), dstOffset);
     }
   }
 

@@ -31,6 +31,22 @@ export function zip(
   const size = a.data.length;
   const out = new Float64Array(size);
 
+  // Fast path: a binary fn that ignores the (x, y, z, c) coordinates only
+  // needs a flat loop, avoiding the nested-loop overhead per element.
+  if (fn.length <= 2) {
+    const ad = a.data;
+    const bd = b.data;
+
+    for (let i = 0; i < size; i++) {
+      out[i] = fn(ad[i], bd[i]);
+    }
+
+    return {
+      ...a,
+      data: out,
+    };
+  }
+
   let i = 0;
 
   const [D, H, W] = a.shape;

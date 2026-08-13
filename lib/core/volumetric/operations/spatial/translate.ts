@@ -18,26 +18,29 @@ export function translate(
 
   const newData = new Float64Array(data.length);
 
-  const inIndex = (x: number, y: number, z: number, c: number) =>
-    ((z * H + y) * W + x) * channels + c;
-
-  const outIndex = (x: number, y: number, z: number, c: number) =>
-    ((z * H + y) * W + x) * channels + c;
+  const ch = channels;
+  const rowStride = W * ch;
 
   for (let z = 0; z < D; z++) {
+    const nz = z - dz;
+
+    if (nz < 0 || nz >= D) continue;
+
     for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const nz = z - dz;
-        const ny = y - dy;
-        const nx = x - dx;
+      const ny = y - dy;
 
-        if (nx < 0 || ny < 0 || nz < 0 || nx >= W || ny >= H || nz >= D)
-          continue;
+      if (ny < 0 || ny >= H) continue;
 
-        for (let c = 0; c < channels; c++) {
-          newData[outIndex(x, y, z, c)] = data[inIndex(nx, ny, nz, c)];
-        }
-      }
+      const xFrom = Math.max(0, dx);
+      const xTo = Math.min(W, W + dx);
+      const rowLen = (xTo - xFrom) * ch;
+
+      if (rowLen <= 0) continue;
+
+      const srcOffset = ((nz * H + ny) * W + (xFrom - dx)) * ch;
+      const dstOffset = ((z * H + y) * W + xFrom) * ch;
+
+      newData.set(data.subarray(srcOffset, srcOffset + rowLen), dstOffset);
     }
   }
 

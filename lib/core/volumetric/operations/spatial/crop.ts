@@ -1,4 +1,4 @@
-import { VolumetricData, createVolumetricData, index } from "../../volumetric";
+import { VolumetricData, createVolumetricData } from "../../volumetric";
 
 /** Extract a rectangular sub-volume from the dataset.
  * @param vol - The volumetric dataset.
@@ -28,15 +28,18 @@ export function crop(
 
   const out = new Float64Array(outW * outH * outD * channels);
 
+  const ch = channels;
+  const rowStride = W * ch;
+  const rowLen = outW * ch;
   let o = 0;
 
   for (let z = z0; z < z1; z++) {
+    const zOffset = z * H * rowStride;
+
     for (let y = y0; y < y1; y++) {
-      for (let x = x0; x < x1; x++) {
-        for (let c = 0; c < channels; c++) {
-          out[o++] = data[index(vol, x, y, z, c)];
-        }
-      }
+      const srcOffset = zOffset + y * rowStride + x0 * ch;
+      out.set(data.subarray(srcOffset, srcOffset + rowLen), o);
+      o += rowLen;
     }
   }
 

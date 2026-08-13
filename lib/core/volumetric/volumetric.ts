@@ -76,6 +76,7 @@ export function createVolumetricData(params: {
 }
 
 /** Compute the flat buffer index for a voxel coordinate and channel. */
+/** * Performance-critical inner loops should generally use direct offset arithmetic.
 /** @param vol - Volumetric data. */
 /** @param x - Column index. */
 /** @param y - Row index. */

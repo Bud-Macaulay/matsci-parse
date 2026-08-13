@@ -22,6 +22,20 @@ export function map(
   const size = D * H * W * channels;
   const out = new Float64Array(size);
 
+  // Fast path: a unary fn that ignores coordinates only needs a flat loop.
+  if (fn.length <= 1) {
+    const data = vol.data;
+
+    for (let i = 0; i < size; i++) {
+      out[i] = fn(data[i]);
+    }
+
+    return {
+      ...vol,
+      data: out,
+    };
+  }
+
   let i = 0;
 
   for (let z = 0; z < D; z++) {
