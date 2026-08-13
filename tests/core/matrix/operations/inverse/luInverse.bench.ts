@@ -4,7 +4,7 @@ import { createMatrix } from "@/core/matrix/matrix";
 import { luInverse } from "@/core/matrix/operations/inverse/luInverse";
 import { makeInvertibleMatrix } from "../../../../helpers/matrix";
 
-const sizes = [32, 64, 128, 256];
+const sizes = [32, 64, 128, 256, 512];
 
 describe("luInverse scaling", () => {
   for (const size of sizes) {

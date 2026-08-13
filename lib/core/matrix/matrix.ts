@@ -59,10 +59,15 @@ export function clone(matrix: Matrix): Matrix {
 }
 
 /** Compute the linear index for the given (row, col) in a row-major layout.
+ *
+ * Useful for general matrix element access.
+ * Performance-critical inner loops should generally use direct offset arithmetic.
+ *
  * @param cols - Number of columns in the matrix.
  * @param row - Row index.
  * @param col - Column index.
- * @returns Linear index into the data array. */
+ * @returns Linear index into the data array.
+ */
 export function index(cols: number, row: number, col: number): number {
   return row * cols + col;
 }

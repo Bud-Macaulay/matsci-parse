@@ -22,16 +22,22 @@ export function lu(A: Matrix): LUDecomposition {
   const data = LU.data;
   const piv = new Int32Array(n);
 
-  for (let i = 0; i < n; i++) piv[i] = i;
+  for (let i = 0; i < n; i++) {
+    piv[i] = i;
+  }
 
   let sign = 1;
 
   for (let k = 0; k < n; k++) {
-    let pivot = k;
-    let max = Math.abs(data[k * n + k]);
+    const rowK = k * n;
 
+    let pivot = k;
+    let max = Math.abs(data[rowK + k]);
+
+    // Find pivot row.
     for (let i = k + 1; i < n; i++) {
-      const v = Math.abs(data[i * n + k]);
+      const rowI = i * n;
+      const v = Math.abs(data[rowI + k]);
 
       if (v > max) {
         max = v;
@@ -40,11 +46,16 @@ export function lu(A: Matrix): LUDecomposition {
     }
 
     if (max < EPSILON) {
-      return { LU, piv, sign, singular: true };
+      return {
+        LU,
+        piv,
+        sign,
+        singular: true,
+      };
     }
 
+    // Swap rows.
     if (pivot !== k) {
-      const rowK = k * n;
       const rowP = pivot * n;
 
       for (let j = 0; j < n; j++) {
@@ -56,17 +67,18 @@ export function lu(A: Matrix): LUDecomposition {
       const tmp = piv[k];
       piv[k] = piv[pivot];
       piv[pivot] = tmp;
+
       sign = -sign;
     }
 
-    const rowK = k * n;
     const pivotVal = data[rowK + k];
 
+    // Eliminate below pivot.
     for (let i = k + 1; i < n; i++) {
       const rowI = i * n;
+      const factor = data[rowI + k] / pivotVal;
 
-      data[rowI + k] /= pivotVal;
-      const factor = data[rowI + k];
+      data[rowI + k] = factor;
 
       for (let j = k + 1; j < n; j++) {
         data[rowI + j] -= factor * data[rowK + j];
@@ -74,5 +86,10 @@ export function lu(A: Matrix): LUDecomposition {
     }
   }
 
-  return { LU, piv, sign, singular: false };
+  return {
+    LU,
+    piv,
+    sign,
+    singular: false,
+  };
 }
