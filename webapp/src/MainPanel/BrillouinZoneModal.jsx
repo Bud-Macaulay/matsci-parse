@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createBZVisualizer } from "brillouinzone-visualizer";
-import { getBrillouinZoneData } from "matsci-parse";
+import { getBrillouinZoneData, toKPOINTS } from "matsci-parse";
 
 import Modal from "../common/Modal";
 import { formatSpaceGroupSymbol } from "../common/textFormatting";
+
+function downloadFile(content, filename) {
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 const prettify = (label) =>
   label
@@ -13,8 +25,9 @@ const prettify = (label) =>
     .replace(/_/g, "\u2081");
 
 const DEFAULT_REFERENCE_DISTANCE = 0.025;
-const MIN_KPOINTS = 40;
-const MAX_KPOINTS = 1000;
+const MIN_POINTS_PER_LINE = 2;
+const MAX_POINTS_PER_LINE = 100;
+const DEFAULT_POINTS_PER_LINE = 40;
 
 /** Approximate reference distance needed to hit a total k-point count. */
 function totalToReferenceDistance(data, targetTotal) {
@@ -23,6 +36,15 @@ function totalToReferenceDistance(data, targetTotal) {
   if (!linear || linear.length < 2) return DEFAULT_REFERENCE_DISTANCE;
   const totalLength = linear[linear.length - 1];
   return Math.max(1e-4, totalLength / Math.max(1, targetTotal - 1));
+}
+
+// VASP line mode interpolates the same number of k-points on every segment
+// ("points per line"). A path with `segments` segments and `pointsPerLine`
+// points per segment samples this many intersections in total (shared
+// endpoints counted once).
+function estimatedKpointTotal(data, pointsPerLine) {
+  if (!data || data.path.length === 0) return 0;
+  return data.path.length * (pointsPerLine - 1) + 1;
 }
 
 export default function BrillouinZoneModal({ structure }) {
@@ -34,7 +56,7 @@ export default function BrillouinZoneModal({ structure }) {
   const [referenceDistance, setReferenceDistance] = useState(
     DEFAULT_REFERENCE_DISTANCE,
   );
-  const [targetTotal, setTargetTotal] = useState(200);
+  const [pointsPerLine, setPointsPerLine] = useState(DEFAULT_POINTS_PER_LINE);
 
   const containerRef = useRef(null);
   const vizRef = useRef(null);
@@ -75,10 +97,13 @@ export default function BrillouinZoneModal({ structure }) {
   );
 
   const handleRecalculate = useCallback(() => {
-    const refDist = totalToReferenceDistance(data, targetTotal);
+    const refDist = totalToReferenceDistance(
+      data,
+      estimatedKpointTotal(data, pointsPerLine),
+    );
     setReferenceDistance(refDist);
     compute(withTimeReversal, refDist);
-  }, [data, targetTotal, withTimeReversal, compute]);
+  }, [data, pointsPerLine, withTimeReversal, compute]);
 
   const handleClose = useCallback(() => {
     setOpen(false);
@@ -89,7 +114,10 @@ export default function BrillouinZoneModal({ structure }) {
     ? data.path.map(([a, b]) => `${prettify(a)}\u2013${prettify(b)}`).join(", ")
     : "";
 
-  const proposedSpacing = totalToReferenceDistance(data, targetTotal);
+  const proposedSpacing = totalToReferenceDistance(
+    data,
+    estimatedKpointTotal(data, pointsPerLine),
+  );
 
   useEffect(() => {
     if (!open || !data || !containerRef.current) return;
@@ -172,6 +200,18 @@ export default function BrillouinZoneModal({ structure }) {
                   </span>
                 )}
               </span>
+              <button
+                onClick={() =>
+                  downloadFile(
+                    toKPOINTS(data.kpath, pointsPerLine),
+                    "KPOINTS",
+                  )
+                }
+                className="buttonSimple border border-emerald-400 bg-emerald-100! text-emerald-700!"
+                title="Download the high-symmetry path as a VASP KPOINTS line-mode file"
+              >
+                KPOINTS
+              </button>
             </div>
           )}
           {!withTimeReversal && data && !data.augmented_path && (
@@ -185,21 +225,29 @@ export default function BrillouinZoneModal({ structure }) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
               <label className="flex items-center gap-2 select-none">
                 <span className="text-gray-400 whitespace-nowrap">
-                  K-points
+                  Points/line
                 </span>
                 <input
                   type="range"
-                  min={MIN_KPOINTS}
-                  max={MAX_KPOINTS}
+                  min={MIN_POINTS_PER_LINE}
+                  max={MAX_POINTS_PER_LINE}
                   step={1}
-                  value={targetTotal}
+                  value={pointsPerLine}
                   onChange={(e) =>
-                    setTargetTotal(parseInt(e.target.value, 10) || 0)
+                    setPointsPerLine(parseInt(e.target.value, 10) || 0)
                   }
                   className="accent-blue-600 w-48"
                 />
-                <span className="font-mono w-12 text-right">{targetTotal}</span>
+                <span className="font-mono w-12 text-right">
+                  {pointsPerLine}
+                </span>
               </label>
+              <span>
+                <span className="text-gray-400">~total </span>
+                <span className="font-mono">
+                  {estimatedKpointTotal(data, pointsPerLine)}
+                </span>
+              </span>
               <span>
                 <span className="text-gray-400">actual </span>
                 <span className="font-mono">
@@ -210,7 +258,8 @@ export default function BrillouinZoneModal({ structure }) {
                 <span className="text-gray-400">spacing </span>
                 <span className="font-mono">{proposedSpacing.toFixed(4)}</span>
                 <span className="text-gray-400"> Å⁻¹</span>
-                {targetTotal !== data.explicit_kpoints_rel.length && (
+                {estimatedKpointTotal(data, pointsPerLine) !==
+                  data.explicit_kpoints_rel.length && (
                   <span className="ml-1 text-gray-400">
                     (recalculate to apply)
                   </span>

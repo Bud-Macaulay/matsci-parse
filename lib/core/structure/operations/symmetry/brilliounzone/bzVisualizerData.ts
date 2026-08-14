@@ -4,6 +4,7 @@ import { getExplicitKPath } from "./seekpath";
 import type { GetPathOptions } from "./seekpath";
 import { getBZPolyhedron } from "./bzPolyhedron";
 import { vecMulMat } from "./seekpathTools";
+import type { KPath } from "@/core/kpoints";
 
 /** Data object compatible with the `brillouinzone-visualizer` widget. */
 export interface BZVisualizerData {
@@ -17,6 +18,8 @@ export interface BZVisualizerData {
   };
   kpoints: Record<string, number[]>;
   kpoints_rel: Record<string, number[]>;
+  /** The high-symmetry path, serializable via `toKPOINTS`. */
+  kpath: KPath;
   path: [string, string][];
   explicit_kpoints_rel: number[][];
   explicit_kpoints_linearcoord: number[];
@@ -59,6 +62,7 @@ export async function getBrillouinZoneData(
     faces_data,
     kpoints,
     kpoints_rel,
+    kpath: res.kpath,
     path: res.path,
     explicit_kpoints_rel: res.explicit_kpoints_rel,
     explicit_kpoints_linearcoord: res.explicit_kpoints_linearcoord,

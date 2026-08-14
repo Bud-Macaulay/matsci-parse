@@ -11,6 +11,11 @@ export interface KPoint {
 export interface KPointSet {
   readonly points: readonly KPoint[];
   readonly weights?: readonly number[];
+  /**
+   * Units the point coordinates are expressed in. Defaults to "reciprocal"
+   * (fractional reciprocal coordinates).
+   */
+  readonly coordinateSystem?: "reciprocal" | "cartesian";
 }
 
 /**

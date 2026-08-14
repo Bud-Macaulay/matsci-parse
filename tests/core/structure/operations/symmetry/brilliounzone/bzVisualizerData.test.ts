@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fromPOSCAR } from "@/core/io/poscar";
 import { POSCARS } from "../../../../../helpers/bulkFiles/allExtBrav";
 import { getBrillouinZoneData } from "@/core/structure/operations/symmetry/brilliounzone/bzVisualizerData";
+import { toKPOINTS } from "@/core/io/kpoints";
 
 const cases = Object.entries(POSCARS).map(([key, poscar]) => ({ key, poscar }));
 
@@ -59,5 +60,16 @@ describe("getBrillouinZoneData", () => {
       expect(e, `${key}`).toBeLessThanOrEqual(n);
       expect(e, `${key}`).toBeGreaterThan(s);
     }
+
+    // the k-path is serializable as a VASP KPOINTS line-mode file
+    expect(data.kpath.segments.length, `${key}`).toBeGreaterThan(0);
+    expect(data.kpath.segments, `${key}`).toEqual(data.path);
+    for (const [start, stop] of data.kpath.segments) {
+      expect(data.kpath.points[start], `${key}: ${start}`).toBeDefined();
+      expect(data.kpath.points[stop], `${key}: ${stop}`).toBeDefined();
+    }
+    const kpointsText = toKPOINTS(data.kpath);
+    expect(kpointsText, `${key}`).toContain("Line-mode");
+    expect(kpointsText, `${key}`).toContain(data.kpath.segments[0][0]);
   });
 });
