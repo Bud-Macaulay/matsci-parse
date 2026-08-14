@@ -1,21 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createBZVisualizer } from "brillouinzone-visualizer";
-import { getBrillouinZoneData, toKPOINTS } from "matsci-parse";
+import { getBrillouinZoneData, kpointsToPW, toKPOINTS } from "matsci-parse";
 
 import Modal from "../common/Modal";
+import DownloadDropdown from "../common/DownloadDropdown";
 import { formatSpaceGroupSymbol } from "../common/textFormatting";
-
-function downloadFile(content, filename) {
-  const blob = new Blob([content], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 
 const prettify = (label) =>
   label
@@ -200,18 +189,25 @@ export default function BrillouinZoneModal({ structure }) {
                   </span>
                 )}
               </span>
-              <button
-                onClick={() =>
-                  downloadFile(
-                    toKPOINTS(data.kpath, pointsPerLine),
-                    "KPOINTS",
-                  )
-                }
-                className="buttonSimple border border-emerald-400 bg-emerald-100! text-emerald-700!"
-                title="Download the high-symmetry path as a VASP KPOINTS line-mode file"
-              >
-                KPOINTS
-              </button>
+              <div className="ml-auto">
+                <DownloadDropdown
+                  items={[
+                    {
+                      key: "kpoints-vasp",
+                      label: "KPOINTS (VASP)",
+                      filename: "KPOINTS",
+                      serialize: () => toKPOINTS(data.kpath, pointsPerLine),
+                    },
+                    {
+                      key: "kpoints-pw",
+                      label: "K_POINTS (pw.in)",
+                      filename: "K_POINTS",
+                      serialize: () => kpointsToPW(data.kpath, pointsPerLine),
+                    },
+                  ]}
+                  menuClassName="w-44"
+                />
+              </div>
             </div>
           )}
           {!withTimeReversal && data && !data.augmented_path && (
@@ -220,7 +216,6 @@ export default function BrillouinZoneModal({ structure }) {
               inversion symmetry, so k and -k are already equivalent.
             </div>
           )}
-
           {data && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
               <label className="flex items-center gap-2 select-none">
