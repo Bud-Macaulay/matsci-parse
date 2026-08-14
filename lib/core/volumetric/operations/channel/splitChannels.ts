@@ -18,26 +18,11 @@ export function splitChannels(vol: VolumetricData): VolumetricData[] {
     () => new Float64Array(voxels),
   );
 
-  if (channels === 4) {
-    const o0 = outputs[0];
-    const o1 = outputs[1];
-    const o2 = outputs[2];
-    const o3 = outputs[3];
-    let j = 0;
+  let j = 0;
 
-    for (let i = 0; i < voxels; i++) {
-      o0[i] = data[j++];
-      o1[i] = data[j++];
-      o2[i] = data[j++];
-      o3[i] = data[j++];
-    }
-  } else {
-    let j = 0;
-
-    for (let i = 0; i < voxels; i++) {
-      for (let c = 0; c < channels; c++) {
-        outputs[c][i] = data[j++];
-      }
+  for (let i = 0; i < voxels; i++) {
+    for (let c = 0; c < channels; c++) {
+      outputs[c][i] = data[j++];
     }
   }
 

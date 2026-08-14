@@ -45,4 +45,23 @@ describe("mergeChannels", () => {
 
     expect(() => mergeChannels([a])).toThrow();
   });
+
+  it("throws if a later input has multiple channels", () => {
+    const a = createVolumetricData({
+      shape: [1, 1, 1],
+      data: [1],
+    });
+
+    const b = createVolumetricData({
+      shape: [1, 1, 1],
+      channels: 2,
+      data: [1, 2],
+    });
+
+    expect(() => mergeChannels([a, b])).toThrow();
+  });
+
+  it("throws when no volumes are provided", () => {
+    expect(() => mergeChannels([])).toThrow("No volumes provided");
+  });
 });
