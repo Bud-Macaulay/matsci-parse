@@ -7,11 +7,18 @@ import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
 import { fromGTH, toGTH } from "@/core/io/pseudo/gth";
 import { fromPSP8, toPSP8 } from "@/core/io/pseudo/psp8";
 import { fromPSML, toPSML } from "@/core/io/pseudo/psml";
+import { fromASE, toASE } from "@/core/io/ase";
+import { fromPymatgen, toPymatgen } from "@/core/io/pymatgen";
 
 const EXTERNAL_DIR = join(process.cwd(), "tests", "external", "pseudopotentials");
+const STRUCTURE_DIR = join(process.cwd(), "tests", "external", "structure");
 
 function loadFile(...segments: string[]): string {
   return readFileSync(join(EXTERNAL_DIR, ...segments), "utf-8");
+}
+
+function loadStructureFile(...segments: string[]): string {
+  return readFileSync(join(STRUCTURE_DIR, ...segments), "utf-8");
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +140,57 @@ if (existsSync(psmlDir)) {
         const reparsed = fromPSML(serialized);
         checkRoundtrip(parsed, reparsed);
         expect(reparsed.header.element).toBe(parsed.header.element);
+      });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ASE JSON round-trip
+// ---------------------------------------------------------------------------
+
+const aseDir = join(STRUCTURE_DIR, "ase-json", "sources", "1", "files");
+if (existsSync(aseDir)) {
+  const aseFiles = readdirSync(aseDir).filter((f) => f.endsWith(".json"));
+
+  describe("ASE JSON round-trip", () => {
+    aseFiles.forEach((file) => {
+      it(`round-trips ${file}`, () => {
+        const data = JSON.parse(loadStructureFile("ase-json", "sources", "1", "files", file));
+        const parsed = fromASE(data);
+        const serialized = toASE(parsed);
+        const reparsed = fromASE(serialized);
+        checkRoundtrip(parsed, reparsed);
+        expect(reparsed.lattice.basis.data).toEqual(parsed.lattice.basis.data);
+        expect(reparsed.sites.length).toBe(parsed.sites.length);
+        for (let i = 0; i < parsed.sites.length; i++) {
+          expect(reparsed.sites[i].species.symbol).toBe(parsed.sites[i].species.symbol);
+          for (let d = 0; d < 3; d++) {
+            expect(reparsed.sites[i].frac[d]).toBeCloseTo(parsed.sites[i].frac[d], 9);
+          }
+        }
+      });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// pymatgen JSON round-trip
+// ---------------------------------------------------------------------------
+
+const pymatgenDir = join(STRUCTURE_DIR, "pymatgen-json", "sources", "1", "files");
+if (existsSync(pymatgenDir)) {
+  const pymatgenFiles = readdirSync(pymatgenDir).filter((f) => f.endsWith(".json"));
+
+  describe("pymatgen JSON round-trip", () => {
+    pymatgenFiles.forEach((file) => {
+      it(`round-trips ${file}`, () => {
+        const data = JSON.parse(loadStructureFile("pymatgen-json", "sources", "1", "files", file));
+        const parsed = fromPymatgen(data);
+        const serialized = toPymatgen(parsed);
+        const reparsed = fromPymatgen(serialized);
+        checkRoundtrip(parsed, reparsed);
+        expect(reparsed).toEqual(parsed);
       });
     });
   });
