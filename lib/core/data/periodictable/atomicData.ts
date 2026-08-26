@@ -1,3 +1,6 @@
+// NOTE: DISCUSS IF THIS THIS SHOULD BE ALL BUNDLED IN THE mc-periodic-table package.
+// WE CAN REEXPORT FROM THERE,
+
 /** Element metadata from the periodic table. */
 export interface ElementInfo {
   atomicNumber: number;
