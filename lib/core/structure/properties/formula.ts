@@ -68,7 +68,7 @@ function formulaFromComposition(
     .join("");
 }
 
-function reducedComposition(
+export function reducedComposition(
   comp: Record<string, number>,
 ): Record<string, number> {
   const factor = compositionGCD(comp);
