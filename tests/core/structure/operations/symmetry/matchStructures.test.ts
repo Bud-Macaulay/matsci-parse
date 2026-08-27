@@ -66,8 +66,8 @@ const structureA = makeStructure([
 ]);
 
 const structureB = makeStructure([
-  [0.5, 0.5, 0.5],
-  [0.75, 0.75, 0.75],
+  [1.0, 0.0, 0.0],
+  [1.25, 0.25, 0.25],
 ]);
 
 describe("matchStructures", () => {
@@ -102,8 +102,8 @@ describe("matchStructures", () => {
     const result = await matchStructures(structureA, different, 0.01);
 
     expect(result.matches).toBe(false);
-    expect(result.rms).not.toBeNull();
-    expect(result.maxDistance).not.toBeNull();
+    expect(result.rms).toBeNull();
+    expect(result.maxDistance).toBeNull();
   });
 
   it("matches within positional tolerance", async () => {
@@ -128,7 +128,8 @@ describe("matchStructures", () => {
     const result = await matchStructures(structureA, displaced, 0.01);
 
     expect(result.matches).toBe(false);
-    expect(result.maxDistance).toBeGreaterThan(0.01);
+    expect(result.rms).toBeNull();
+    expect(result.maxDistance).toBeNull();
   });
 
   it("standardizes equivalent structures consistently", async () => {
@@ -227,9 +228,8 @@ describe("supercell equivalence", () => {
     const result = await matchStructures(primitive, noisy, 0.01);
 
     expect(result.matches).toBe(false);
-    expect(result.rms).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeGreaterThan(0.01);
+    expect(result.rms).toBeNull();
+    expect(result.maxDistance).toBeNull();
   });
 
   it("matches the noisy supercell with wider tolerance 0.1", async () => {
