@@ -29,7 +29,7 @@
  * @see https://github.com/spglib/spglib/blob/master/src/niggli.c
  */
 
-import { Matrix, createMatrix } from "../../matrix";
+import { Matrix } from "../../matrix";
 
 interface KernelOut {
   l: number;
@@ -41,7 +41,7 @@ interface KernelOut {
 function niggliKernel(
   input: Float64Array,
   basis: Float64Array,
-  transform: Int32Array | null,
+  transform: Float64Array | null,
   eps: number,
   out: KernelOut,
 ): void {
@@ -58,6 +58,19 @@ function niggliKernel(
   let b20 = input[6];
   let b21 = input[7];
   let b22 = input[8];
+
+  // Scalarized accumulated unimodular transform T (starts as identity). The
+  // same sparse row ops applied to the basis are applied here, so at the end
+  // reduced = T × original. Written back to `transform` only at the end.
+  let x00 = r ? r[0] : 1;
+  let x01 = r ? r[1] : 0;
+  let x02 = r ? r[2] : 0;
+  let x10 = r ? r[3] : 0;
+  let x11 = r ? r[4] : 1;
+  let x12 = r ? r[5] : 0;
+  let x20 = r ? r[6] : 0;
+  let x21 = r ? r[7] : 0;
+  let x22 = r ? r[8] : 1;
 
   // --- Initial metric parameters ---
   let A = b00 * b00 + b01 * b01 + b02 * b02;
@@ -83,13 +96,13 @@ function niggliKernel(
       let t02 = b02;
       b02 = -b12; b12 = -t02;
       b20 = -b20; b21 = -b21; b22 = -b22;
-      if (r) {
-        let t: number;
-        t = r[0]; r[0] = -r[3]; r[3] = -t;
-        t = r[1]; r[1] = -r[4]; r[4] = -t;
-        t = r[2]; r[2] = -r[5]; r[5] = -t;
-        r[6] = -r[6]; r[7] = -r[7]; r[8] = -r[8];
-      }
+      let xt00 = x00;
+      x00 = -x10; x10 = -xt00;
+      let xt01 = x01;
+      x01 = -x11; x11 = -xt01;
+      let xt02 = x02;
+      x02 = -x12; x12 = -xt02;
+      x20 = -x20; x21 = -x21; x22 = -x22;
       const tA = A;
       const txi = xi;
       A = B;
@@ -108,13 +121,13 @@ function niggliKernel(
       b11 = -b21; b21 = -t1;
       let t2 = b12;
       b12 = -b22; b22 = -t2;
-      if (r) {
-        let t: number;
-        r[0] = -r[0]; r[1] = -r[1]; r[2] = -r[2];
-        t = r[3]; r[3] = -r[6]; r[6] = -t;
-        t = r[4]; r[4] = -r[7]; r[7] = -t;
-        t = r[5]; r[5] = -r[8]; r[8] = -t;
-      }
+      x00 = -x00; x01 = -x01; x02 = -x02;
+      let xt0 = x10;
+      x10 = -x20; x20 = -xt0;
+      let xt1 = x11;
+      x11 = -x21; x21 = -xt1;
+      let xt2 = x12;
+      x12 = -x22; x22 = -xt2;
       const tB = B;
       const teta = eta;
       B = C;
@@ -128,18 +141,17 @@ function niggliKernel(
     l = xi < -eps ? -1 : xi > eps ? 1 : 0;
     m = eta < -eps ? -1 : eta > eps ? 1 : 0;
     n = zeta < -eps ? -1 : zeta > eps ? 1 : 0;
-    if (l * m * n === 1) {
+    const lmn = l * m * n;
+    if (lmn === 1) {
       const i = l === -1 ? -1 : 1;
       const j = m === -1 ? -1 : 1;
       const k = n === -1 ? -1 : 1;
       b00 *= i; b01 *= i; b02 *= i;
       b10 *= j; b11 *= j; b12 *= j;
       b20 *= k; b21 *= k; b22 *= k;
-      if (r) {
-        r[0] *= i; r[1] *= i; r[2] *= i;
-        r[3] *= j; r[4] *= j; r[5] *= j;
-        r[6] *= k; r[7] *= k; r[8] *= k;
-      }
+      x00 *= i; x01 *= i; x02 *= i;
+      x10 *= j; x11 *= j; x12 *= j;
+      x20 *= k; x21 *= k; x22 *= k;
       zeta *= i * j;
       eta *= i * k;
       xi *= j * k;
@@ -147,7 +159,7 @@ function niggliKernel(
 
     // ---- Step 4: further sign flips when l·m·n ∈ {0, −1} ----
     if (!(l === -1 && m === -1 && n === -1)) {
-      if (l * m * n === 0 || l * m * n === -1) {
+      if (lmn === 0 || lmn === -1) {
         let i = 1;
         let j = 1;
         let k = 1;
@@ -168,11 +180,9 @@ function niggliKernel(
         b00 *= i; b01 *= i; b02 *= i;
         b10 *= j; b11 *= j; b12 *= j;
         b20 *= k; b21 *= k; b22 *= k;
-        if (r) {
-          r[0] *= i; r[1] *= i; r[2] *= i;
-          r[3] *= j; r[4] *= j; r[5] *= j;
-          r[6] *= k; r[7] *= k; r[8] *= k;
-        }
+        x00 *= i; x01 *= i; x02 *= i;
+        x10 *= j; x11 *= j; x12 *= j;
+        x20 *= k; x21 *= k; x22 *= k;
         zeta *= i * j;
         eta *= i * k;
         xi *= j * k;
@@ -187,9 +197,7 @@ function niggliKernel(
     ) {
       const s: number = xi > 0 ? -1 : 1;
       b20 += s * b10; b21 += s * b11; b22 += s * b12;
-      if (r) {
-        r[6] += s * r[3]; r[7] += s * r[4]; r[8] += s * r[5];
-      }
+      x20 += s * x10; x21 += s * x11; x22 += s * x12;
       C += s * xi + B;
       xi = xi + 2 * s * B;
       eta = eta + s * zeta;
@@ -204,9 +212,7 @@ function niggliKernel(
     ) {
       const s: number = eta > 0 ? -1 : 1;
       b20 += s * b00; b21 += s * b01; b22 += s * b02;
-      if (r) {
-        r[6] += s * r[0]; r[7] += s * r[1]; r[8] += s * r[2];
-      }
+      x20 += s * x00; x21 += s * x01; x22 += s * x02;
       C += s * eta + A;
       xi = xi + s * zeta;
       eta = eta + 2 * s * A;
@@ -221,9 +227,7 @@ function niggliKernel(
     ) {
       const s: number = zeta > 0 ? -1 : 1;
       b10 += s * b00; b11 += s * b01; b12 += s * b02;
-      if (r) {
-        r[3] += s * r[0]; r[4] += s * r[1]; r[5] += s * r[2];
-      }
+      x10 += s * x00; x11 += s * x01; x12 += s * x02;
       B += s * zeta + A;
       xi = xi + s * eta;
       zeta = zeta + 2 * s * A;
@@ -238,9 +242,7 @@ function niggliKernel(
         (Math.abs(sum) <= eps && 2 * (A + eta) + zeta > eps)
       ) {
         b20 += b00 + b10; b21 += b01 + b11; b22 += b02 + b12;
-        if (r) {
-          r[6] += r[0] + r[3]; r[7] += r[1] + r[4]; r[8] += r[2] + r[5];
-        }
+        x20 += x00 + x10; x21 += x01 + x11; x22 += x02 + x12;
         C += A + B + xi + eta + zeta;
         xi = xi + zeta + 2 * B;
         eta = eta + zeta + 2 * A;
@@ -256,12 +258,22 @@ function niggliKernel(
     basis[0] = b00; basis[1] = b01; basis[2] = b02;
     basis[3] = b10; basis[4] = b11; basis[5] = b12;
     basis[6] = b20; basis[7] = b21; basis[8] = b22;
+    if (r) {
+      r[0] = x00; r[1] = x01; r[2] = x02;
+      r[3] = x10; r[4] = x11; r[5] = x12;
+      r[6] = x20; r[7] = x21; r[8] = x22;
+    }
     return;
   }
 
   basis[0] = b00; basis[1] = b01; basis[2] = b02;
   basis[3] = b10; basis[4] = b11; basis[5] = b12;
   basis[6] = b20; basis[7] = b21; basis[8] = b22;
+  if (r) {
+    r[0] = x00; r[1] = x01; r[2] = x02;
+    r[3] = x10; r[4] = x11; r[5] = x12;
+    r[6] = x20; r[7] = x21; r[8] = x22;
+  }
   out.ok = false;
 }
 
@@ -297,13 +309,16 @@ export function niggli(input: Matrix, eps = 1e-5): NiggliResult | null {
   // no transposition is needed. `rightTransform` accumulates the same row
   // operations, yielding directly the left-multiply form `reduced = T × input`.
   const basis = new Float64Array(input.data);
-  const transform = new Int32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  const transform = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
   const out: KernelOut = { l: 0, m: 0, n: 0, ok: false };
   niggliKernel(input.data, basis, transform, eps, out);
   if (!out.ok) return null;
 
+  // `basis` is a private working copy (never the caller's input) and
+  // `transform` is integer-valued, so wrap them directly as the result
+  // matrices without an extra array copy.
   return {
-    basis: createMatrix(3, 3, basis),
-    transform: createMatrix(3, 3, transform),
+    basis: { rows: 3, cols: 3, data: basis },
+    transform: { rows: 3, cols: 3, data: transform },
   };
 }
