@@ -2,7 +2,7 @@ import { Matrix } from "@/core/matrix/matrix";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { mul } from "@/core/matrix/operations/mul";
 import { gjInverse } from "@/core/matrix/operations/inverse/gaussJordan";
-import { niggli_reduce } from "../spglib-wasm";
+import { niggli } from "@/core/matrix/operations/reduction/niggli";
 import {
   cellParams,
   getReciprocalCellRows,
@@ -82,9 +82,9 @@ export async function transformAP(
   const convLattice = matrixFromRowMajor(lattice.flat());
 
   const reciprocalCellOrig = getReciprocalCellRows(convLattice);
-  const reduced = await niggli_reduce(Array.from(reciprocalCellOrig.data));
+  const reduced = niggli(reciprocalCellOrig);
   if (!reduced) throw new Error("Niggli reduction failed for aP lattice");
-  const reciprocalCell2 = matrixFromRowMajor(reduced);
+  const reciprocalCell2 = reduced.basis;
   const realCell2 = getRealCellFromReciprocalRows(reciprocalCell2);
 
   const [ka2, kb2, kc2, coskalpha2, coskbeta2, coskgamma2] =

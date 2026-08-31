@@ -1,97 +1,12 @@
 /**
- * Runtime bindings for the self-contained spglib WASM build.
+ * Runtime bindings for the self-contained hand-rolled spglib WASM build.
  *
- * Exposes the same MoyoDataset-shaped interface as `@spglib/moyo-wasm` so the
- * rest of the library can swap engines without changing its API.
+ * Retained only as a reference for the pure-TS Niggli reduction benchmark
+ * (`niggli.bench.ts`). Production symmetry analysis goes through `../spglib`
+ * (backed by `@spglib/moyo-wasm`).
  */
 
 import initWasm from "./spglib_wasm.js";
-
-export interface Lattice {
-  basis: [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-}
-
-export interface MoyoCell {
-  lattice: Lattice;
-  positions: [number, number, number][];
-  numbers: number[];
-}
-
-export interface MoyoDataset {
-  number: number;
-  hall_number: number;
-  hm_symbol: string;
-  operations: MoyoOperation[];
-  orbits: number[];
-  wyckoffs: string[];
-  site_symmetry_symbols: string[];
-  std_cell: MoyoCell;
-  std_linear: [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  std_origin_shift: [number, number, number];
-  std_rotation_matrix: [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  pearson_symbol: string;
-  prim_std_cell: MoyoCell;
-  prim_std_linear: [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  prim_std_origin_shift: [number, number, number];
-  mapping_std_prim: number[];
-  symprec: number;
-  angle_tolerance: { type: "Default" };
-}
-
-export interface MoyoOperation {
-  rotation: [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  translation: [number, number, number];
-}
 
 type Module = Awaited<ReturnType<typeof initWasm>> | null;
 
@@ -117,59 +32,6 @@ export function init(): Promise<Module> {
     })();
   }
   return ready;
-}
-
-interface CellInput {
-  lattice: { basis: number[] };
-  positions: number[][];
-  numbers: number[];
-}
-
-/** Analyze a cell and return a MoyoDataset-shaped result. */
-export async function analyze_cell(
-  cell_json: string,
-  symprec: number,
-  _setting = "Standard",
-): Promise<MoyoDataset> {
-  const mod = await init();
-  if (!mod) throw new Error("spglib WASM module failed to initialize");
-
-  const cell = JSON.parse(cell_json) as CellInput;
-  const lattice = cell.lattice.basis;
-  const positions = cell.positions;
-  const numbers = cell.numbers;
-  const n = positions.length;
-
-  if (lattice.length !== 9 || positions.length !== n || numbers.length !== n) {
-    throw new Error("spglib analyze_cell: malformed cell input");
-  }
-
-  const latPtr = mod._malloc(9 * 8);
-  const posPtr = mod._malloc(n * 3 * 8);
-  const numPtr = mod._malloc(n * 4);
-
-  try {
-    new Float64Array(mod.HEAP8.buffer, latPtr, 9).set(lattice);
-    const posArr = new Float64Array(mod.HEAP8.buffer, posPtr, n * 3);
-    for (let i = 0; i < n; i++) posArr.set(positions[i], i * 3);
-    new Int32Array(mod.HEAP8.buffer, numPtr, n).set(numbers);
-
-    const jsonPtr = mod._spglib_analyze_cell(
-      latPtr,
-      posPtr,
-      numPtr,
-      n,
-      symprec,
-    );
-    if (!jsonPtr) throw new Error("spglib analyze_cell returned null");
-    const json = mod.UTF8ToString(jsonPtr);
-    mod._spglib_free_string(jsonPtr);
-    return JSON.parse(json) as MoyoDataset;
-  } finally {
-    mod._free(latPtr);
-    mod._free(posPtr);
-    mod._free(numPtr);
-  }
 }
 
 /**

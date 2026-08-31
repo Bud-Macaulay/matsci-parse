@@ -1,6 +1,6 @@
+import type { MoyoDataset } from "@spglib/moyo-wasm";
 import { Structure } from "../../../structure";
 import { getSymmetry } from "../spglib";
-import { MoyoDataset } from "../spglib-wasm";
 import { spgroup_data } from "../spgData";
 
 import { parameters } from "../../../../lattice/parameters";

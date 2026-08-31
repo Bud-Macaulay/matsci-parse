@@ -1,12 +1,43 @@
-import { init, analyze_cell } from "./spglib-wasm";
-import type { MoyoDataset } from "./spglib-wasm";
+/**
+ * First-class symmetry engine backed by `@spglib/moyo-wasm`.
+ *
+ * This is the primary way to run structure-symmetry analysis in the library.
+ * All `analyze_cell`/space-group work goes through the moyo WASM module here.
+ * (The lattice Niggli reduction that seekpath used to obtain from the legacy
+ * `spglib-wasm/` hand-rolled build is now a pure-TS implementation in
+ * `matrix/operations/reduction/niggli.ts`.)
+ *
+ * `analyze_cell` is synchronous once the WASM is loaded; the async wrappers
+ * below exist to await the one-time `init()` and keep the public API uniform.
+ */
+
+import init, { analyze_cell } from "@spglib/moyo-wasm";
+import type { MoyoDataset } from "@spglib/moyo-wasm";
 
 import { createLattice } from "@/core/lattice";
 import { Structure } from "../../structure";
 
-/** Ensure the WASM module is loaded (idempotent). */
+let ready: Promise<unknown> | null = null;
+
+/** Ensure the Moyo WASM module is loaded (idempotent). */
 export function initMoyo() {
-  return init();
+  if (!ready) {
+    ready = (async () => {
+      // In Node.js (tests) read the wasm bytes from disk; the browser fetches
+      // the URL that the package resolves for itself.
+      if (typeof process !== "undefined" && process.versions?.node) {
+        const { readFileSync } = await import("fs");
+        const { createRequire } = await import("module");
+        const require = createRequire(import.meta.url);
+        const wasmPath = require.resolve(
+          "@spglib/moyo-wasm/moyo_wasm_bg.wasm",
+        );
+        return await init({ module_or_path: readFileSync(wasmPath) });
+      }
+      return await init();
+    })();
+  }
+  return ready;
 }
 
 /** Serialize a structure into the Moyo/SPGLIB input representation. */
@@ -44,7 +75,7 @@ function toMoyoInput(structure: Structure): {
 export async function analyzeStructure(
   structure: Structure,
   tolerance = 1e-4,
-  setting = "Standard",
+  setting = "Spglib",
 ): Promise<MoyoDataset> {
   await initMoyo();
   return analyze_cell(
@@ -58,7 +89,7 @@ export async function analyzeStructure(
 export async function getSymmetry(
   structure: Structure,
   tolerance = 1e-4,
-  setting = "Standard",
+  setting = "Spglib",
 ): Promise<{
   primitive: Structure;
   conventional: Structure;
@@ -72,7 +103,7 @@ export async function getSymmetry(
   const results = await analyzeStructure(structure, tolerance, setting);
 
   // -----------------------------
-  // 4. Convert Moyo cell → Structure
+  // 2. Build reversible mapping
   // -----------------------------
   const symbolToId = new Map<string, number>();
   const idToSymbol = new Map<number, string>();
@@ -115,7 +146,7 @@ export async function getSymmetry(
   }
 
   // -----------------------------
-  // 5. Return both structures
+  // 3. Return both structures
   // -----------------------------
   return {
     primitive: build(results.prim_std_cell),
