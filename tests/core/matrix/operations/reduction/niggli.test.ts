@@ -77,8 +77,7 @@ describe("niggli", () => {
     }
   });
 
-  it("satisfies the Niggli conditions on a generic triclinic cell", () => {
-    const m = mat([4, 0, 0, 2, 4.34, 0, 1, 2, 5.7]);
+  it("satisfies the Niggli conditions on a generic triclinic cell", () => {    const m = mat([4, 0, 0, 2, 4.34, 0, 1, 2, 5.7]);
     const res = niggli(m)!;
     const d = res.basis.data;
     const [a, b, c] = rows(d);

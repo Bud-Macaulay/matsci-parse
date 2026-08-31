@@ -2,39 +2,34 @@ import { bench, describe } from "vitest";
 import { createMatrix } from "@/core/matrix/matrix";
 import { niggli } from "@/core/matrix/operations/reduction/niggli";
 import { init, niggli_reduce } from "@/core/structure/operations/symmetry/spglib-wasm";
+import { buildCorpus } from "../../../../helpers/niggliCorpus";
 
-function randomLattice(seed: number): number[] {
-  let s = seed;
-  const rnd = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  const d = new Float64Array(9);
-  for (let i = 0; i < 9; i++) d[i] = (rnd() - 0.5) * 12;
-  return Array.from(d);
+// Full API only. One representative cell per category keeps the benchmark quick
+// while still covering easy, hard and convergence-heavy paths.
+const corpus = buildCorpus();
+const picks: { name: string; data: number[] }[] = [];
+for (const cat of corpus) {
+  picks.push({ name: cat.name, data: cat.cells[0].data });
 }
 
-const M = 200;
-const lattices: number[][] = [];
-for (let i = 0; i < M; i++) lattices.push(randomLattice(i + 1));
-const matrices = lattices.map((l) => createMatrix(3, 3, new Float64Array(l)));
+const matrices = picks.map((p) => createMatrix(3, 3, new Float64Array(p.data)));
+const latticeLists = picks.map((p) => p.data.slice());
 
 // Warm up the WASM module and the JIT before timing.
-void init().then(() => niggli_reduce(lattices[0].slice()));
-niggli(matrices[0]);
+void init().then(() => niggli_reduce(latticeLists[0].slice()));
+for (const m of matrices) niggli(m);
 
 describe("niggli reduction", () => {
   bench(
-    `TS niggli: ${M} triclinic cells`,
+    `TS niggli (full API, ${picks.length} repr. cells)`,
     () => {
       for (const m of matrices) niggli(m);
     },
   );
-
   bench(
-    `wasm niggli_reduce: ${M} triclinic cells`,
+    `wasm niggli_reduce (${picks.length} repr. cells)`,
     async () => {
-      for (const l of lattices) await niggli_reduce(l.slice());
+      for (const l of latticeLists) await niggli_reduce(l.slice());
     },
   );
 });

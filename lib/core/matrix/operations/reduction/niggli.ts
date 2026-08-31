@@ -31,363 +31,238 @@
 
 import { Matrix, createMatrix } from "../../matrix";
 
-/**
- * Internal state for the Niggli iteration.
- *
- * Row-vector convention: the internal basis rows are the lattice vectors,
- * matching the exported API exactly (hence no transpose is required). The
- * mutations are sparse in-place row operations.
- */
-interface NiggliState {
-  A: number;
-  B: number;
-  C: number;
-  xi: number;
-  eta: number;
-  zeta: number;
-  eps: number;
+interface KernelOut {
   l: number;
   m: number;
   n: number;
-  /** Current 3×3 row-major basis (rows are lattice vectors). */
-  basis: Float64Array;
-  /**
-   * Accumulated unimodular transform T such that basis = T × original
-   * (left-multiply, row-vector convention). The returned `transform` is this
-   * matrix itself. Always integer-valued, so stored as Int32Array.
-   */
-  rightTransform: Int32Array;
+  ok: boolean;
 }
 
-/**
- * Recompute the metric parameters (A, B, C, xi, eta, zeta) from the current
- * basis and classify the off-diagonal angle types (l, m, n) in one pass.
- *
- * Rows r0 = b[0..2], r1 = b[3..5], r2 = b[6..8] are the lattice vectors:
- *   A = |r0|², B = |r1|², C = |r2|²
- *   zeta = 2·(r0·r1), eta = 2·(r0·r2), xi = 2·(r1·r2)
- */
-function setParameters(p: NiggliState): void {
-  const b = p.basis;
-
-  const A = b[0] * b[0] + b[1] * b[1] + b[2] * b[2];
-  const B = b[3] * b[3] + b[4] * b[4] + b[5] * b[5];
-  const C = b[6] * b[6] + b[7] * b[7] + b[8] * b[8];
-
-  const zeta = 2 * (b[0] * b[3] + b[1] * b[4] + b[2] * b[5]);
-  const eta = 2 * (b[0] * b[6] + b[1] * b[7] + b[2] * b[8]);
-  const xi = 2 * (b[3] * b[6] + b[4] * b[7] + b[5] * b[8]);
-
-  p.A = A;
-  p.B = B;
-  p.C = C;
-  p.xi = xi;
-  p.eta = eta;
-  p.zeta = zeta;
-
-  const eps = p.eps;
-  p.l = xi < -eps ? -1 : xi > eps ? 1 : 0;
-  p.m = eta < -eps ? -1 : eta > eps ? 1 : 0;
-  p.n = zeta < -eps ? -1 : zeta > eps ? 1 : 0;
-}
-
-/**
- * Each `stepN` probes the current metric parameters; if it fires it applies
- * the corresponding sparse in-place row operation to both the basis and the
- * accumulated unimodular transform, updates the metric parameters
- * analytically, and returns `true`. Returns `false` without mutating anything
- * otherwise. The mutation, metric update, and angle re-classification are all
- * inlined into the same function to avoid per-step call overhead.
- */
-
-/** r0 = −r1, r1 = −r0, r2 = −r2; (A,B,C,xi,eta,zeta) → (B,A,C,eta,xi,zeta) */
-function step1(p: NiggliState): boolean {
-  const e = p.eps;
-  if (
-    p.A > p.B + e ||
-    (Math.abs(p.A - p.B) <= e && Math.abs(p.xi) > Math.abs(p.eta) + e)
-  ) {
-    const b = p.basis;
-    const r = p.rightTransform;
-    let t: number;
-    t = b[0]; b[0] = -b[3]; b[3] = -t;
-    t = b[1]; b[1] = -b[4]; b[4] = -t;
-    t = b[2]; b[2] = -b[5]; b[5] = -t;
-    b[6] = -b[6]; b[7] = -b[7]; b[8] = -b[8];
-    t = r[0]; r[0] = -r[3]; r[3] = -t;
-    t = r[1]; r[1] = -r[4]; r[4] = -t;
-    t = r[2]; r[2] = -r[5]; r[5] = -t;
-    r[6] = -r[6]; r[7] = -r[7]; r[8] = -r[8];
-
-    const A = p.A;
-    const B = p.B;
-    const xi = p.xi;
-    const eta = p.eta;
-    p.A = B;
-    p.B = A;
-    p.xi = eta;
-    p.eta = xi;
-
-    p.l = p.xi < -e ? -1 : p.xi > e ? 1 : 0;
-    p.m = p.eta < -e ? -1 : p.eta > e ? 1 : 0;
-    return true;
-  }
-  return false;
-}
-
-/** r0 = −r0, r1 = −r2, r2 = −r1; (A,B,C,xi,eta,zeta) → (A,C,B,xi,zeta,eta) */
-function step2(p: NiggliState): boolean {
-  const e = p.eps;
-  if (
-    p.B > p.C + e ||
-    (Math.abs(p.B - p.C) <= e && Math.abs(p.eta) > Math.abs(p.zeta) + e)
-  ) {
-    const b = p.basis;
-    const r = p.rightTransform;
-    let t: number;
-    b[0] = -b[0]; b[1] = -b[1]; b[2] = -b[2];
-    t = b[3]; b[3] = -b[6]; b[6] = -t;
-    t = b[4]; b[4] = -b[7]; b[7] = -t;
-    t = b[5]; b[5] = -b[8]; b[8] = -t;
-    r[0] = -r[0]; r[1] = -r[1]; r[2] = -r[2];
-    t = r[3]; r[3] = -r[6]; r[6] = -t;
-    t = r[4]; r[4] = -r[7]; r[7] = -t;
-    t = r[5]; r[5] = -r[8]; r[8] = -t;
-
-    const B = p.B;
-    const C = p.C;
-    const eta = p.eta;
-    const zeta = p.zeta;
-    p.B = C;
-    p.C = B;
-    p.eta = zeta;
-    p.zeta = eta;
-
-    p.m = p.eta < -e ? -1 : p.eta > e ? 1 : 0;
-    p.n = p.zeta < -e ? -1 : p.zeta > e ? 1 : 0;
-    return true;
-  }
-  return false;
-}
-
-/** r0 *= i, r1 *= j, r2 *= k; A,B,C unchanged; off-diagonals pick up sign */
-function applySignFlip(p: NiggliState, i: number, j: number, k: number): void {
-  const b = p.basis;
-  const r = p.rightTransform;
-  b[0] *= i; b[1] *= i; b[2] *= i;
-  b[3] *= j; b[4] *= j; b[5] *= j;
-  b[6] *= k; b[7] *= k; b[8] *= k;
-  r[0] *= i; r[1] *= i; r[2] *= i;
-  r[3] *= j; r[4] *= j; r[5] *= j;
-  r[6] *= k; r[7] *= k; r[8] *= k;
-
-  p.zeta *= i * j;
-  p.eta *= i * k;
-  p.xi *= j * k;
-
-  const e = p.eps;
-  p.l = p.xi < -e ? -1 : p.xi > e ? 1 : 0;
-  p.m = p.eta < -e ? -1 : p.eta > e ? 1 : 0;
-  p.n = p.zeta < -e ? -1 : p.zeta > e ? 1 : 0;
-}
-
-function step3(p: NiggliState): boolean {
-  const { l, m, n } = p;
-  if (l * m * n === 1) {
-    applySignFlip(p, l === -1 ? -1 : 1, m === -1 ? -1 : 1, n === -1 ? -1 : 1);
-    return true;
-  }
-  return false;
-}
-
-function step4(p: NiggliState): boolean {
-  const { l, m, n } = p;
-  if (l === -1 && m === -1 && n === -1) {
-    return false;
-  }
-
-  if (l * m * n === 0 || l * m * n === -1) {
-    let i = 1;
-    let j = 1;
-    let k = 1;
-    let r = -1; // 0: i, 1: j, 2: k
-    if (l === 1) i = -1;
-    if (l === 0) r = 0;
-    if (m === 1) j = -1;
-    if (m === 0) r = 1;
-    if (n === 1) k = -1;
-    if (n === 0) r = 2;
-
-    if (i * j * k === -1) {
-      if (r === 0) i = -1;
-      if (r === 1) j = -1;
-      if (r === 2) k = -1;
-    }
-
-    applySignFlip(p, i, j, k);
-    return true;
-  }
-
-  return false;
-}
-
-/** r2 += sign · r1 */
-function step5(p: NiggliState): boolean {
-  const { xi, B, eta, zeta, eps } = p;
-  if (
-    Math.abs(xi) > B + eps ||
-    (Math.abs(B - xi) <= eps && 2 * eta < zeta - eps) ||
-    (Math.abs(B + xi) <= eps && zeta < -eps)
-  ) {
-    const s: number = xi > 0 ? -1 : 1;
-    const b = p.basis;
-    const r = p.rightTransform;
-    b[6] += s * b[3]; b[7] += s * b[4]; b[8] += s * b[5];
-    r[6] += s * r[3]; r[7] += s * r[4]; r[8] += s * r[5];
-
-    p.C += s * xi + B;
-    p.xi = xi + 2 * s * B;
-    p.eta = eta + s * zeta;
-
-    p.l = p.xi < -eps ? -1 : p.xi > eps ? 1 : 0;
-    p.m = p.eta < -eps ? -1 : p.eta > eps ? 1 : 0;
-    return true;
-  }
-  return false;
-}
-
-/** r2 += sign · r0 */
-function step6(p: NiggliState): boolean {
-  const { eta, A, xi, zeta, eps } = p;
-  if (
-    Math.abs(eta) > A + eps ||
-    (Math.abs(A - eta) <= eps && 2 * xi < zeta - eps) ||
-    (Math.abs(A + eta) <= eps && zeta < -eps)
-  ) {
-    const s: number = eta > 0 ? -1 : 1;
-    const b = p.basis;
-    const r = p.rightTransform;
-    b[6] += s * b[0]; b[7] += s * b[1]; b[8] += s * b[2];
-    r[6] += s * r[0]; r[7] += s * r[1]; r[8] += s * r[2];
-
-    p.C += s * eta + A;
-    p.xi = xi + s * zeta;
-    p.eta = eta + 2 * s * A;
-
-    p.l = p.xi < -eps ? -1 : p.xi > eps ? 1 : 0;
-    p.m = p.eta < -eps ? -1 : p.eta > eps ? 1 : 0;
-    return true;
-  }
-  return false;
-}
-
-/** r1 += sign · r0 */
-function step7(p: NiggliState): boolean {
-  const { zeta, A, xi, eta, eps } = p;
-  if (
-    Math.abs(zeta) > A + eps ||
-    (Math.abs(A - zeta) <= eps && 2 * xi < eta - eps) ||
-    (Math.abs(A + zeta) <= eps && eta < -eps)
-  ) {
-    const s: number = zeta > 0 ? -1 : 1;
-    const b = p.basis;
-    const r = p.rightTransform;
-    b[3] += s * b[0]; b[4] += s * b[1]; b[5] += s * b[2];
-    r[3] += s * r[0]; r[4] += s * r[1]; r[5] += s * r[2];
-
-    p.B += s * zeta + A;
-    p.xi = xi + s * eta;
-    p.zeta = zeta + 2 * s * A;
-
-    p.l = p.xi < -eps ? -1 : p.xi > eps ? 1 : 0;
-    p.n = p.zeta < -eps ? -1 : p.zeta > eps ? 1 : 0;
-    return true;
-  }
-  return false;
-}
-
-/** r2 += r0 + r1 */
-function step8(p: NiggliState): boolean {
-  const { xi, eta, zeta, A, B, eps } = p;
-  const sum = xi + eta + zeta + A + B;
-  if (
-    sum < -eps ||
-    (Math.abs(sum) <= eps && 2 * (A + eta) + zeta > eps)
-  ) {
-    const b = p.basis;
-    const r = p.rightTransform;
-    b[6] += b[0] + b[3]; b[7] += b[1] + b[4]; b[8] += b[2] + b[5];
-    r[6] += r[0] + r[3]; r[7] += r[1] + r[4]; r[8] += r[2] + r[5];
-
-    p.C += A + B + xi + eta + zeta;
-    p.xi = xi + zeta + 2 * B;
-    p.eta = eta + zeta + 2 * A;
-
-    p.l = p.xi < -eps ? -1 : p.xi > eps ? 1 : 0;
-    p.m = p.eta < -eps ? -1 : p.eta > eps ? 1 : 0;
-    return true;
-  }
-  return false;
-}
-
-/**
- * Reduce a basis matrix with row-vector orientation (basis rows are the basis
- * vectors, transforms left-multiply).
- */
-function reduce(
+function niggliKernel(
   input: Float64Array,
+  basis: Float64Array,
+  transform: Int32Array | null,
   eps: number,
-): { basis: Float64Array; transform: Int32Array } | null {
-  const p: NiggliState = {
-    A: 0,
-    B: 0,
-    C: 0,
-    xi: 0,
-    eta: 0,
-    zeta: 0,
-    eps,
-    l: 0,
-    m: 0,
-    n: 0,
-    basis: new Float64Array(input),
-    rightTransform: new Int32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
-  };
+  out: KernelOut,
+): void {
+  const r = transform;
 
-  setParameters(p);
+  // Scalarized 3×3 basis (rows are lattice vectors). Operated on directly and
+  // written back to `basis` only once the reduction converges.
+  let b00 = input[0];
+  let b01 = input[1];
+  let b02 = input[2];
+  let b10 = input[3];
+  let b11 = input[4];
+  let b12 = input[5];
+  let b20 = input[6];
+  let b21 = input[7];
+  let b22 = input[8];
+
+  // --- Initial metric parameters ---
+  let A = b00 * b00 + b01 * b01 + b02 * b02;
+  let B = b10 * b10 + b11 * b11 + b12 * b12;
+  let C = b20 * b20 + b21 * b21 + b22 * b22;
+  let zeta = 2 * (b00 * b10 + b01 * b11 + b02 * b12);
+  let eta = 2 * (b00 * b20 + b01 * b21 + b02 * b22);
+  let xi = 2 * (b10 * b20 + b11 * b21 + b12 * b22);
+
+  let l = 0;
+  let m = 0;
+  let n = 0;
 
   const maxAttempts = 1000;
-  // Hand-unrolled Grosse-Kunstleve loop. After a step that requires re-scanning
-  // from the start (2, 5, 6, 7, 8), restart the pass; otherwise fall through to
-  // the next step with the freshly updated parameters.
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (step1(p)) {
-      // fall through
+    // ---- Step 1: r0 = −r1, r1 = −r0, r2 = −r2 ----
+    // (A,B,C,xi,eta,zeta) -> (B,A,C,eta,xi,zeta)
+    if (A > B + eps || (Math.abs(A - B) <= eps && Math.abs(xi) > Math.abs(eta) + eps)) {
+      let t00 = b00;
+      b00 = -b10; b10 = -t00;
+      let t01 = b01;
+      b01 = -b11; b11 = -t01;
+      let t02 = b02;
+      b02 = -b12; b12 = -t02;
+      b20 = -b20; b21 = -b21; b22 = -b22;
+      if (r) {
+        let t: number;
+        t = r[0]; r[0] = -r[3]; r[3] = -t;
+        t = r[1]; r[1] = -r[4]; r[4] = -t;
+        t = r[2]; r[2] = -r[5]; r[5] = -t;
+        r[6] = -r[6]; r[7] = -r[7]; r[8] = -r[8];
+      }
+      const tA = A;
+      const txi = xi;
+      A = B;
+      B = tA;
+      xi = eta;
+      eta = txi;
     }
-    if (step2(p)) {
+
+    // ---- Step 2: r0 = −r0, r1 = −r2, r2 = −r1 ----
+    // (A,B,C,xi,eta,zeta) -> (A,C,B,xi,zeta,eta)
+    if (B > C + eps || (Math.abs(B - C) <= eps && Math.abs(eta) > Math.abs(zeta) + eps)) {
+      b00 = -b00; b01 = -b01; b02 = -b02;
+      let t0 = b10;
+      b10 = -b20; b20 = -t0;
+      let t1 = b11;
+      b11 = -b21; b21 = -t1;
+      let t2 = b12;
+      b12 = -b22; b22 = -t2;
+      if (r) {
+        let t: number;
+        r[0] = -r[0]; r[1] = -r[1]; r[2] = -r[2];
+        t = r[3]; r[3] = -r[6]; r[6] = -t;
+        t = r[4]; r[4] = -r[7]; r[7] = -t;
+        t = r[5]; r[5] = -r[8]; r[8] = -t;
+      }
+      const tB = B;
+      const teta = eta;
+      B = C;
+      C = tB;
+      eta = zeta;
+      zeta = teta;
       continue;
     }
-    if (step3(p)) {
-      // fall through
+
+    // ---- Step 3: sign flip so l·m·n = 1 ----
+    l = xi < -eps ? -1 : xi > eps ? 1 : 0;
+    m = eta < -eps ? -1 : eta > eps ? 1 : 0;
+    n = zeta < -eps ? -1 : zeta > eps ? 1 : 0;
+    if (l * m * n === 1) {
+      const i = l === -1 ? -1 : 1;
+      const j = m === -1 ? -1 : 1;
+      const k = n === -1 ? -1 : 1;
+      b00 *= i; b01 *= i; b02 *= i;
+      b10 *= j; b11 *= j; b12 *= j;
+      b20 *= k; b21 *= k; b22 *= k;
+      if (r) {
+        r[0] *= i; r[1] *= i; r[2] *= i;
+        r[3] *= j; r[4] *= j; r[5] *= j;
+        r[6] *= k; r[7] *= k; r[8] *= k;
+      }
+      zeta *= i * j;
+      eta *= i * k;
+      xi *= j * k;
     }
-    if (step4(p)) {
-      // fall through
+
+    // ---- Step 4: further sign flips when l·m·n ∈ {0, −1} ----
+    if (!(l === -1 && m === -1 && n === -1)) {
+      if (l * m * n === 0 || l * m * n === -1) {
+        let i = 1;
+        let j = 1;
+        let k = 1;
+        let which = -1;
+        if (l === 1) i = -1;
+        if (l === 0) which = 0;
+        if (m === 1) j = -1;
+        if (m === 0) which = 1;
+        if (n === 1) k = -1;
+        if (n === 0) which = 2;
+
+        if (i * j * k === -1) {
+          if (which === 0) i = -1;
+          if (which === 1) j = -1;
+          if (which === 2) k = -1;
+        }
+
+        b00 *= i; b01 *= i; b02 *= i;
+        b10 *= j; b11 *= j; b12 *= j;
+        b20 *= k; b21 *= k; b22 *= k;
+        if (r) {
+          r[0] *= i; r[1] *= i; r[2] *= i;
+          r[3] *= j; r[4] *= j; r[5] *= j;
+          r[6] *= k; r[7] *= k; r[8] *= k;
+        }
+        zeta *= i * j;
+        eta *= i * k;
+        xi *= j * k;
+      }
     }
-    if (step5(p)) {
+
+    // ---- Step 5: r2 += sign · r1 ----
+    if (
+      Math.abs(xi) > B + eps ||
+      (Math.abs(B - xi) <= eps && 2 * eta < zeta - eps) ||
+      (Math.abs(B + xi) <= eps && zeta < -eps)
+    ) {
+      const s: number = xi > 0 ? -1 : 1;
+      b20 += s * b10; b21 += s * b11; b22 += s * b12;
+      if (r) {
+        r[6] += s * r[3]; r[7] += s * r[4]; r[8] += s * r[5];
+      }
+      C += s * xi + B;
+      xi = xi + 2 * s * B;
+      eta = eta + s * zeta;
       continue;
     }
-    if (step6(p)) {
+
+    // ---- Step 6: r2 += sign · r0 ----
+    if (
+      Math.abs(eta) > A + eps ||
+      (Math.abs(A - eta) <= eps && 2 * xi < zeta - eps) ||
+      (Math.abs(A + eta) <= eps && zeta < -eps)
+    ) {
+      const s: number = eta > 0 ? -1 : 1;
+      b20 += s * b00; b21 += s * b01; b22 += s * b02;
+      if (r) {
+        r[6] += s * r[0]; r[7] += s * r[1]; r[8] += s * r[2];
+      }
+      C += s * eta + A;
+      xi = xi + s * zeta;
+      eta = eta + 2 * s * A;
       continue;
     }
-    if (step7(p)) {
+
+    // ---- Step 7: r1 += sign · r0 ----
+    if (
+      Math.abs(zeta) > A + eps ||
+      (Math.abs(A - zeta) <= eps && 2 * xi < eta - eps) ||
+      (Math.abs(A + zeta) <= eps && eta < -eps)
+    ) {
+      const s: number = zeta > 0 ? -1 : 1;
+      b10 += s * b00; b11 += s * b01; b12 += s * b02;
+      if (r) {
+        r[3] += s * r[0]; r[4] += s * r[1]; r[5] += s * r[2];
+      }
+      B += s * zeta + A;
+      xi = xi + s * eta;
+      zeta = zeta + 2 * s * A;
       continue;
     }
-    if (step8(p)) {
-      continue;
+
+    // ---- Step 8: r2 += r0 + r1 ----
+    {
+      const sum = xi + eta + zeta + A + B;
+      if (
+        sum < -eps ||
+        (Math.abs(sum) <= eps && 2 * (A + eta) + zeta > eps)
+      ) {
+        b20 += b00 + b10; b21 += b01 + b11; b22 += b02 + b12;
+        if (r) {
+          r[6] += r[0] + r[3]; r[7] += r[1] + r[4]; r[8] += r[2] + r[5];
+        }
+        C += A + B + xi + eta + zeta;
+        xi = xi + zeta + 2 * B;
+        eta = eta + zeta + 2 * A;
+        continue;
+      }
     }
-    return { basis: p.basis, transform: p.rightTransform };
+
+    // No step fired: converged.
+    out.l = l;
+    out.m = m;
+    out.n = n;
+    out.ok = true;
+    basis[0] = b00; basis[1] = b01; basis[2] = b02;
+    basis[3] = b10; basis[4] = b11; basis[5] = b12;
+    basis[6] = b20; basis[7] = b21; basis[8] = b22;
+    return;
   }
 
-  return null;
+  basis[0] = b00; basis[1] = b01; basis[2] = b02;
+  basis[3] = b10; basis[4] = b11; basis[5] = b12;
+  basis[6] = b20; basis[7] = b21; basis[8] = b22;
+  out.ok = false;
 }
 
 export interface NiggliResult {
@@ -421,11 +296,14 @@ export function niggli(input: Matrix, eps = 1e-5): NiggliResult | null {
   // vectors), so the input is reduced directly and the result returned as-is;
   // no transposition is needed. `rightTransform` accumulates the same row
   // operations, yielding directly the left-multiply form `reduced = T × input`.
-  const res = reduce(new Float64Array(input.data), eps);
-  if (!res) return null;
+  const basis = new Float64Array(input.data);
+  const transform = new Int32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  const out: KernelOut = { l: 0, m: 0, n: 0, ok: false };
+  niggliKernel(input.data, basis, transform, eps, out);
+  if (!out.ok) return null;
 
   return {
-    basis: createMatrix(3, 3, res.basis),
-    transform: createMatrix(3, 3, res.transform),
+    basis: createMatrix(3, 3, basis),
+    transform: createMatrix(3, 3, transform),
   };
 }
