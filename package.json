@@ -46,7 +46,6 @@
   "dependencies": {
     "@spglib/moyo-wasm": "^0.17.0",
     "fast-xml-parser": "^5.10.1",
-    "matsci-parse": "file:matsci-parse-0.12.1.tgz",
     "voro3d": "^0.0.7"
   }
 }
