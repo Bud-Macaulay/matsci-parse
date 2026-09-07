@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { toCrystalD3, fromCrystalD3 } from "@/core/io/kpoints";
+import type { KPath } from "@/core/kpoints/kpoints";
 
 // A realistic D3 BAND file (reciprocal coordinates in 2π/a units, one
 // segment per line).
@@ -76,11 +77,28 @@ describe("toCrystalD3", () => {
 
     expect(lines[0]).toBe("BAND");
     expect(lines[1]).toBe("round trip");
-    expect(lines[2]).toBe("9 0 0 1 0");
+    expect(lines[2]).toBe("9 1 360 1 0 1 0");
     expect(lines[3]).toContain("0 0 0 102700 102700 0");
     expect(lines[3]).toContain("GAMMA -> C");
     expect(lines[11]).toContain("0 0 0 0 132340 0");
     expect(lines[11]).toContain("GAMMA -> V_2");
+  });
+
+  it("writes the total k-point count as segments × points per segment", () => {
+    const path = fromCrystalD3(d3Bands);
+    const text = toCrystalD3(path, "", 15);
+    expect(text.split("\n")[2]).toBe("9 1 135 1 0 1 0");
+  });
+
+  it("uses the path density when no explicit point count is given", () => {
+    const path: KPath = {
+      kind: "path",
+      points: { G: [0, 0, 0], X: [0.5, 0, 0.5] },
+      segments: [["G", "X"], ["X", "G"]],
+      density: 20,
+    };
+    const text = toCrystalD3(path, "density");
+    expect(text.split("\n")[2]).toBe("2 1 40 1 0 1 0");
   });
 
   it("round-trips", () => {

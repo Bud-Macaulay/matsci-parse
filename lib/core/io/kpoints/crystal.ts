@@ -4,12 +4,22 @@ import type { KPath, KPoints, Vec3 } from "../../kpoints/kpoints";
 //  CRYSTAL D3 BAND format
 //  https://www.crystal.unito.it/Manuals/crystal17.pdf
 //
-//  Format (for a band-structure path):
+//  Format (for a band-structure path), per the CRYSTAL manual and
+//  https://tutorials.crystalsolutions.eu (keyword BAND):
 //    BAND
 //    <title>
-//    <nseg> <nband/npts/nrec/...> <first_band> <last_band>   !<comment>
+//    <nseg> <ISHR> <totk> <first_band> <last_band> <write_unit25> <print>  !<comment>
 //    x1 y1 z1 x2 y2 z2   !Segment_name
 //    ...
+//
+//  Header numbers:
+//    nseg        number of segments in the reciprocal-space path
+//    ISHR        shrinking factor; segment coordinates are multiples of 1/ISHR
+//    totk        total number of k points along the path
+//    first_band  first band to be saved
+//    last_band   last band to be saved
+//    write_unit25  if 1, write the bands on fortran unit 25
+//    print       printing options
 //
 //  Each segment line has 6 reciprocal-space coordinates (start, end)
 //  followed by an optional `!` comment indicating the segment label.
@@ -17,6 +27,9 @@ import type { KPath, KPoints, Vec3 } from "../../kpoints/kpoints";
 // ──────────────────────────────────────────────────────────────────────
 
 const BAND_HEADER = /^BAND\s*$/i;
+
+/** Default number of k-points interpolated per band-path segment. */
+const DEFAULT_POINTS_PER_SEGMENT = 40;
 
 function stripComment(line: string): string {
   let cut = line.length;
@@ -170,13 +183,22 @@ function vecApproxEqual(a: Vec3, b: Vec3): boolean {
  * Serialize canonical k-point data as a CRYSTAL D3 BAND input file.
  *
  * The path segments are written as start/end coordinate pairs with inline
- * segment name comments.  A header line with reasonable defaults is
- * included (1 band, 0th–0th band range).
+ * segment name comments.  The header line follows the CRYSTAL BAND format:
+ * segment count, shrinking factor 1 (fractional reciprocal coordinates),
+ * the total number of k points (segments × points per segment), a
+ * 1st-to-0th band range, unit-25 writing on, and no printing options.
  *
- * @param data  The canonical k-point data.  Must be a {@link KPath}.
- * @param title Optional title line (defaults to empty).
+ * @param data             The canonical k-point data.  Must be a {@link KPath}.
+ * @param title            Optional title line (defaults to empty).
+ * @param pointsPerSegment Number of k points interpolated per segment.
+ *                         Defaults to the path's own `density` when set,
+ *                         otherwise 40.
  */
-export function toCrystalD3(data: KPoints, title = ""): string {
+export function toCrystalD3(
+  data: KPoints,
+  title = "",
+  pointsPerSegment?: number,
+): string {
   if (data.kind !== "path") {
     throw new Error("toCrystalD3 only supports KPath data");
   }
@@ -193,9 +215,20 @@ export function toCrystalD3(data: KPoints, title = ""): string {
     segmentLines.push(formatVec6(start, end, `${startName} -> ${endName}`));
   }
 
-  const nks = data.segments.length;
-  // Header: [nsegments, nrec=0, npts=0, first_band=1, last_band=0]
-  const header = `${nks} 0 0 1 0`;
+  const nseg = data.segments.length;
+  const density =
+    pointsPerSegment !== undefined
+      ? Math.max(1, Math.round(pointsPerSegment))
+      : data.density !== undefined
+        ? Math.max(1, Math.round(data.density))
+        : DEFAULT_POINTS_PER_SEGMENT;
+
+  // TODO(check): CRYSTAL's exact joint-dedup rule for the total k-point count
+  // is unverified.  nseg × points-per-segment matches the MgO tutorial
+  // (4 segments → 60 total = 4 × 15) and mirrors the VASP/QE density semantics.
+  const totalPoints = nseg * density;
+  // [nseg, ISHR=1, totk, first_band, last_band, write_unit25, print]
+  const header = `${nseg} 1 ${totalPoints} 1 0 1 0`;
 
   return ["BAND", title, header, ...segmentLines].join("\n");
 }
