@@ -91,10 +91,15 @@ export interface KPointsGamma {
 /**
  * K_POINTS card for band-structure calculations (crystal_b or tpiba_b).
  * List of k-points defining high-symmetry paths.
+ *
+ * `nks` is the number of supplied special k-points (vertices); each
+ * vertex weight `wᵢ` is the number of intermediate k-points on the
+ * segment from vertex *i* to vertex *i+1*.  The last vertex weight is
+ * ignored by pw.x.
  */
 export interface KPointsBands {
   mode: "crystal_b" | "tpiba_b";
-  /** Number of k-points per segment */
+  /** Number of band-path vertices (special k-points). */
   nks: number;
   points: Kpt[];
 }

@@ -26,7 +26,7 @@ K_POINTS tpiba
 
 export const qeTpibaBands = `
 K_POINTS tpiba_b
-20
+4
 0.0000 0.0000 0.0000 1.0
 0.5000 0.0000 0.0000 1.0
 0.5000 0.5000 0.0000 1.0
@@ -35,10 +35,10 @@ K_POINTS tpiba_b
 
 export const qeCrystalBands = `
 K_POINTS crystal_b
-15
-0.0000 0.0000 0.0000 1.0
-0.5000 0.5000 0.0000 1.0
-0.5000 0.5000 0.5000 1.0
+3
+0.0000 0.0000 0.0000 40
+0.5000 0.5000 0.0000 40
+0.5000 0.5000 0.5000 1
 `;
 
 export const qeCrystalCovering = `

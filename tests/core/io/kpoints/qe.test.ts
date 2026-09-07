@@ -51,7 +51,7 @@ describe("fromPWKPoints", () => {
     const card = fromPWKPoints(fixtures.qeTpibaBands);
 
     if (card.mode === "tpiba_b") {
-      expect(card.nks).toBe(20);
+      expect(card.nks).toBe(4);
       expect(card.points).toHaveLength(4);
       expect(card.points[1]).toEqual({ x: 0.5, y: 0, z: 0, w: 1 });
     } else {
@@ -63,8 +63,10 @@ describe("fromPWKPoints", () => {
     const card = fromPWKPoints(fixtures.qeCrystalBands);
 
     if (card.mode === "crystal_b") {
-      expect(card.nks).toBe(15);
+      expect(card.nks).toBe(3);
       expect(card.points).toHaveLength(3);
+      expect(card.points[0]).toEqual({ x: 0, y: 0, z: 0, w: 40 });
+      expect(card.points[2]).toEqual({ x: 0.5, y: 0.5, z: 0.5, w: 1 });
     } else {
       throw new Error("expected crystal_b mode");
     }
@@ -203,20 +205,25 @@ describe("toPWKPoints", () => {
 describe("kpointsFromPW", () => {
   it("reads an automatic grid as a KGrid", () => {
     expect(kpointsFromPW(fixtures.qeAutomatic)).toEqual({
+      kind: "grid",
       mesh: [4, 4, 4],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
   });
 
   it("reads a gamma card as a 1x1x1 grid", () => {
     expect(kpointsFromPW(fixtures.qeGamma)).toEqual({
+      kind: "grid",
       mesh: [1, 1, 1],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
   });
 
   it("reads a crystal list as a reciprocal point set", () => {
     expect(kpointsFromPW(fixtures.qeCrystal)).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.5, 0, 0] },
@@ -241,6 +248,7 @@ describe("kpointsFromPW", () => {
 
   it("reads a crystal_c covering as a point set", () => {
     expect(kpointsFromPW(fixtures.qeCrystalCovering)).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.5, 0.5, 0.5] },
@@ -252,6 +260,7 @@ describe("kpointsFromPW", () => {
 
   it("reads a crystal_b band path as a KPath", () => {
     expect(kpointsFromPW(fixtures.qeCrystalBands)).toEqual({
+      kind: "path",
       points: {
         k1: [0, 0, 0],
         k2: [0.5, 0.5, 0],
@@ -261,13 +270,16 @@ describe("kpointsFromPW", () => {
         ["k1", "k2"],
         ["k2", "k3"],
       ],
+      density: 40,
     });
   });
 
   it("reads the K_POINTS card from a full pw.in file", () => {
     expect(kpointsFromPW(fixtures.qeInFile)).toEqual({
+      kind: "grid",
       mesh: [6, 6, 6],
       origin: [1, 1, 1],
+      scheme: "gamma-centered",
     });
   });
 
@@ -281,13 +293,19 @@ describe("kpointsFromPW", () => {
 describe("kpointsToPW", () => {
   it("writes a grid as an automatic card", () => {
     expect(
-      kpointsToPW({ mesh: [4, 4, 4], origin: [0.5, 0.5, 0] }),
+      kpointsToPW({
+        kind: "grid",
+        mesh: [4, 4, 4],
+        origin: [0.5, 0.5, 0],
+        scheme: "gamma-centered",
+      }),
     ).toBe("K_POINTS automatic\n4 4 4 0.5 0.5 0");
   });
 
   it("writes a reciprocal point set as a crystal list", () => {
     expect(
       kpointsToPW({
+        kind: "points",
         points: [
           { coordinate: [0, 0, 0] },
           { coordinate: [0.5, 0.5, 0.5] },
@@ -300,6 +318,7 @@ describe("kpointsToPW", () => {
   it("writes a cartesian point set as a tpiba list", () => {
     expect(
       kpointsToPW({
+        kind: "points",
         points: [{ coordinate: [0.25, 0.25, 0.25] }],
         coordinateSystem: "cartesian",
       }),
@@ -309,20 +328,32 @@ describe("kpointsToPW", () => {
   it("writes a path as a crystal_b card with a default segment density", () => {
     const path = kpointsFromPW(fixtures.qeCrystalBands);
     const text = kpointsToPW(path);
-    expect(text).toMatch(/^K_POINTS crystal_b\n40\n/);
-    expect(text).toContain("0 0 0 1");
+    expect(text).toMatch(/^K_POINTS crystal_b\n3\n/);
+    expect(text).toContain("0 0 0 40");
     expect(text).toContain("0.5 0.5 0.5 1");
   });
 
   it("honors the requested segment density", () => {
     const path = kpointsFromPW(fixtures.qeCrystalBands);
-    expect(kpointsToPW(path, 12)).toMatch(/^K_POINTS crystal_b\n12\n/);
+    const text12 = kpointsToPW(path, 12);
+    expect(text12).toMatch(/^K_POINTS crystal_b\n3\n/);
+    expect(text12).toContain("0 0 0 12");
   });
 
   it("round-trips every canonical form", () => {
     const cases = [
-      { mesh: [4, 4, 4], origin: [0, 0, 0] },
-      { mesh: [6, 8, 10], origin: [0.5, 0.5, 0] },
+      {
+        kind: "grid",
+        mesh: [4, 4, 4],
+        origin: [0, 0, 0],
+        scheme: "gamma-centered",
+      },
+      {
+        kind: "grid",
+        mesh: [6, 8, 10],
+        origin: [0.5, 0.5, 0],
+        scheme: "gamma-centered",
+      },
       kpointsFromPW(fixtures.qeCrystal),
       kpointsFromPW(fixtures.qeTpiba),
       kpointsFromPW(fixtures.qeCrystalBands),

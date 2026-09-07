@@ -232,7 +232,7 @@ export async function getPath(
   const primDet = Math.abs(determinant(primitiveMatrix));
 
   return {
-    kpath: { points, segments: path },
+    kpath: { kind: "path", points, segments: path },
     point_coords: points,
     path,
     has_inversion_symmetry: hasInv,

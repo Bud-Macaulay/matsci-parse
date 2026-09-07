@@ -239,6 +239,7 @@ describe("getExplicitFromImplicit", () => {
     const result = getExplicitFromImplicit(
       {
         kpath: {
+          kind: "path",
           points: {
             GAMMA: [0, 0, 0],
             X: [0.5, 0, 0],
@@ -265,6 +266,7 @@ describe("getExplicitFromImplicit", () => {
     const result = getExplicitFromImplicit(
       {
         kpath: {
+          kind: "path",
           points: {
             GAMMA: [0, 0, 0],
             X: [0.5, 0, 0],

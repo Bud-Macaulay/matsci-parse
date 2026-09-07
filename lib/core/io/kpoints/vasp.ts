@@ -5,6 +5,7 @@ import type {
   KPath,
   KPoint,
   KPointSet,
+  KPoints,
 } from "../../kpoints/kpoints";
 import { LineReader } from "../helpers";
 
@@ -21,7 +22,7 @@ const LIST_COMMENT = "K-points list";
  * modes (line 2 is a count with a "Line-mode" scheme, or a negative count)
  * become a {@link KPath}. The deprecated fully-automatic mode errors out.
  */
-export function fromKPOINTS(text: string): KGrid | KPath | KPointSet {
+export function fromKPOINTS(text: string): KPoints {
   const r = new LineReader(text);
 
   // The first line is a free-form comment. Skip any leading blank lines,
@@ -44,7 +45,7 @@ export function fromKPOINTS(text: string): KGrid | KPath | KPointSet {
     // A negative count is the legacy line-mode marker; a "Line-mode" scheme
     // line marks the current one.
     if (scheme.toLowerCase().startsWith("l") || modeNumber < 0) {
-      return parseLineMode(r, scheme, modeNumber < 0);
+      return parseLineMode(r, scheme, modeNumber < 0, Math.abs(modeNumber));
     }
     return parseExplicitList(r, scheme, modeNumber);
   }
@@ -70,8 +71,10 @@ function parseAutomaticMesh(r: LineReader): KGrid {
       : parseVec3(shiftLine.trim(), "shift");
 
   return {
+    kind: "grid",
     mesh,
     origin: monkhorstPack ? monkhorstOrigin(mesh, shift) : shift,
+    scheme: monkhorstPack ? "monkhorst-pack" : "gamma-centered",
   };
 }
 
@@ -91,7 +94,7 @@ function parseExplicitList(
     weights.push(weight);
   }
 
-  return { points, weights, coordinateSystem };
+  return { kind: "points", points, weights, coordinateSystem };
 }
 
 /**
@@ -105,6 +108,7 @@ function parseLineMode(
   r: LineReader,
   scheme: string,
   legacyScheme: boolean,
+  pointsPerLine: number,
 ): KPath {
   const coordinateSystem = parseCoordinateSystem(
     legacyScheme ? scheme : r.nextTrimmed(),
@@ -150,7 +154,12 @@ function parseLineMode(
     }
   }
 
-  return { points, segments };
+  const density =
+    Number.isFinite(pointsPerLine) && pointsPerLine > 0
+      ? Math.round(pointsPerLine)
+      : undefined;
+
+  return { kind: "path", points, segments, density };
 }
 
 /** Parse a line-mode point row: x y z [label]; labels may follow "!". */
@@ -255,19 +264,21 @@ function monkhorstOrigin(mesh: GridShape, shift: Vec3): Vec3 {
  * canonicalized to a mesh when their points form a regular grid with uniform
  * weights (only in reciprocal coordinates); otherwise they are written as an
  * explicit list. Paths are written in reciprocal line mode, interpolating
- * `pointsPerLine` k-points per segment (default 40 when omitted).
+ * `pointsPerLine` k-points per segment (default 40 when omitted; falls back
+ * to `KPath.density` if set).
  */
 export function toKPOINTS(
-  data: KGrid | KPath | KPointSet,
+  data: KPoints,
   pointsPerLine?: number,
 ): string {
-  if ("mesh" in data) {
-    return serializeGrid(data);
+  switch (data.kind) {
+    case "grid":
+      return serializeGrid(data);
+    case "path":
+      return serializePath(data, pointsPerLine);
+    case "points":
+      return serializePointSet(data);
   }
-  if ("segments" in data) {
-    return serializePath(data, pointsPerLine);
-  }
-  return serializePointSet(data);
 }
 
 /**
@@ -276,17 +287,13 @@ export function toKPOINTS(
  * as a Monkhorst-Pack file, anything else as a Gamma-centered file with the
  * origin as the shift. Either way the generated k-point mesh is identical.
  */
-function serializeGrid({ mesh, origin }: KGrid): string {
-  const monkhorst = origin.every(
-    (o, i) => Math.abs(o - (1 - mesh[i]) / (2 * mesh[i])) < 1e-12,
-  );
-  const scheme = monkhorst ? "Monkhorst-Pack" : "Gamma";
-  const shift = monkhorst ? [0, 0, 0] : origin;
+function serializeGrid({ mesh, origin, scheme }: KGrid): string {
+  const shift = scheme === "monkhorst-pack" ? [0, 0, 0] : origin;
 
   return [
     GRID_COMMENT,
     "0",
-    scheme,
+    scheme === "monkhorst-pack" ? "Monkhorst-Pack" : "Gamma",
     mesh.join(" "),
     shift.join(" "),
   ].join("\n");
@@ -320,13 +327,15 @@ function serializePointSet(data: KPointSet): string {
 const DEFAULT_POINTS_PER_LINE = 40;
 
 function serializePath(
-  { points, segments }: KPath,
+  { points, segments, density: pathDensity }: KPath,
   pointsPerLine?: number,
 ): string {
   const density =
-    pointsPerLine === undefined
-      ? DEFAULT_POINTS_PER_LINE
-      : Math.max(1, Math.round(pointsPerLine));
+    pointsPerLine !== undefined
+      ? Math.max(1, Math.round(pointsPerLine))
+      : pathDensity !== undefined
+        ? Math.max(1, Math.round(pathDensity))
+        : DEFAULT_POINTS_PER_LINE;
 
   const rows: string[] = [];
   for (const [start, stop] of segments) {
@@ -382,5 +391,10 @@ function detectGrid(data: KPointSet): KGrid | null {
     }
   }
 
-  return { mesh, origin: [axes[0][0], axes[1][0], axes[2][0]] };
+  return {
+    kind: "grid",
+    mesh,
+    origin: [axes[0][0], axes[1][0], axes[2][0]],
+    scheme: "gamma-centered",
+  };
 }

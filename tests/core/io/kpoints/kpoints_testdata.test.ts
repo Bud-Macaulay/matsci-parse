@@ -55,30 +55,40 @@ describe("kpoints test data", () => {
 
   it("parses gamma grids", () => {
     expect(fromKPOINTS(vaspGammaMesh1x1x1)).toEqual({
+      kind: "grid",
       mesh: [1, 1, 1],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
     expect(fromKPOINTS(vaspGammaShifted)).toEqual({
+      kind: "grid",
       mesh: [6, 8, 10],
       origin: [0.5, 0.5, 0],
+      scheme: "gamma-centered",
     });
   });
 
   it("parses Monkhorst-Pack grids", () => {
     expect(fromKPOINTS(vaspMPShifted)).toEqual({
+      kind: "grid",
       mesh: [5, 7, 9],
       origin: [mpOffset(5) + 0.5, mpOffset(7) + 0.5, mpOffset(9) + 0.5],
+      scheme: "monkhorst-pack",
     });
   });
 
   it("parses density-derived grids", () => {
     expect(fromKPOINTS(vaspDensity1000)).toEqual({
+      kind: "grid",
       mesh: [7, 7, 7],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
     expect(fromKPOINTS(vaspDensity5000)).toEqual({
+      kind: "grid",
       mesh: [13, 13, 13],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
   });
 
@@ -88,14 +98,18 @@ describe("kpoints test data", () => {
         expect(
           fromKPOINTS(meshKpoints(scheme, [mesh, mesh, mesh])),
         ).toEqual({
+          kind: "grid",
           mesh: [mesh, mesh, mesh],
           origin: scheme === "Gamma" ? [0, 0, 0] : [mesh, mesh, mesh].map(mpOffset),
+          scheme: scheme === "Gamma" ? "gamma-centered" : "monkhorst-pack",
         });
       }
       for (const mesh of ANISOTROPIC_MESHES) {
         expect(fromKPOINTS(meshKpoints(scheme, mesh))).toEqual({
+          kind: "grid",
           mesh,
           origin: scheme === "Gamma" ? [0, 0, 0] : mesh.map(mpOffset),
+          scheme: scheme === "Gamma" ? "gamma-centered" : "monkhorst-pack",
         });
       }
     }
@@ -103,16 +117,19 @@ describe("kpoints test data", () => {
 
   it("parses reciprocal lists, with and without weights and labels", () => {
     expect(fromKPOINTS(vaspListReciprocal)).toEqual({
+      kind: "points",
       points: SIMPLE_POINTS,
       weights: [1, 1, 1, 1],
       coordinateSystem: "reciprocal",
     });
     expect(fromKPOINTS(vaspListReciprocalWeighted)).toEqual({
+      kind: "points",
       points: SIMPLE_POINTS,
       weights: [2, 1, 1, 1],
       coordinateSystem: "reciprocal",
     });
     expect(fromKPOINTS(vaspListReciprocalWeightedLabeled)).toEqual({
+      kind: "points",
       points: SIMPLE_POINTS,
       weights: [2, 1, 1, 1],
       coordinateSystem: "reciprocal",
@@ -121,11 +138,13 @@ describe("kpoints test data", () => {
 
   it("parses Cartesian lists and ignores labels", () => {
     expect(fromKPOINTS(vaspListCartesian)).toEqual({
+      kind: "points",
       points: SIMPLE_POINTS,
       weights: [1, 1, 1, 1],
       coordinateSystem: "cartesian",
     });
     expect(fromKPOINTS(vaspListCartesianWeighted)).toEqual({
+      kind: "points",
       points: SIMPLE_POINTS,
       weights: [2, 1, 1, 1],
       coordinateSystem: "cartesian",
@@ -135,6 +154,7 @@ describe("kpoints test data", () => {
   it("parses the tetrahedron k-point list, ignoring the block", () => {
     const parsed = fromKPOINTS(vaspTetrahedron);
     expect(parsed).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.5, 0, 0] },
@@ -152,6 +172,7 @@ describe("kpoints test data", () => {
 
   it("parses the line-mode path", () => {
     expect(fromKPOINTS(vaspLinePath)).toEqual({
+      kind: "path",
       points: {
         "\\Gamma": [0, 0, 0],
         P: [0.5, -0.49999999999999994, 0.5],
@@ -177,6 +198,7 @@ describe("kpoints test data", () => {
         ["Q_1", "L"],
         ["L", "Z"],
       ],
+      density: 20,
     });
   });
 

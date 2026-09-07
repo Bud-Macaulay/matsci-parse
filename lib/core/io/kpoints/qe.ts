@@ -2,6 +2,7 @@ import type {
   KGrid,
   KPath,
   KPointSet,
+  KPoints,
   Vec3,
 } from "../../kpoints/kpoints";
 import type { KPointsBands, KPointsCard, KPointsList, Kpt } from "../pw/schema/cards";
@@ -104,7 +105,13 @@ export function fromPWKPoints(text: string): KPointsCard {
       if (Number.isNaN(nks)) {
         throw new Error("K_POINTS band path requires nks");
       }
-      return { mode, nks, points: rest.slice(1).map(parseKpt) };
+      const pointLines = rest.slice(1, 1 + nks);
+      if (pointLines.length !== nks) {
+        throw new Error(
+          `Expected ${nks} k-points, got ${pointLines.length}`,
+        );
+      }
+      return { mode, nks, points: pointLines.map(parseKpt) };
     }
     case "crystal_c":
     case "tpiba_c":
@@ -166,6 +173,7 @@ function pointListToKPointSet(
   const reciprocal =
     mode === "crystal" || mode === "crystal_c" ? "reciprocal" : "cartesian";
   return {
+    kind: "points",
     points: points.map((k) => ({ coordinate: [k.x, k.y, k.z] as const })),
     weights: points.map((k) => k.w),
     coordinateSystem: reciprocal,
@@ -192,7 +200,18 @@ function pathFromBandPoints(points: readonly Kpt[]): KPath {
   for (let i = 0; i < points.length - 1; i++) {
     segments.push([nameFor(points[i]), nameFor(points[i + 1])]);
   }
-  return { points: named, segments };
+
+  // Extract density: the weight of each vertex (except the last) is the
+  // number of intermediate k-points on the segment to the next vertex.
+  // If all segment weights are equal, set KPath.density.
+  const segmentWeights = points.slice(0, -1).map((k) => k.w);
+  const density =
+    segmentWeights.length > 0 &&
+    segmentWeights.every((w) => w === segmentWeights[0])
+      ? segmentWeights[0]
+      : undefined;
+
+  return { kind: "path", points: named, segments, density };
 }
 
 /**
@@ -206,14 +225,24 @@ function pathFromBandPoints(points: readonly Kpt[]): KPath {
  * - crystal_b band paths map to {@link KPath} (tpiba_b needs a lattice and
  *   is not supported)
  */
-export function kpointsFromPW(text: string): KGrid | KPath | KPointSet {
+export function kpointsFromPW(text: string): KPoints {
   const card = fromPWKPoints(text);
 
   switch (card.mode) {
     case "automatic":
-      return { mesh: card.grid, origin: card.shift };
+      return {
+        kind: "grid",
+        mesh: card.grid,
+        origin: card.shift,
+        scheme: "gamma-centered",
+      };
     case "gamma":
-      return { mesh: [1, 1, 1], origin: [0, 0, 0] };
+      return {
+        kind: "grid",
+        mesh: [1, 1, 1],
+        origin: [0, 0, 0],
+        scheme: "gamma-centered",
+      };
     case "crystal":
     case "tpiba":
     case "crystal_c":
@@ -233,20 +262,24 @@ function pathToBandCard(
   pointsPerSegment: number,
 ): KPointsBands {
   const vertices: Kpt[] = [];
+  // Build the vertex list in segment order (shared endpoints collapse naturally)
   for (const [start, stop] of path.segments) {
     const s = path.points[start];
-    const e = path.points[stop];
-    if (!s || !e) {
-      throw new Error(`KPath references unknown point '${start}' or '${stop}'`);
+    if (!s) {
+      throw new Error(`KPath references unknown point '${start}'`);
     }
-    vertices.push({ x: s[0], y: s[1], z: s[2], w: 1 });
+    vertices.push({ x: s[0], y: s[1], z: s[2], w: pointsPerSegment });
   }
   const last = path.segments[path.segments.length - 1];
-  const end = last ? path.points[last[1]] : undefined;
-  if (end) {
+  if (last) {
+    const end = path.points[last[1]];
+    if (!end) {
+      throw new Error(`KPath references unknown point '${last[1]}'`);
+    }
+    // Last vertex weight is ignored by pw.x; write 1 by convention.
     vertices.push({ x: end[0], y: end[1], z: end[2], w: 1 });
   }
-  return { mode: "crystal_b", nks: pointsPerSegment, points: vertices };
+  return { mode: "crystal_b", nks: vertices.length, points: vertices };
 }
 
 function kPointSetToListCard(set: KPointSet): KPointsList {
@@ -270,25 +303,68 @@ function kPointSetToListCard(set: KPointSet): KPointsList {
  * - k-point sets are written as crystal (reciprocal) or tpiba (2*pi/alat)
  *   lists, depending on their coordinate system
  * - paths are written as crystal_b band paths; `pointsPerSegment` (default
- *   40) sets the number of k-points interpolated along each segment
+ *   40) sets the number of k-points interpolated along each segment.
+ *   When `pointsPerSegment` is omitted, the path's own `density` is used
+ *   if set, otherwise the default.
+ *   High-symmetry point names are written as inline comments.
  */
 export function kpointsToPW(
-  data: KGrid | KPath | KPointSet,
+  data: KPoints,
   pointsPerSegment?: number,
 ): string {
-  if ("mesh" in data) {
-    return toPWKPoints({
-      mode: "automatic",
-      grid: [...data.mesh],
-      shift: [...data.origin],
-    });
+  switch (data.kind) {
+    case "grid":
+      return toPWKPoints({
+        mode: "automatic",
+        grid: [...data.mesh],
+        shift: [...data.origin],
+      });
+    case "path": {
+      const density =
+        pointsPerSegment !== undefined
+          ? Math.max(1, Math.round(pointsPerSegment))
+          : data.density !== undefined
+            ? Math.max(1, Math.round(data.density))
+            : DEFAULT_POINTS_PER_SEGMENT;
+      return pathWithComments(data, density);
+    }
+    case "points":
+      return toPWKPoints(kPointSetToListCard(data));
   }
-  if ("segments" in data) {
-    const density =
-      pointsPerSegment === undefined
-        ? DEFAULT_POINTS_PER_SEGMENT
-        : Math.max(1, Math.round(pointsPerSegment));
-    return toPWKPoints(pathToBandCard(data, density));
+}
+
+/**
+ * Serialize a KPath as a crystal_b card with high-symmetry point name comments.
+ */
+function pathWithComments(path: KPath, density: number): string {
+  // Build the vertex list in segment order (shared endpoints collapse naturally)
+  const vertices: { x: number; y: number; z: number; label: string; w: number }[] = [];
+  const seen = new Set<string>();
+  for (let si = 0; si < path.segments.length; si++) {
+    const [start, stop] = path.segments[si];
+    const s = path.points[start];
+    if (!s) {
+      throw new Error(`KPath references unknown point '${start}'`);
+    }
+    const sKey = start;
+    if (!seen.has(sKey)) {
+      seen.add(sKey);
+      vertices.push({ x: s[0], y: s[1], z: s[2], label: start, w: density });
+    }
   }
-  return toPWKPoints(kPointSetToListCard(data));
+  const last = path.segments[path.segments.length - 1];
+  if (last) {
+    const end = path.points[last[1]];
+    if (!end) {
+      throw new Error(`KPath references unknown point '${last[1]}'`);
+    }
+    // Last vertex weight is ignored by pw.x; write 1 by convention.
+    vertices.push({ x: end[0], y: end[1], z: end[2], label: last[1], w: 1 });
+  }
+
+  const lines = [`K_POINTS crystal_b`, String(vertices.length)];
+  for (const v of vertices) {
+    lines.push(`${v.x} ${v.y} ${v.z} ${v.w} ! ${v.label}`);
+  }
+  return lines.join("\n");
 }

@@ -4,7 +4,7 @@ export * from "./lattice";
 export * from "./species";
 
 export * as kpoints from "./kpoints";
-export type { KPath, KPoint, KPointSet, KGrid } from "./kpoints";
+export type { KPoints, KPath, KPoint, KPointSet, KGrid, Vec3, GridShape } from "./kpoints";
 
 export * from "./volumetric";
 

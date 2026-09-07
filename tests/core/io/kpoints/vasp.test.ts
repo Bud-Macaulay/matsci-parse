@@ -7,15 +7,19 @@ import * as fixtures from "../teststrings/kpoints";
 describe("fromKPOINTS", () => {
   it("parses a Gamma-centered automatic mesh", () => {
     expect(fromKPOINTS(fixtures.vaspGammaGrid)).toEqual({
+      kind: "grid",
       mesh: [4, 4, 4],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
   });
 
   it("parses a Monkhorst-Pack automatic mesh", () => {
     expect(fromKPOINTS(fixtures.vaspMPGrid)).toEqual({
+      kind: "grid",
       mesh: [4, 4, 4],
       origin: [-3 / 8, -3 / 8, -3 / 8],
+      scheme: "monkhorst-pack",
     });
   });
 
@@ -28,8 +32,10 @@ Monkhorst-Pack
 0.5 0.5 0.5
 `;
     expect(fromKPOINTS(text)).toEqual({
+      kind: "grid",
       mesh: [8, 8, 8],
       origin: [1 / 16, 1 / 16, 1 / 16],
+      scheme: "monkhorst-pack",
     });
   });
 
@@ -42,8 +48,10 @@ Gamma
 0.5 0.25 0.1
 `;
     expect(fromKPOINTS(text)).toEqual({
+      kind: "grid",
       mesh: [2, 2, 2],
       origin: [0.5, 0.25, 0.1],
+      scheme: "gamma-centered",
     });
   });
 
@@ -56,35 +64,52 @@ Monkhorst-Pack
 0 0 0
 `;
     expect(fromKPOINTS(text)).toEqual({
+      kind: "grid",
       mesh: [4, 6, 8],
       origin: [-3 / 8, -5 / 12, -7 / 16],
+      scheme: "monkhorst-pack",
     });
   });
 
   it("accepts the short mesh scheme names", () => {
     const gamma = fromKPOINTS("c\n0\nG\n2 2 2\n0 0 0");
-    expect(gamma).toEqual({ mesh: [2, 2, 2], origin: [0, 0, 0] });
+    expect(gamma).toEqual({
+      kind: "grid",
+      mesh: [2, 2, 2],
+      origin: [0, 0, 0],
+      scheme: "gamma-centered",
+    });
 
     const mp = fromKPOINTS("c\n0\nM\n2 2 2\n0 0 0");
-    expect(mp).toEqual({ mesh: [2, 2, 2], origin: [-1 / 4, -1 / 4, -1 / 4] });
+    expect(mp).toEqual({
+      kind: "grid",
+      mesh: [2, 2, 2],
+      origin: [-1 / 4, -1 / 4, -1 / 4],
+      scheme: "monkhorst-pack",
+    });
   });
 
   it("parses a real Gamma file without a shift line", () => {
     expect(fromKPOINTS(fixtures.vaspRealGamma)).toEqual({
+      kind: "grid",
       mesh: [4, 4, 4],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
   });
 
   it("parses a real Monkhorst-Pack file without a shift line", () => {
     expect(fromKPOINTS(fixtures.vaspRealMonkhorst)).toEqual({
+      kind: "grid",
       mesh: [4, 4, 4],
       origin: [-3 / 8, -3 / 8, -3 / 8],
+      scheme: "monkhorst-pack",
     });
   });
 
   it("parses real explicit Cartesian and reciprocal lists", () => {
     expect(fromKPOINTS(fixtures.vaspRealCartesian)).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.5, 0, 0] },
@@ -95,6 +120,7 @@ Monkhorst-Pack
     });
 
     expect(fromKPOINTS(fixtures.vaspRealReciprocal)).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.5, 0, 0] },
@@ -113,6 +139,7 @@ Monkhorst-Pack
 
   it("parses an explicit reciprocal k-point list", () => {
     expect(fromKPOINTS(fixtures.vaspList)).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0, 0, 0.5] },
@@ -126,6 +153,7 @@ Monkhorst-Pack
 
   it("parses a Cartesian k-point list", () => {
     expect(fromKPOINTS(fixtures.vaspCartesianList)).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.1, 0.2, 0.3] },
@@ -137,6 +165,7 @@ Monkhorst-Pack
 
   it("defaults a missing point weight to 1", () => {
     expect(fromKPOINTS("c\n2\nReciprocal\n0 0 0\n0 0 0.5")).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0, 0, 0.5] },
@@ -160,6 +189,7 @@ Monkhorst-Pack
 
   it("parses a reciprocal line-mode band path", () => {
     expect(fromKPOINTS(fixtures.vaspLineMode)).toEqual({
+      kind: "path",
       points: {
         G: [0, 0, 0],
         X: [0.5, 0.5, 0],
@@ -169,6 +199,7 @@ Monkhorst-Pack
         ["G", "X"],
         ["X", "W"],
       ],
+      density: 40,
     });
   });
 
@@ -182,11 +213,13 @@ Reciprocal
 0.5 0.0 0.0 ! X
 `;
     expect(fromKPOINTS(text)).toEqual({
+      kind: "path",
       points: {
         Gamma: [0, 0, 0],
         X: [0.5, 0, 0],
       },
       segments: [["Gamma", "X"]],
+      density: 10,
     });
   });
 
@@ -200,11 +233,13 @@ Reciprocal
 0.5 0.5 0.5
 `;
     expect(fromKPOINTS(text)).toEqual({
+      kind: "path",
       points: {
         k1: [0, 0, 0],
         k2: [0.5, 0.5, 0.5],
       },
       segments: [["k1", "k2"]],
+      density: 10,
     });
   });
 
@@ -307,25 +342,41 @@ Reciprocal
 describe("toKPOINTS", () => {
   it("writes a Gamma-centered grid with the origin as the shift", () => {
     expect(
-      toKPOINTS({ mesh: [4, 4, 4], origin: [0, 0, 0] }),
+      toKPOINTS({
+        kind: "grid",
+        mesh: [4, 4, 4],
+        origin: [0, 0, 0],
+        scheme: "gamma-centered",
+      }),
     ).toBe("Automatic mesh\n0\nGamma\n4 4 4\n0 0 0");
   });
 
   it("writes a shifted Gamma-centered grid", () => {
     expect(
-      toKPOINTS({ mesh: [2, 2, 2], origin: [0.5, 0.25, 0.1] }),
+      toKPOINTS({
+        kind: "grid",
+        mesh: [2, 2, 2],
+        origin: [0.5, 0.25, 0.1],
+        scheme: "gamma-centered",
+      }),
     ).toBe("Automatic mesh\n0\nGamma\n2 2 2\n0.5 0.25 0.1");
   });
 
-  it("detects a canonical Monkhorst-Pack origin", () => {
+  it("writes a Monkhorst-Pack grid with zero shift", () => {
     expect(
-      toKPOINTS({ mesh: [8, 8, 8], origin: [-0.4375, -0.4375, -0.4375] }),
+      toKPOINTS({
+        kind: "grid",
+        mesh: [8, 8, 8],
+        origin: [-0.4375, -0.4375, -0.4375],
+        scheme: "monkhorst-pack",
+      }),
     ).toBe("Automatic mesh\n0\nMonkhorst-Pack\n8 8 8\n0 0 0");
   });
 
   it("writes a band path in reciprocal line mode", () => {
     expect(
       toKPOINTS({
+        kind: "path",
         points: {
           G: [0, 0, 0],
           X: [0.5, 0.5, 0],
@@ -338,9 +389,11 @@ describe("toKPOINTS", () => {
   it("honors the requested points-per-line density for a band path", () => {
     const path = fromKPOINTS(fixtures.vaspLineMode);
     expect(toKPOINTS(path, 12)).toMatch(/^Band path\n12\n/);
-    expect(fromKPOINTS(toKPOINTS(path, 12))).toEqual(path);
     expect(toKPOINTS(path, 0.5)).toMatch(/^Band path\n1\n/);
     expect(toKPOINTS(path, 40.4)).toMatch(/^Band path\n40\n/);
+    // Explicit arg overrides path density; round-trip reflects override
+    const roundTrip = fromKPOINTS(toKPOINTS(path, 12));
+    expect(roundTrip).toMatchObject({ kind: "path", density: 12 });
   });
 
   it("round-trips a band path", () => {
@@ -363,12 +416,19 @@ describe("toKPOINTS", () => {
 
   it("round-trips real meshes that omit the shift line", () => {
     expect(fromKPOINTS(toKPOINTS(fromKPOINTS(fixtures.vaspRealGamma)))).toEqual({
+      kind: "grid",
       mesh: [4, 4, 4],
       origin: [0, 0, 0],
+      scheme: "gamma-centered",
     });
     expect(
       fromKPOINTS(toKPOINTS(fromKPOINTS(fixtures.vaspRealMonkhorst))),
-    ).toEqual({ mesh: [4, 4, 4], origin: [-3 / 8, -3 / 8, -3 / 8] });
+    ).toEqual({
+      kind: "grid",
+      mesh: [4, 4, 4],
+      origin: [-3 / 8, -3 / 8, -3 / 8],
+      scheme: "monkhorst-pack",
+    });
   });
 
   it("round-trips real explicit lists", () => {
@@ -409,6 +469,7 @@ Reciprocal
 0.5 0.5 0.5 1
 `);
     expect(list).toEqual({
+      kind: "points",
       points: [
         { coordinate: [0, 0, 0] },
         { coordinate: [0.5, 0, 0] },
@@ -423,7 +484,12 @@ Reciprocal
       coordinateSystem: "reciprocal",
     });
 
-    const grid = { mesh: [2, 2, 2], origin: [0, 0, 0] };
+    const grid = {
+      kind: "grid",
+      mesh: [2, 2, 2],
+      origin: [0, 0, 0],
+      scheme: "gamma-centered",
+    };
     expect(toKPOINTS(list)).toBe("Automatic mesh\n0\nGamma\n2 2 2\n0 0 0");
     expect(fromKPOINTS(toKPOINTS(list))).toEqual(grid);
   });

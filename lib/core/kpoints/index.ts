@@ -1,1 +1,9 @@
-export type { KPath, KPoint, KPointSet, KGrid, Vec3 } from "./kpoints";
+export type {
+  KPoints,
+  KPath,
+  KPoint,
+  KPointSet,
+  KGrid,
+  Vec3,
+  GridShape,
+} from "./kpoints";

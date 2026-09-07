@@ -14,6 +14,9 @@ importers:
       fast-xml-parser:
         specifier: ^5.10.1
         version: 5.10.1
+      matsci-parse:
+        specifier: file:matsci-parse-0.12.1.tgz
+        version: file:matsci-parse-0.12.1.tgz
       voro3d:
         specifier: ^0.0.7
         version: 0.0.7
@@ -1398,6 +1401,10 @@ packages:
   markdown-it@14.1.1:
     resolution: {integrity: sha512-BuU2qnTti9YKgK5N+IeMubp14ZUKUUw7yeJbkjtosvHiP0AZ5c8IAgEMk79D0eC8F23r4Ac/q8cAIFdm2FtyoA==}
     hasBin: true
+
+  matsci-parse@file:matsci-parse-0.12.1.tgz:
+    resolution: {integrity: sha512-9xYGLIxql6BzWmLw+9zBXUTOQlbFzAtgpCB5nu4SP4H52MqzZtW1EpQ4g76Dp+od5IMT5u5JbcABeD3HDt95cQ==, tarball: file:matsci-parse-0.12.1.tgz}
+    version: 0.12.1
 
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
@@ -2960,6 +2967,12 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
+
+  matsci-parse@file:matsci-parse-0.12.1.tgz:
+    dependencies:
+      '@spglib/moyo-wasm': 0.17.0
+      fast-xml-parser: 5.10.1
+      voro3d: 0.0.7
 
   mdn-data@2.27.1: {}
 
