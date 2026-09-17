@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@spglib/moyo-wasm':
-        specifier: ^0.17.0
-        version: 0.17.0
+        specifier: ^0.18.0
+        version: 0.18.0
       fast-xml-parser:
         specifier: ^5.10.1
         version: 5.10.1
@@ -646,8 +646,8 @@ packages:
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
 
-  '@spglib/moyo-wasm@0.17.0':
-    resolution: {integrity: sha512-4tb7iiH8qrT5oqRtj7OXLRSCoGykMEomu5dKbnEqbG3nI5w8QrFq4iTj8pY70XRSEUFgA5CZi73RtYrhiEMDaQ==}
+  '@spglib/moyo-wasm@0.18.0':
+    resolution: {integrity: sha512-xFilBO8piFZ/Z99nimN8oAljLo/2q1qGaUQV7T5ZvA+D2LGnz6W3Xj0ghD70/YpWYCtvg1DtymHLaQChk/F36Q==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2211,7 +2211,7 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.0.2': {}
 
-  '@spglib/moyo-wasm@0.17.0': {}
+  '@spglib/moyo-wasm@0.18.0': {}
 
   '@standard-schema/spec@1.1.0': {}
 

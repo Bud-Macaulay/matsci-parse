@@ -18,8 +18,6 @@ import {
   subscriptFormula,
 } from "@/core/structure/properties/formula";
 
-import { diamondCPOSCAR, layeredStructure } from "../teststrings/spglibPoscar";
-
 import { supercell } from "@/core/structure/operations/supercell";
 
 import {
@@ -250,7 +248,12 @@ describe("parseFormula", () => {
   });
 
   it("round-trips structure formulas", () => {
-    for (const poscar of [simpleCubic, diamondCPOSCAR, layeredStructure, mc3d_1011]) {
+    for (const poscar of [
+      simpleCubic,
+      diamondCPOSCAR,
+      layeredStructure,
+      mc3d_1011,
+    ]) {
       const s = fromPOSCAR(poscar);
 
       expect(parseFormula(hillFormula(s))).toEqual(composition(s));
