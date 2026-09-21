@@ -23,18 +23,24 @@ let ready: Promise<unknown> | null = null;
 export function initMoyo() {
   if (!ready) {
     ready = (async () => {
-      // In Node.js (tests) read the wasm bytes from disk; the browser fetches
-      // the URL that the package resolves for itself.
-      if (typeof process !== "undefined" && process.versions?.node) {
-        const { readFileSync } = await import("fs");
-        const { createRequire } = await import("module");
-        const require = createRequire(import.meta.url);
-        const wasmPath = require.resolve(
-          "@spglib/moyo-wasm/moyo_wasm_bg.wasm",
-        );
-        return await init({ module_or_path: readFileSync(wasmPath) });
+      try {
+        // In Node.js (tests) read the wasm bytes from disk; the browser fetches
+        // the URL that the package resolves for itself.
+        if (typeof process !== "undefined" && process.versions?.node) {
+          const { readFileSync } = await import("fs");
+          const { createRequire } = await import("module");
+          const require = createRequire(import.meta.url);
+          const wasmPath = require.resolve(
+            "@spglib/moyo-wasm/moyo_wasm_bg.wasm",
+          );
+          return await init({ module_or_path: readFileSync(wasmPath) });
+        }
+        return await init();
+      } catch (e) {
+        // Don't cache rejections: allow a later call to retry the load.
+        ready = null;
+        throw e;
       }
-      return await init();
     })();
   }
   return ready;
