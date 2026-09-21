@@ -10,13 +10,29 @@ import { LineReader } from "../helpers";
 function cleanValue(value: string | undefined): number {
   if (value === undefined) return NaN;
 
+  const unquoted = value.replace(/^['"]+|['"]+$/g, "").trim();
   // remove uncertainty notation:
   // 5.432(1) -> 5.432
-  return Number(value.replace(/\(.+\)/, ""));
+  return Number(unquoted.replace(/\(.+\)/, ""));
 }
 
 function tokenize(line: string): string[] {
   return line.match(/'[^']*'|"[^"]*"|\S+/g) ?? [];
+}
+
+function isSymOpHeader(header: string): boolean {
+  const t = header.toLowerCase();
+  return (
+    t.includes("symmetry_equiv_pos") || t.includes("symop_operation_xyz")
+  );
+}
+
+/** Strips oxidation-state/charge suffixes (e.g. "Na1+" -> "Na", "O2-" -> "O"). */
+function cleanSpeciesSymbol(raw: string | undefined): string {
+  if (raw === undefined) return "";
+  const unquoted = raw.replace(/^['"]+|['"]+$/g, "").trim();
+  const m = unquoted.match(/^([A-Z][a-z]?)/);
+  return m ? m[1] : unquoted;
 }
 
 /** Parses a CIF (Crystallographic Information File) string into a Structure. */
@@ -36,13 +52,43 @@ export function fromCIF(text: string): Structure {
   let currentHeaders: string[] = [];
   let collectingAtoms = false;
   let collectingSymOps = false;
+  // Headers mention atom sites but the loop kind is only known once data
+  // starts (coordinate loop vs. aniso/geom/etc.). Resolved per loop.
+  let potentialAtoms = false;
+  let loopIsAniso = false;
   const symOpStrings: string[] = [];
+
+  function resetLoopState() {
+    inLoop = false;
+    collectingAtoms = false;
+    collectingSymOps = false;
+    potentialAtoms = false;
+    loopIsAniso = false;
+    currentHeaders = [];
+  }
 
   const r = new LineReader(text);
   let rawLine: string | null;
   while ((rawLine = r.next()) !== null) {
     const line = rawLine.trim();
     if (!line) continue;
+
+    // Comments and data/save blocks always terminate an active loop.
+    if (line.startsWith("#")) continue;
+    if (line.startsWith("data_") || line.startsWith("save_")) {
+      resetLoopState();
+      continue;
+    }
+
+    if (line === "loop_") {
+      inLoop = true;
+      currentHeaders = [];
+      collectingAtoms = false;
+      collectingSymOps = false;
+      potentialAtoms = false;
+      loopIsAniso = false;
+      continue;
+    }
 
     if (line.startsWith("_cell_length_a")) {
       a = cleanValue(tokenize(line)[1]);
@@ -56,26 +102,57 @@ export function fromCIF(text: string): Structure {
       beta = cleanValue(tokenize(line)[1]);
     } else if (line.startsWith("_cell_angle_gamma")) {
       gamma = cleanValue(tokenize(line)[1]);
-    } else if (line === "loop_") {
-      inLoop = true;
-      currentHeaders = [];
-      collectingAtoms = false;
-      collectingSymOps = false;
-      continue;
     }
 
     if (inLoop && line.startsWith("_")) {
+      // A tag after data rows have started belongs outside the loop:
+      // terminate the loop and treat it as a regular tag line.
+      if (atomRows.length > 0 && collectingAtoms) {
+        resetLoopState();
+        continue;
+      }
+      if (symOpStrings.length > 0 && collectingSymOps) {
+        resetLoopState();
+        continue;
+      }
+
       currentHeaders.push(line);
 
-      if (line.includes("_atom_site_")) {
-        collectingAtoms = true;
-        collectingSymOps = false;
-      } else if (line.includes("_symmetry_equiv_pos_as_xyz")) {
+      if (isSymOpHeader(line)) {
         collectingSymOps = true;
         collectingAtoms = false;
+        potentialAtoms = false;
+      } else if (line.includes("_atom_site_aniso_")) {
+        // Anisotropic displacement parameters for the same sites —
+        // never coordinate data.
+        loopIsAniso = true;
+        collectingAtoms = false;
+        potentialAtoms = false;
+      } else if (line.includes("_atom_site_")) {
+        // Could be the coordinate loop, but also matches geom loops
+        // (e.g. `_geom_angle_atom_site_label_1`). Decided at data time.
+        if (!loopIsAniso) potentialAtoms = true;
+        collectingSymOps = false;
       }
 
       continue;
+    }
+
+    if (inLoop && potentialAtoms && !collectingAtoms) {
+      // First data row of a candidate atom loop: only coordinate loops
+      // (with fractional columns) are collected; aniso/geom/etc. ignored.
+      const hasFract =
+        currentHeaders.some((h) => h.includes("fract_x")) ||
+        currentHeaders.some((h) => h.includes("fract_y")) ||
+        currentHeaders.some((h) => h.includes("fract_z"));
+
+      if (!hasFract || loopIsAniso) {
+        potentialAtoms = false;
+      } else {
+        potentialAtoms = false;
+        collectingAtoms = true;
+        collectingSymOps = false;
+      }
     }
 
     if (inLoop && collectingAtoms) {
@@ -87,14 +164,16 @@ export function fromCIF(text: string): Structure {
     }
 
     if (inLoop && collectingSymOps) {
-      const tokens = tokenize(line);
+      // Symop rows look like `12 'x+1/2, y, -z'` or `x, y, z`.
+      // Parse the whole line instead of individual tokens so unquoted
+      // operations are not split apart.
+      let s = line;
+      const idMatch = s.match(/^\d+\s+(.*)$/);
+      if (idMatch) s = idMatch[1].trim();
+      s = s.replace(/^['"]+|['"]+$/g, "").trim();
 
-      for (const t of tokens) {
-        const cleaned = t.replace(/['"]/g, "").trim();
-
-        if (cleaned.includes(",")) {
-          symOpStrings.push(cleaned);
-        }
+      if (s.includes(",")) {
+        symOpStrings.push(s);
       }
     }
   }
@@ -122,7 +201,7 @@ export function fromCIF(text: string): Structure {
 
     return {
       species: {
-        symbol: row[ispecies],
+        symbol: cleanSpeciesSymbol(row[ispecies]),
       },
 
       frac: new Float64Array([

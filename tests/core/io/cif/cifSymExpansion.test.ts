@@ -22,10 +22,15 @@ const testCases: SymExpansionTestCase[] = [
     name: "P-1: FeN",
     cif: cifFixtures.sgn2Cif,
     expected: {
+      // P-1 has 2 symops; Fe sits on an inversion centre (mult 1) while
+      // each N is general (mult 2): 1 + 2 + 2 = 5 sites after expansion.
+      // Fractional coordinates are wrapped to [0, 1).
       sites: [
         { species: "Fe", frac: [0.5, 0.0, 0.0] }, // centered
-        { species: "N", frac: [0.163, -0.346, -0.485] },
-        { species: "N", frac: [0.065, -0.309, -0.861] },
+        { species: "N", frac: [0.163, 0.654, 0.515] },
+        { species: "N", frac: [0.837, 0.346, 0.485] },
+        { species: "N", frac: [0.065, 0.691, 0.139] },
+        { species: "N", frac: [0.935, 0.309, 0.861] },
       ],
     },
   },
