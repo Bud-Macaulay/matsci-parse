@@ -1,6 +1,10 @@
-import { parse as parseTxml } from "txml";
+import { parse as parseTxml } from "txml/txml";
 
-import { parseFortranNumber, parseIntSafe, parseFortranBool } from "./fortran-helpers";
+import {
+  parseFortranNumber,
+  parseIntSafe,
+  parseFortranBool,
+} from "./fortran-helpers";
 
 /** An XML node: attributes under `@_<name>`, leaf text under `#text`. */
 export type XmlNode = Record<string, any>;
@@ -11,13 +15,21 @@ export function attr(node: XmlNode | undefined, name: string): string {
 }
 
 /** Get an attribute as a Fortran-number. */
-export function attrNum(node: XmlNode | undefined, name: string, fallback = 0): number {
+export function attrNum(
+  node: XmlNode | undefined,
+  name: string,
+  fallback = 0,
+): number {
   const v = attr(node, name);
   return v ? parseFortranNumber(v) : fallback;
 }
 
 /** Get an attribute as an integer. */
-export function attrInt(node: XmlNode | undefined, name: string, fallback = 0): number {
+export function attrInt(
+  node: XmlNode | undefined,
+  name: string,
+  fallback = 0,
+): number {
   const v = attr(node, name);
   return v ? parseIntSafe(v) : fallback;
 }
