@@ -1,10 +1,24 @@
+/**
+ * First-class pseudopotential data model.
+ *
+ * This module defines the canonical in-memory representation of a
+ * pseudopotential. The model is derived from the UPF v2.0.1 format (the
+ * superset of all supported formats) and every other format is handled by an
+ * adapter in `lib/core/io/pseudo/` that converts into / out of this type.
+ *
+ * Canonical in-memory units: **Rydberg (energy), Bohr (length)** — i.e. the
+ * UPF-native units. Adapters for Hartree-based formats (PSP8, FHI/CPI, PSML,
+ * GTH) convert energies on parse (×2) and back on serialize (×0.5). Both
+ * factors are exact powers of two, so round-trips stay bit-exact.
+ */
+
 /** Pseudopotential type identifiers in UPF format. */
 export type PseudopotentialType = "NC" | "SL" | "1/r" | "US" | "PAW";
 
-/** Relativistic treatment identifiers. */
-export type RelativisticType = "scalar" | "full" | "nonrelativistic";
+/** Relativistic treatment identifiers. "no" is observed in the wild (FHI98PP). */
+export type RelativisticType = "scalar" | "full" | "nonrelativistic" | "no";
 
-/** UPF version string. */
+/** UPF version string. Only set when the source format is UPF. */
 export type UPFVersion = "1.0.0" | "2.0.1";
 
 /** Source format identifier for interconversion. */
@@ -17,6 +31,24 @@ export type PseudopotentialFormat =
   | "GTH"
   | "HGH";
 
+/** Canonical in-memory energy unit (Rydberg). */
+export type EnergyUnit = "Ry";
+
+/** Canonical in-memory length unit (Bohr). */
+export type LengthUnit = "Bohr";
+
+/** Units attached to every first-class pseudopotential object. */
+export interface PseudopotentialUnits {
+  energy: EnergyUnit;
+  length: LengthUnit;
+}
+
+/** The canonical unit system (Ry / Bohr). */
+export const CANONICAL_UNITS: PseudopotentialUnits = {
+  energy: "Ry",
+  length: "Bohr",
+};
+
 /** Header attributes from PP_HEADER section. */
 export interface PseudopotentialHeader {
   /** Generation code identifier. */
@@ -27,7 +59,7 @@ export interface PseudopotentialHeader {
   date?: string;
   /** Brief description. */
   comment?: string;
-  /** Chemical element symbol. */
+  /** Chemical element symbol ("" when the source format carries none, e.g. raw .cpi). */
   element: string;
   /** Pseudopotential type. */
   pseudoType: PseudopotentialType;
@@ -75,6 +107,14 @@ export interface PseudopotentialHeader {
   xcCode?: number;
   /** Spin-orbit extension switch (PSP8). */
   extensionSwitch?: number;
+  /** Pseudopotential well radius r2well (PSP8/FHI ABINIT header). */
+  r2well?: number;
+  /** Core charge radius rchrg (PSP8 ABINIT header). */
+  rchrg?: number;
+  /** Core charge model flag fchrg (PSP8 ABINIT header). */
+  fchrg?: number;
+  /** Core charge qchrg (PSP8 ABINIT header). */
+  qchrg?: number;
 }
 
 /** Radial mesh parameters and data from PP_MESH section. */
@@ -105,6 +145,8 @@ export interface PseudopotentialLocal {
 
 /** A single Kleinman-Bylander projector from PP_BETA section. */
 export interface BetaProjector {
+  /** 1-based position of this projector in the file ordering. */
+  index?: number;
   /** Angular momentum of this projector. */
   angularMomentum: number;
   /** Number of mesh points for this projector. */
@@ -121,38 +163,50 @@ export interface BetaProjector {
   beta: Float64Array;
 }
 
+/** A single Q_ij^L augmentation function from PP_QIJL.i.j.L (USPP/PAW). */
+export interface QijlFunction {
+  /** First projector index (1-based). */
+  i: number;
+  /** Second projector index (1-based). */
+  j: number;
+  /** Augmentation angular momentum. */
+  l: number;
+  /** Augmentation function values on the radial mesh. */
+  qijl: Float64Array;
+}
+
 /** Nonlocal pseudopotential data from PP_NONLOCAL section. */
 export interface PseudopotentialNonlocal {
   /** Array of beta projectors. */
   betas: BetaProjector[];
-  /** D_ij matrix entries. Format: [nb, mb, value] triples. */
+  /** D_ij matrix entries. Format: [nb, mb, value in Ry] triples (1-based). */
   dij: Array<[number, number, number]>;
   /** Number of Q function expansion coefficients. */
   nqf?: number;
-  /** Inner radii for Q function pseudization. */
-  rinner?: Float64Array;
-  /** Q_ij norm integrals. */
-  qqq?: Array<[number, number, number]>;
-  /** Augmentation functions r^2 q_ij(r). */
-  qfunc?: Array<[number, number, number, Float64Array]>;
   /** Augmentation data (USPP/PAW). */
   augmentation?: AugmentationData;
 }
 
 /** Augmentation data from PP_AUGMENTATION section (USPP/PAW). */
 export interface AugmentationData {
+  /** Number of Q function expansion coefficients. */
+  nqf?: number;
+  /** Number of Q_ij composite functions (nqlc). */
+  nqlc?: number;
   /** Augmentation charge shape (BESSEL, GAUSS, PSQ, etc.). */
   shape?: string;
   /** Augmentation matching radius. */
   rMatchAugfun?: number;
-  /** Index of radial grid point at augmentation radius. */
+  /** Cutoff radius for augmentation (alias: iraug). */
+  cutoffR?: number;
+  /** Index of radial grid point at the augmentation cutoff radius. */
+  cutoffRIndex?: number;
+  /** Index of radial grid point at augmentation radius (legacy alias). */
   irc?: number;
-  /** Maximum angular momentum of augmentation. */
+  /** Maximum angular momentum of augmentation (accepts l_max_aug / lmax_aug). */
   lmaxAug?: number;
-  /** Augmentation multipoles augmom(nb, nb1, l). */
-  augmom?: Float64Array;
-  /** Augmentation functions augfun(k). */
-  augfun?: Float64Array[];
+  /** Augmentation pseudization threshold. */
+  augmentationEpsilon?: number;
   /** Q_ij norms from PP_Q section. */
   q?: Float64Array;
   /** Electrostatic multipoles from PP_MULTIPOLES section. */
@@ -163,6 +217,8 @@ export interface AugmentationData {
   rinner?: Float64Array;
   /** Whether augmentation charge depends on angular momentum. */
   qWithL?: boolean;
+  /** Augmentation charge functions from PP_QIJL.i.j.L sections. */
+  qijl?: QijlFunction[];
 }
 
 /** Atomic wavefunction from PP_CHI section. */
@@ -175,7 +231,7 @@ export interface PseudopotentialWfc {
   label?: string;
   /** Principal quantum number. */
   n?: number;
-  /** Pseudo energy. */
+  /** Pseudo energy (Ry). */
   pseudoEnergy?: number;
   /** Inner cutoff radius. */
   cutoffRadius?: number;
@@ -205,7 +261,7 @@ export interface PawData {
   occupations: Float64Array;
   /** All-electron core charge. */
   aeNlcc: Float64Array;
-  /** All-electron local potential. */
+  /** All-electron local potential (Ry). */
   aeVloc: Float64Array;
   /** All-electron wavefunctions. */
   aeWfcs: FullWfc[];
@@ -213,8 +269,10 @@ export interface PawData {
   psWfcs: FullWfc[];
 }
 
-/** GIPAW data from PP_GIPAW_RECONSTRUCTION section. */
+/** GIPAW data from PP_GIPAW / PP_GIPAW_RECONSTRUCTION section. */
 export interface GipawData {
+  /** Which tag the data was read from (preserved for round-trip fidelity). */
+  tag?: "PP_GIPAW" | "PP_GIPAW_RECONSTRUCTION";
   /** GIPAW data format version. */
   gipawDataFormat: number;
   /** Core orbitals. */
@@ -236,61 +294,83 @@ export interface GipawData {
   vlocPs: Float64Array;
 }
 
+/** A single relativistic wavefunction entry with its radial data. */
+export interface RelativisticWfc {
+  /** Total angular momentum j of the spinor. */
+  jchi: number;
+  index?: number;
+  els?: string;
+  nn?: number;
+  lchi?: number;
+  oc?: number;
+  /** Relativistic wavefunction values (may be absent in legacy files). */
+  chi?: Float64Array;
+}
+
+/** A single relativistic projector entry with its radial data. */
+export interface RelativisticBeta {
+  /** Total angular momentum j of the projector. */
+  jjj: number;
+  index?: number;
+  lll?: number;
+  /** Relativistic projector values (may be absent in legacy files). */
+  beta?: Float64Array;
+}
+
 /** Spin-orbit data from PP_SPIN_ORB section. */
 export interface SpinOrbitData {
   /** Relativistic wavefunction data. */
-  relWfcs: Array<{
-    jchi: number;
-    index?: number;
-    els?: string;
-    nn?: number;
-    lchi?: number;
-    oc?: number;
-  }>;
+  relWfcs: RelativisticWfc[];
   /** Relativistic projector data. */
-  relBetas: Array<{
-    jjj: number;
-    index?: number;
-    lll?: number;
-  }>;
+  relBetas: RelativisticBeta[];
 }
 
-/** GTH/HGH analytical pseudopotential parameters. */
+/** GTH/HGH analytical pseudopotential parameters (energies in Ry). */
 export interface GthData {
   /** Valence electron configuration [s, p, d, ...]. */
   nElec: number[];
   /** Local potential Gaussian radius. */
   rLoc: number;
-  /** Local potential Gaussian coefficients. */
+  /** Local potential Gaussian coefficients (Ry). */
   cexpPpl: number[];
   /** Non-local projector radii per angular momentum channel. */
   rPs: number[];
-  /** h-matrix elements [channel][i][j]. */
+  /** h-matrix elements [channel][i][j] (Ry). */
   hprj: number[][][];
-  /** k-matrix elements for spin-orbit [channel][i][j]. */
+  /** k-matrix elements for spin-orbit [channel][i][j] (Ry). */
   kprj?: number[][][];
 }
 
-/** Provenance metadata (PSML and others). */
+/** Provenance metadata: where this object came from. */
 export interface Provenance {
+  /** Format the data was originally read from. */
+  sourceFormat: PseudopotentialFormat;
   /** Generator program name. */
-  creator: string;
+  creator?: string;
   /** Generation date. */
   date?: string;
   /** Embedded input files. */
   inputFiles?: Array<{ name: string; content: string }>;
+  /** True when analytical parameters (GTH/HGH) are preserved alongside the grid. */
+  analytical?: boolean;
+  /** Free-form notes (e.g. appended by resampling operations). */
+  notes?: string;
 }
 
-/** Complete pseudopotential data parsed from a pseudopotential file. */
+/** Complete pseudopotential data: the first-class pseudopotential object. */
 export interface Pseudopotential {
-  /** Source format. */
-  format?: PseudopotentialFormat;
-  /** UPF format version (for UPF formats). */
-  version: UPFVersion;
+  /** Source format this object was parsed from. */
+  format: PseudopotentialFormat;
+  /** UPF format version (only set for UPF1/UPF2 sources). */
+  version?: UPFVersion;
+  /** Canonical in-memory units (always Ry / Bohr). */
+  units: PseudopotentialUnits;
+  /** Provenance metadata (source format, generator, ...). */
+  provenance: Provenance;
   /** Human-readable info section. */
   info?: string;
-  /** Provenance metadata. */
-  provenance?: Provenance;
+  /** Raw PP_INPUTFILE content, when present in the source. */
+  inputFile?: string;
   /** Header with metadata. */
   header: PseudopotentialHeader;
   /** Radial mesh. */
@@ -307,8 +387,6 @@ export interface Pseudopotential {
   }>;
   /** Nonlocal projectors and D_ij. */
   nonlocal: PseudopotentialNonlocal;
-  /** Augmentation data (USPP/PAW). DEPRECATED: prefer nonlocal.augmentation. */
-  augmentation?: AugmentationData;
   /** Atomic pseudo-wavefunctions. */
   pswfc: PseudopotentialWfc[];
   /** Atomic all-electron wavefunctions (PAW). */

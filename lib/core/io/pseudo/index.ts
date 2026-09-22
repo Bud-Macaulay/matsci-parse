@@ -4,3 +4,4 @@ export * from "./fhi";
 export * from "./psp8";
 export * from "./psml";
 export * from "./gth";
+export * from "./registry";

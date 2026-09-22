@@ -38,8 +38,9 @@ describe("GTH parser", () => {
       expect(pp.gth).toBeDefined();
       expect(pp.gth!.rLoc).toBeCloseTo(0.2);
       expect(pp.gth!.cexpPpl.length).toBe(2);
-      expect(pp.gth!.cexpPpl[0]).toBeCloseTo(-4.04797008);
-      expect(pp.gth!.cexpPpl[1]).toBeCloseTo(0.66965815);
+      // Canonical units are Ry (file values in Hartree × 2)
+      expect(pp.gth!.cexpPpl[0]).toBeCloseTo(-4.04797008 * 2);
+      expect(pp.gth!.cexpPpl[1]).toBeCloseTo(0.66965815 * 2);
     });
 
     it("has no non-local projectors", () => {
@@ -66,7 +67,7 @@ describe("GTH parser", () => {
       expect(pp.header.element).toBe("He");
       expect(pp.header.zValence).toBeCloseTo(2.0);
       expect(pp.gth!.rLoc).toBeCloseTo(0.2);
-      expect(pp.gth!.cexpPpl).toEqual([-9.06984697, 1.67662166]);
+      expect(pp.gth!.cexpPpl).toEqual([-9.06984697 * 2, 1.67662166 * 2]);
     });
   });
 
@@ -94,17 +95,17 @@ describe("GTH parser", () => {
       expect(pp.gth!.rPs[1]).toBeCloseTo(0.35634007);
     });
 
-    it("h-matrix elements match submodule data", () => {
+    it("h-matrix elements match submodule data (×2 for Ry)", () => {
       const pp = fromGTH(realCGthPbe);
-      expect(pp.gth!.hprj[0]).toEqual([[9.86073638]]);
-      expect(pp.gth!.hprj[1]).toEqual([[-0.08162373]]);
+      expect(pp.gth!.hprj[0]).toEqual([[9.86073638 * 2]]);
+      expect(pp.gth!.hprj[1]).toEqual([[-0.08162373 * 2]]);
     });
 
     it("D_ij entries are correct", () => {
       const pp = fromGTH(realCGthPbe);
       expect(pp.nonlocal.dij.length).toBe(2);
-      expect(pp.nonlocal.dij[0][2]).toBeCloseTo(9.86073638);
-      expect(pp.nonlocal.dij[1][2]).toBeCloseTo(-0.08162373);
+      expect(pp.nonlocal.dij[0][2]).toBeCloseTo(9.86073638 * 2);
+      expect(pp.nonlocal.dij[1][2]).toBeCloseTo(-0.08162373 * 2);
     });
   });
 
@@ -153,6 +154,38 @@ describe("GTH parser", () => {
       const a = fromGTH(realCGthPbe);
       const c = fromGTH(toGTH(a));
       expect(c).toEqual(a);
+    });
+  });
+
+  describe("k-matrix (SOC) entries", () => {
+    const socEntry = [
+      "Xx GTH-PBE-q1",
+      "    1",
+      "     0.20000000    1    -4.04797008     0.66965815",
+      "    1",
+      "     0.30000000    1     1.50000000     0.25000000",
+    ].join("\n");
+
+    it("parses inline k-matrix with Hartree→Ry conversion", () => {
+      const pp = fromGTH(socEntry);
+      expect(pp.header.hasSo).toBe(true);
+      expect(pp.gth!.kprj).toBeDefined();
+      expect(pp.gth!.kprj![0]).toEqual([[0.25 * 2]]);
+      expect(pp.gth!.hprj[0]).toEqual([[1.5 * 2]]);
+    });
+
+    it("round-trips k-matrix losslessly", () => {
+      const a = fromGTH(socEntry);
+      const c = fromGTH(toGTH(a));
+      expect(c).toEqual(a);
+    });
+
+    it("keeps analytical params alongside the evaluated grid", () => {
+      const pp = fromGTH(socEntry);
+      expect(pp.provenance.analytical).toBe(true);
+      expect(pp.gth).toBeDefined();
+      expect(pp.local.vloc.length).toBe(500);
+      expect(pp.nonlocal.betas.length).toBe(1);
     });
   });
 });

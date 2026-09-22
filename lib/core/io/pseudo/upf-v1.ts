@@ -16,6 +16,8 @@ import type {
   PseudopotentialWfc,
 } from "../../pseudopotential/pseudopotential";
 
+import { CANONICAL_UNITS } from "../../pseudopotential/pseudopotential";
+
 import {
   parseFortranNumber,
   parseFloat64Array,
@@ -125,8 +127,8 @@ export function fromUPFv1(text: string): Pseudopotential {
 
   // Parse PP_MESH section
   const meshSection = extractSection(text, "PP_MESH");
-  let r = new Float64Array(0);
-  let rab = new Float64Array(0);
+  let r: Float64Array = new Float64Array(0);
+  let rab: Float64Array = new Float64Array(0);
 
   if (meshSection) {
     const rSection = extractSubSection(meshSection, "PP_R");
@@ -244,6 +246,8 @@ export function fromUPFv1(text: string): Pseudopotential {
   return {
     format: "UPF1",
     version: "1.0.0",
+    units: { ...CANONICAL_UNITS },
+    provenance: { sourceFormat: "UPF1" },
     header: {
       element,
       pseudoType,

@@ -7,6 +7,8 @@ import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
 import { fromGTH, toGTH } from "@/core/io/pseudo/gth";
 import { fromPSP8, toPSP8 } from "@/core/io/pseudo/psp8";
 import { fromPSML, toPSML } from "@/core/io/pseudo/psml";
+import { validate } from "@/core/pseudopotential/validate";
+import type { Pseudopotential } from "@/core/pseudopotential/pseudopotential";
 import { fromASE, toASE } from "@/core/io/ase";
 import { fromPymatgen, toPymatgen } from "@/core/io/pymatgen";
 
@@ -30,6 +32,28 @@ function checkRoundtrip<T>(parsed: T, reparsed: T) {
   expect(reparsed).toBeDefined();
 }
 
+/**
+ * FHI envelope metadata (element, XC, ABINIT header trivia) has no
+ * representation in raw .cpi text. Normalize it away so the tabulated
+ * data itself is compared strictly.
+ */
+function normalizeFhi(pp: Pseudopotential): Pseudopotential {
+  return {
+    ...pp,
+    header: {
+      ...pp.header,
+      element: "",
+      functional: "",
+      xcCode: undefined,
+      r2well: undefined,
+      rchrg: undefined,
+      fchrg: undefined,
+      qchrg: undefined,
+    },
+    provenance: { sourceFormat: "CPI" },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // FHI round-trip
 // ---------------------------------------------------------------------------
@@ -49,6 +73,8 @@ fhiDirs.forEach((dir) => {
         const cpi = toFHI(parsed);
         const reparsed = fromFHI(cpi);
         checkRoundtrip(parsed, reparsed);
+        // Tabulated data survives bit-exactly; envelope metadata is .cpi-lossy.
+        expect(normalizeFhi(reparsed)).toEqual(normalizeFhi(parsed));
         expect(reparsed.mesh.r.length).toBe(parsed.mesh.r.length);
         expect(reparsed.header.zValence).toBeCloseTo(parsed.header.zValence);
         expect(reparsed.header.element).toBe("");
@@ -67,12 +93,15 @@ if (existsSync(upfDir)) {
 
   describe("UPF round-trip", () => {
     upfFiles.forEach((file) => {
-      it(`round-trips ${file}`, () => {
+      it(`round-trips ${file}`, { timeout: 30000 }, () => {
         const text = loadFile("upf-v2", "sources", "1", "files", file);
         const parsed = fromUPF(text);
+        expect(validate(parsed)).toEqual([]);
         const serialized = toUPF(parsed);
         const reparsed = fromUPF(serialized);
         checkRoundtrip(parsed, reparsed);
+        // UPF is the lossless hub: the full object must survive bit-exactly.
+        expect(reparsed).toEqual(parsed);
         expect(reparsed.header.element).toBe(parsed.header.element);
       });
     });
@@ -92,6 +121,7 @@ if (existsSync(psp8Dir)) {
       it(`round-trips ${file}`, { timeout: 30000 }, () => {
         const text = loadFile("psp8", "sources", "1", "files", file);
         const parsed = fromPSP8(text);
+        expect(validate(parsed)).toEqual([]);
         const serialized = toPSP8(parsed);
         const reparsed = fromPSP8(serialized);
         checkRoundtrip(parsed, reparsed);
@@ -117,6 +147,8 @@ if (existsSync(gthDir)) {
         const serialized = toGTH(parsed);
         const reparsed = fromGTH(serialized);
         checkRoundtrip(parsed, reparsed);
+        // Analytical params + evaluated grid survive bit-exactly.
+        expect(reparsed).toEqual(parsed);
         expect(reparsed.header.zValence).toBeCloseTo(parsed.header.zValence);
       });
     });
@@ -139,6 +171,7 @@ if (existsSync(psmlDir)) {
         const serialized = toPSML(parsed);
         const reparsed = fromPSML(serialized);
         checkRoundtrip(parsed, reparsed);
+        expect(reparsed).toEqual(parsed);
         expect(reparsed.header.element).toBe(parsed.header.element);
       });
     });

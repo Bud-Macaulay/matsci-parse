@@ -1,11 +1,22 @@
 /**
- * GTH/HGH (Goedecker-Teter-Hutter / Hartwigsen-Goedecker-Hutter) parser.
+ * GTH/HGH (Goedecker-Teter-Hutter / Hartwigsen-Goedecker-Hutter) adapter.
+ *
+ * Converts between GTH text and the first-class Pseudopotential object
+ * (canonical units Ry / Bohr).
  *
  * GTH/HGH pseudopotentials are analytical, defined by Gaussian functions
- * rather than tabulated on a radial grid. At parse time, we evaluate the
- * analytical expressions on a logarithmic grid for the IR.
+ * rather than tabulated on a radial grid. The IR keeps BOTH: the analytical
+ * parameters in `gth` (with `provenance.analytical = true`) and an evaluated
+ * tabulation on a logarithmic grid for grid-based consumers.
  *
- * Units: Hartree (energy), Bohr (length).
+ * Native units: Hartree (energy), Bohr (length) — analytical parameters are
+ * converted to Ry on parse (×2) and back on serialize (×0.5). Length-like
+ * parameters (rLoc, rPs) are unit-free here (Bohr in both systems).
+ *
+ * Loss notes: k-matrix (SOC) is parsed when present (inline channel-line
+ * remainder, or trailing block after the last channel) and round-trips;
+ * entries without analytical GTH parameters cannot be written (`toGTH`
+ * throws — use `canWriteGTH()` to check first).
  *
  * Reference:
  * - GTH: Goedecker, Teter, Hutter, PRB 54, 1703 (1996)
@@ -20,15 +31,42 @@ import type {
   PseudopotentialNonlocal,
   BetaProjector,
   GthData,
+  PseudopotentialFormat,
 } from "../../pseudopotential/pseudopotential";
+
+import { CANONICAL_UNITS } from "../../pseudopotential/pseudopotential";
+import {
+  RY_TO_HA,
+  haToRy,
+} from "../../pseudopotential/units";
+
+import { makeRadialGrid } from "../../pseudopotential/operations";
 
 import {
   parseFortranNumber,
   formatFortranNumber,
-  formatDataArray,
 } from "./fortran-helpers";
 
-interface GthParsedEntry {
+export interface GTHConversionCheck {
+  ok: boolean;
+  reasons: string[];
+}
+
+/**
+ * Report whether a first-class pseudopotential can be written as GTH.
+ * Tabulated-only data cannot be inverted to analytical GTH form.
+ */
+export function canWriteGTH(pp: Pseudopotential): GTHConversionCheck {
+  const reasons: string[] = [];
+  if (!pp.gth) {
+    reasons.push(
+      "no GTH analytical parameters (tabulated-only data cannot be inverted to GTH form)",
+    );
+  }
+  return { ok: reasons.length === 0, reasons };
+}
+
+export interface GthParsedEntry {
   element: string;
   potentialName: string;
   aliases: string[];
@@ -44,6 +82,31 @@ interface GthParsedEntry {
   }>;
   hasKprj: boolean;
   kprj?: number[][][];
+}
+
+/** True for comment / blank / entry-boundary lines vs numeric data lines. */
+function isBoundaryLine(line: string | undefined): boolean {
+  if (line === undefined) return true;
+  const t = line.trim();
+  return t === "" || t.startsWith("#") || !/^[-+.\d]/.test(t);
+}
+
+/**
+ * Expand upper-triangle values (row-major: h11, h12, ..., h1n, h22, ...)
+ * into a full symmetric n×n matrix, matching GthData's [channel][i][j].
+ */
+function upperToSymmetric(flat: number[], n: number): number[][] {
+  const m: number[][] = [];
+  for (let i = 0; i < n; i++) m.push(new Array(n).fill(0));
+  let pos = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = i; j < n; j++) {
+      const v = flat[pos++] ?? 0;
+      m[i][j] = v;
+      m[j][i] = v;
+    }
+  }
+  return m;
 }
 
 /**
@@ -107,29 +170,54 @@ export function parseGTHFile(text: string): GthParsedEntry[] {
       const r = parseFortranNumber(channelParts[0]);
       const nprjPpnl = parseInt(channelParts[1]);
 
-      // Read h-matrix upper triangle.
-      // CP2K format puts values on the same line after r and nprjPpnl;
-      // the hand-crafted format puts them on separate lines.
-      const hprj: number[][] = [];
+      // Upper-triangle size of the h-matrix for this channel.
+      const hNeeded = (nprjPpnl * (nprjPpnl + 1)) / 2;
+
+      // Read h-matrix: inline tokens first, then one value per following line.
+      const hFlat: number[] = [];
       let inlineIdx = 2;
-      for (let ii = 0; ii < nprjPpnl; ii++) {
-        hprj.push([]);
-        for (let jj = ii; jj < nprjPpnl; jj++) {
-          if (inlineIdx < channelParts.length) {
-            hprj[ii].push(parseFortranNumber(channelParts[inlineIdx++]));
-          } else if (i < lines.length) {
-            hprj[ii].push(parseFortranNumber(lines[i++].trim().split(/\s+/)[0]));
-          } else {
-            hprj[ii].push(0);
-          }
+      while (hFlat.length < hNeeded) {
+        if (inlineIdx < channelParts.length) {
+          hFlat.push(parseFortranNumber(channelParts[inlineIdx++]));
+        } else if (i < lines.length) {
+          hFlat.push(parseFortranNumber(lines[i++].trim().split(/\s+/)[0]));
+        } else {
+          hFlat.push(0);
         }
       }
+      const hprj: number[][] = upperToSymmetric(hFlat, nprjPpnl);
 
       channels.push({ r, nprjPpnl, hprj });
 
-      // Check for k-matrix (SOC) — follows h-matrix if present
-      // In GTH_SOC_POTENTIALS, the k-matrix has the same structure
-      // For now, we don't parse it from the standard GTH_POTENTIALS
+      // k-matrix (SOC): inline remainder on the channel line, if present.
+      const inlineRemainder = channelParts.slice(inlineIdx).map(parseFortranNumber);
+      if (
+        !hasKprj &&
+        inlineRemainder.length >= hNeeded &&
+        inlineRemainder.every(Number.isFinite)
+      ) {
+        hasKprj = true;
+        const kFlat = inlineRemainder.slice(0, hNeeded);
+        const kmat = upperToSymmetric(kFlat, nprjPpnl);
+        while (kprjArrays.length < l) kprjArrays.push([]);
+        kprjArrays.push(kmat);
+      } else if (!hasKprj && l === nprj - 1 && hNeeded > 0) {
+        // Trailing multi-line k block: only valid on the LAST channel, where
+        // the lines after it must be an entry boundary (not next-channel data).
+        const kFlat: number[] = [];
+        let j = i;
+        while (kFlat.length < hNeeded && j < lines.length && !isBoundaryLine(lines[j])) {
+          kFlat.push(parseFortranNumber(lines[j].trim().split(/\s+/)[0]));
+          j++;
+        }
+        if (kFlat.length === hNeeded && isBoundaryLine(lines[j])) {
+          hasKprj = true;
+          i = j;
+          const kmat = upperToSymmetric(kFlat, nprjPpnl);
+          while (kprjArrays.length < l) kprjArrays.push([]);
+          kprjArrays.push(kmat);
+        }
+      }
     }
 
     entries.push({
@@ -155,6 +243,8 @@ export function parseGTHFile(text: string): GthParsedEntry[] {
  *
  * V_local(r) = -Zval/r * erf(r / (sqrt(2) * r_loc))
  *            + exp(-r²/(2r_loc²)) * (c0 + c1*(r/r_loc)² + c2*(r/r_loc)⁴ + c3*(r/r_loc)⁶)
+ *
+ * Units follow the units of cexpPpl (converted to Ry before calling).
  */
 function evalGthLocal(r: Float64Array, zVal: number, rLoc: number, cexpPpl: number[]): Float64Array {
   const vloc = new Float64Array(r.length);
@@ -217,7 +307,7 @@ function evalGthProjector(
 }
 
 /**
- * Parse a single GTH/HGH entry and convert to Pseudopotential IR.
+ * Parse a single GTH/HGH entry and convert to a first-class Pseudopotential.
  */
 export function fromGTH(text: string): Pseudopotential {
   const entries = parseGTHFile(text);
@@ -228,31 +318,35 @@ export function fromGTH(text: string): Pseudopotential {
 }
 
 /**
- * Parse a single GTH entry into a Pseudopotential.
+ * Parse a single GTH entry into a first-class Pseudopotential.
+ *
+ * Analytical parameters are converted to Ry and stored in `gth` alongside
+ * an evaluated tabulation on a logarithmic grid.
  */
 export function fromGthEntry(entry: GthParsedEntry): Pseudopotential {
   const zVal = entry.nElec.reduce((a, b) => a + b, 0);
   const lMax = entry.channels.length > 0 ? entry.channels.length - 1 : 0;
 
+  const format: PseudopotentialFormat = /HGH/i.test(entry.potentialName)
+    ? "HGH"
+    : "GTH";
+
   // Build a logarithmic radial grid
   const npts = 500;
   const rmax = 20.0; // Bohr, sufficient for most pseudopotentials
-  const r = new Float64Array(npts);
-  const rab = new Float64Array(npts);
-  const dx = Math.log(rmax) / (npts - 1);
-  for (let i = 0; i < npts; i++) {
-    r[i] = Math.exp(dx * i);
-    rab[i] = r[i] * dx;
-  }
-  if (npts > 1) {
-    r[0] = r[1] * 0.01; // Avoid r=0 for erf evaluation
-    rab[0] = r[0] * dx;
-  }
+  const { r, rab } = makeRadialGrid({ npts, rmax, type: "log" });
 
-  // Evaluate local potential
-  const localVloc = evalGthLocal(r, zVal, entry.rLoc, entry.cexpPpl);
+  // Convert analytical energies Hartree → Ry.
+  const cexpPplRy = entry.cexpPpl.map(haToRy);
+  const hprjRy = entry.channels.map((ch) =>
+    ch.hprj.map((row) => row.map(haToRy)),
+  );
+  const kprjRy = entry.kprj?.map((m) => m.map((row) => row.map(haToRy)));
 
-  // Evaluate projectors
+  // Evaluate local potential (Ry)
+  const localVloc = evalGthLocal(r, zVal, entry.rLoc, cexpPplRy);
+
+  // Evaluate projectors (normalization is unit-free)
   const betas: BetaProjector[] = [];
   const dij: Array<[number, number, number]> = [];
   let projIdx = 1;
@@ -262,64 +356,78 @@ export function fromGthEntry(entry: GthParsedEntry): Pseudopotential {
     for (let p = 0; p < ch.nprjPpnl; p++) {
       const betaData = evalGthProjector(r, l, p, ch.r);
       betas.push({
+        index: projIdx + p,
         angularMomentum: l,
         ultrasoftCutoffRadius: 0,
-        label: `${l}${String.fromCharCode(115 + l)}${p + 1}`,
+        label: `${l}${"spdf"[l] ?? l}${p + 1}`,
         beta: betaData,
       });
-
-      // D_ij from h-matrix (diagonal for single projectors)
-      const hij = ch.hprj[p]?.[p] ?? 1.0;
-      dij.push([projIdx, projIdx, hij]);
-      projIdx++;
     }
+    // D_ij is the full h-block: for GTH the h-matrix couples the
+    // projectors of a channel directly.
+    for (let p = 0; p < ch.nprjPpnl; p++) {
+      for (let q = 0; q < ch.nprjPpnl; q++) {
+        dij.push([projIdx + p, projIdx + q, hprjRy[l]?.[p]?.[q] ?? (p === q ? 1.0 : 0)]);
+      }
+    }
+    projIdx += ch.nprjPpnl;
   }
 
-  // GTH analytical data
+  const mesh: PseudopotentialMesh = {
+    gridType: "logarithmic",
+    rmax,
+    r,
+    rab,
+  };
+
+  // GTH analytical data (energies in Ry)
   const gthData: GthData = {
     nElec: entry.nElec,
     rLoc: entry.rLoc,
-    cexpPpl: entry.cexpPpl,
+    cexpPpl: cexpPplRy,
     rPs: entry.channels.map((ch) => ch.r),
-    hprj: entry.channels.map((ch) => ch.hprj),
-    kprj: entry.kprj,
+    hprj: hprjRy,
+    kprj: kprjRy,
+  };
+
+  const header: PseudopotentialHeader = {
+    element: entry.element,
+    pseudoType: "NC",
+    relativistic: "scalar",
+    isUltrasoft: false,
+    isPaw: false,
+    isCoulomb: false,
+    hasSo: entry.hasKprj,
+    hasWfc: false,
+    hasGipaw: false,
+    pawAsGipaw: false,
+    coreCorrection: false,
+    functional: entry.potentialName,
+    zValence: zVal,
+    totalPsenergy: 0,
+    wfcCutoff: 0,
+    rhoCutoff: 0,
+    lMax,
+    lMaxRho: lMax,
+    lLocal: 0,
+    meshSize: npts,
+    numberOfWfc: 0,
+    numberOfProj: betas.length,
   };
 
   return {
-    format: "GTH",
-    version: "2.0.1",
-    header: {
-      element: entry.element,
-      pseudoType: "NC",
-      relativistic: "scalar",
-      isUltrasoft: false,
-      isPaw: false,
-      isCoulomb: false,
-      hasSo: entry.hasKprj,
-      hasWfc: false,
-      hasGipaw: false,
-      pawAsGipaw: false,
-      coreCorrection: false,
-      functional: entry.potentialName,
-      zValence: zVal,
-      totalPsenergy: 0,
-      wfcCutoff: 0,
-      rhoCutoff: 0,
-      lMax,
-      lMaxRho: lMax,
-      lLocal: 0,
-      meshSize: npts,
-      numberOfWfc: 0,
-      numberOfProj: betas.length,
+    format,
+    units: { ...CANONICAL_UNITS },
+    provenance: {
+      sourceFormat: format,
+      analytical: true,
+      notes:
+        entry.aliases.length > 0 ? `aliases: ${entry.aliases.join(", ")}` : undefined,
     },
-    mesh: {
-      gridType: "logarithmic",
-      rmax: rmax,
-      r,
-      rab,
-    },
-    local: { vloc: localVloc },
-    nonlocal: { betas, dij },
+    header,
+    mesh,
+    local: { vloc: localVloc } satisfies PseudopotentialLocal,
+    nonlocal: { betas, dij } satisfies PseudopotentialNonlocal,
     pswfc: [],
     rhoatom: new Float64Array(npts),
     gth: gthData,
@@ -327,11 +435,14 @@ export function fromGthEntry(entry: GthParsedEntry): Pseudopotential {
 }
 
 /**
- * Serialize a Pseudopotential to GTH format (single element entry).
+ * Serialize a first-class Pseudopotential to GTH format (single element entry).
+ * Analytical parameters are written back in Hartree (native GTH units);
+ * the k-matrix is written inline on the channel line when present.
  */
 export function toGTH(pp: Pseudopotential): string {
+  const check = canWriteGTH(pp);
   if (!pp.gth) {
-    throw new Error("Pseudopotential does not have GTH analytical parameters");
+    throw new Error(check.reasons[0]);
   }
 
   const lines: string[] = [];
@@ -358,20 +469,41 @@ export function toGTH(pp: Pseudopotential): string {
   }
   lines.push(nElec.join("  "));
 
-  // Local part
-  lines.push(`${formatFortranNumber(gth.rLoc)}  ${gth.cexpPpl.length}  ${gth.cexpPpl.map((c) => formatFortranNumber(c)).join("  ")}`);
+  // Local part (Ry → Ha)
+  const cHa = gth.cexpPpl.map((c) => c * RY_TO_HA);
+  lines.push(`${formatFortranNumber(gth.rLoc)}  ${cHa.length}  ${cHa.map((c) => formatFortranNumber(c)).join("  ")}`);
 
-  // Non-local part
+  // Non-local part (Ry → Ha)
   lines.push(`${gth.rPs.length}`);
   for (let l = 0; l < gth.hprj.length; l++) {
     const h = gth.hprj[l];
     const nprj = h.length;
-    lines.push(`${formatFortranNumber(gth.rPs[l])}  ${nprj}`);
-    // h-matrix upper triangle
-    for (let i = 0; i < nprj; i++) {
-      for (let j = i; j < nprj; j++) {
-        const val = h[i]?.[j] ?? 0;
-        lines.push(formatFortranNumber(val));
+    const k = gth.kprj?.[l];
+    if (k) {
+      // k-matrix inline on the channel line so the parser recovers it.
+      const hVals: string[] = [];
+      for (let i = 0; i < nprj; i++) {
+        for (let j = i; j < nprj; j++) {
+          hVals.push(formatFortranNumber((h[i]?.[j] ?? 0) * RY_TO_HA));
+        }
+      }
+      const kVals: string[] = [];
+      for (let i = 0; i < nprj; i++) {
+        for (let j = i; j < nprj; j++) {
+          kVals.push(formatFortranNumber((k[i]?.[j] ?? 0) * RY_TO_HA));
+        }
+      }
+      lines.push(
+        `${formatFortranNumber(gth.rPs[l])}  ${nprj}  ${hVals.join("  ")}  ${kVals.join("  ")}`,
+      );
+    } else {
+      lines.push(`${formatFortranNumber(gth.rPs[l])}  ${nprj}`);
+      // h-matrix upper triangle
+      for (let i = 0; i < nprj; i++) {
+        for (let j = i; j < nprj; j++) {
+          const val = (h[i]?.[j] ?? 0) * RY_TO_HA;
+          lines.push(formatFortranNumber(val));
+        }
       }
     }
   }

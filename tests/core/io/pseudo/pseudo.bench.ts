@@ -4,7 +4,11 @@ import { fromGTH, toGTH } from "@/core/io/pseudo/gth";
 import { fromPSP8, toPSP8 } from "@/core/io/pseudo/psp8";
 import { fromPSML, toPSML } from "@/core/io/pseudo/psml";
 import { fromUPF, toUPF } from "@/core/io/pseudo/upf";
+import { fromUPFv1, toUPFv1 } from "@/core/io/pseudo/upf-v1";
 import { fromFHI, toFHI } from "@/core/io/pseudo/fhi";
+import { detectFormat, parse, convert } from "@/core/io/pseudo/registry";
+import { validate } from "@/core/pseudopotential/validate";
+import { resampleLinear, makeRadialGrid } from "@/core/pseudopotential/operations";
 
 import {
   realHGthPbe,
@@ -17,7 +21,7 @@ import {
 
 import { realHPsp8, realCPsp8 } from "./teststrings/psp8";
 
-import { realMoUpfV2Fhi, heNcUpf } from "./teststrings/upf";
+import { realMoUpfV2Fhi, heNcUpf, oPawUpf } from "./teststrings/upf";
 
 import { realHPsml, realCPsml, realOPsml } from "./teststrings/psml";
 
@@ -242,5 +246,124 @@ describe("pseudo round-trip: PSML", () => {
 
   bench("fromPSML → toPSML (O)", () => {
     toPSML(fromPSML(realOPsml));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UPF v1 (synthetic NC fixture via UPF2, 728 mesh)
+// ---------------------------------------------------------------------------
+
+const upfv1Text = toUPFv1(fromUPF(heNcUpf));
+const upfv1Parsed = fromUPFv1(upfv1Text);
+
+// warmup
+toUPFv1(upfv1Parsed);
+
+describe("pseudo parse: UPF v1", () => {
+  bench("fromUPFv1 (He NC, 728 mesh)", () => {
+    fromUPFv1(upfv1Text);
+  });
+});
+
+describe("pseudo serialize: UPF v1", () => {
+  bench("toUPFv1 (He NC)", () => {
+    toUPFv1(upfv1Parsed);
+  });
+});
+
+describe("pseudo round-trip: UPF v1", () => {
+  bench("fromUPFv1 → toUPFv1 (He NC)", () => {
+    toUPFv1(fromUPFv1(upfv1Text));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// UPF v2 PAW (largest shape: augmentation + PAW + GIPAW)
+// ---------------------------------------------------------------------------
+
+const upfPaw = fromUPF(oPawUpf);
+
+// warmup
+toUPF(upfPaw);
+
+describe("pseudo parse: UPF v2 PAW", () => {
+  bench("fromUPF (O PAW, 1095 mesh, QIJL + PAW + GIPAW)", () => {
+    fromUPF(oPawUpf);
+  });
+});
+
+describe("pseudo serialize: UPF v2 PAW", () => {
+  bench("toUPF (O PAW)", () => {
+    toUPF(upfPaw);
+  });
+});
+
+describe("pseudo round-trip: UPF v2 PAW", () => {
+  bench("fromUPF → toUPF (O PAW)", () => {
+    toUPF(fromUPF(oPawUpf));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Registry (detection + dispatch + conversion)
+// ---------------------------------------------------------------------------
+
+describe("pseudo registry: detectFormat", () => {
+  bench("detectFormat (UPF2)", () => {
+    detectFormat(heNcUpf);
+  });
+
+  bench("detectFormat (PSP8)", () => {
+    detectFormat(realHPsp8);
+  });
+
+  bench("detectFormat (PSML)", () => {
+    detectFormat(realHPsml);
+  });
+
+  bench("detectFormat (FHI)", () => {
+    detectFormat(realHFhi);
+  });
+
+  bench("detectFormat (GTH)", () => {
+    detectFormat(realHGthPbe);
+  });
+});
+
+describe("pseudo registry: parse + convert", () => {
+  bench("parse (auto-detect UPF2 He)", () => {
+    parse(heNcUpf);
+  });
+
+  bench("convert PSP8 → UPF2 (H)", () => {
+    convert(realHPsp8, "UPF2");
+  });
+
+  bench("convert FHI → UPF2 (C)", () => {
+    convert(realCFhi, "UPF2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// First-class operations
+// ---------------------------------------------------------------------------
+
+const { r: resampleGrid } = makeRadialGrid({
+  npts: 500,
+  rmax: upfHe.mesh.r[upfHe.mesh.r.length - 1],
+  type: "log",
+});
+
+describe("pseudo operations", () => {
+  bench("validate (He NC, 728 mesh)", () => {
+    validate(upfHe);
+  });
+
+  bench("validate (O PAW, 1095 mesh)", () => {
+    validate(upfPaw);
+  });
+
+  bench("resampleLinear (He NC, 728 → 500 pts)", () => {
+    resampleLinear(upfHe, resampleGrid);
   });
 });

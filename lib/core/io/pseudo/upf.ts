@@ -1,5 +1,3 @@
-import { XMLParser, XMLBuilder } from "fast-xml-parser";
-
 import type {
   Pseudopotential,
   PseudopotentialHeader,
@@ -13,9 +11,15 @@ import type {
   PawData,
   GipawData,
   SpinOrbitData,
+  RelativisticWfc,
+  RelativisticBeta,
+  QijlFunction,
   PseudopotentialType,
   RelativisticType,
+  UPFVersion,
 } from "../../pseudopotential/pseudopotential";
+
+import { CANONICAL_UNITS } from "../../pseudopotential/pseudopotential";
 
 import {
   parseFortranNumber,
@@ -36,43 +40,18 @@ import {
   attrBool,
   textOf,
   toArray,
+  entries,
+  parseXml,
 } from "./xml-helpers";
 
 function parseData(text: string): Float64Array {
   return parseFloat64Array(text);
 }
 
-// ── XML parser config ──────────────────────────────────────────────
-
-const parserOptions = {
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  allowBooleanAttributes: true,
-  parseTagValue: false,
-  parseAttributeValue: false,
-  trimValues: true,
-  isArray: (_name: string, jpath: string, isLeafNode: boolean, isAttribute: boolean) => {
-    if (isAttribute) return false;
-    // These tags can appear multiple times — always wrap in array.
-    // Also match dotted variants (e.g. PP_GIPAW_CORE_ORBITAL.1).
-    if (
-      _name === "PP_BETA" ||
-      _name.startsWith("PP_BETA.") ||
-      _name === "PP_CHI" ||
-      _name.startsWith("PP_CHI.") ||
-      _name === "PP_VNL" ||
-      _name === "PP_AEWFC" ||
-      _name.startsWith("PP_AEWFC.") ||
-      _name.startsWith("PP_GIPAW_CORE_ORBITAL.") ||
-      _name.startsWith("PP_GIPAW_ORBITAL.") ||
-      _name === "PP_RELWFC" ||
-      _name === "PP_RELBETA"
-    ) {
-      return true;
-    }
-    return false;
-  },
-};
+/** Parse optional radial data: undefined when the element has no text. */
+function parseOptionalData(text: string): Float64Array | undefined {
+  return text.trim() ? parseData(text) : undefined;
+}
 
 // ── Section parsers ────────────────────────────────────────────────
 
@@ -108,8 +87,10 @@ function parseHeader(node: XmlNode): PseudopotentialHeader {
 }
 
 function parseMesh(node: XmlNode): PseudopotentialMesh {
+  const dx = attr(node, "dx") ? attrNum(node, "dx") : undefined;
   return {
-    dx: attr(node, "dx") ? attrNum(node, "dx") : undefined,
+    gridType: dx != null ? "logarithmic" : "custom",
+    dx,
     mesh: attr(node, "mesh") ? attrInt(node, "mesh") : undefined,
     xmin: attr(node, "xmin") ? attrNum(node, "xmin") : undefined,
     rmax: attrNum(node, "rmax"),
@@ -125,6 +106,7 @@ function parseLocal(node: XmlNode): PseudopotentialLocal {
 
 function parseBeta(node: XmlNode): BetaProjector {
   return {
+    index: attr(node, "index") ? attrInt(node, "index") : undefined,
     angularMomentum: attrInt(node, "angular_momentum"),
     cutoffRadiusIndex: attr(node, "cutoff_radius_index")
       ? attrInt(node, "cutoff_radius_index")
@@ -141,9 +123,66 @@ function parseBeta(node: XmlNode): BetaProjector {
   };
 }
 
+function parseQijlKey(key: string): { i: number; j: number; l: number } | null {
+  const m = key.match(/^PP_QIJL\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) return null;
+  return { i: parseIntSafe(m[1]), j: parseIntSafe(m[2]), l: parseIntSafe(m[3]) };
+}
+
+function parseAugmentation(node: XmlNode): AugmentationData {
+  const qijl: QijlFunction[] = [];
+  for (const [key, val] of entries(node)) {
+    const ids = parseQijlKey(key);
+    if (ids) {
+      for (const q of toArray(val)) {
+        qijl.push({ ...ids, qijl: parseData(textOf(q)) });
+      }
+    }
+  }
+  qijl.sort((a, b) => a.i - b.i || a.j - b.j || a.l - b.l);
+
+  return {
+    nqf: attr(node, "nqf") ? attrInt(node, "nqf") : undefined,
+    nqlc: attr(node, "nqlc") ? attrInt(node, "nqlc") : undefined,
+    qWithL: attr(node, "q_with_l") ? attrBool(node, "q_with_l") : undefined,
+    shape: attr(node, "shape") || undefined,
+    rMatchAugfun: attr(node, "r_match_augfun")
+      ? attrNum(node, "r_match_augfun")
+      : undefined,
+    cutoffR: attr(node, "cutoff_r")
+      ? attrNum(node, "cutoff_r")
+      : undefined,
+    cutoffRIndex: attr(node, "cutoff_r_index")
+      ? attrInt(node, "cutoff_r_index")
+      : attr(node, "iraug")
+        ? attrInt(node, "iraug")
+        : undefined,
+    irc: attr(node, "irc") ? attrInt(node, "irc") : undefined,
+    lmaxAug: attr(node, "l_max_aug")
+      ? attrInt(node, "l_max_aug")
+      : attr(node, "lmax_aug")
+        ? attrInt(node, "lmax_aug")
+        : undefined,
+    augmentationEpsilon: attr(node, "augmentation_epsilon")
+      ? attrNum(node, "augmentation_epsilon")
+      : undefined,
+    q: node["PP_Q"] ? parseData(textOf(node["PP_Q"])) : undefined,
+    multipoles: node["PP_MULTIPOLES"]
+      ? parseData(textOf(node["PP_MULTIPOLES"]))
+      : undefined,
+    qfcoeff: node["PP_QFCOEFF"]
+      ? parseData(textOf(node["PP_QFCOEFF"]))
+      : undefined,
+    rinner: node["PP_RINNER"]
+      ? parseData(textOf(node["PP_RINNER"]))
+      : undefined,
+    qijl: qijl.length > 0 ? qijl : undefined,
+  };
+}
+
 function parseNonlocal(node: XmlNode): PseudopotentialNonlocal {
   const betas: BetaProjector[] = [];
-  for (const [key, val] of Object.entries(node)) {
+  for (const [key, val] of entries(node)) {
     if (key === "PP_BETA" || key.startsWith("PP_BETA.")) {
       betas.push(...toArray(val).map(parseBeta));
     }
@@ -156,15 +195,47 @@ function parseNonlocal(node: XmlNode): PseudopotentialNonlocal {
   if (tokens.length > 0) {
     const nProj = betas.length;
 
+    // Triplet format wins when every (nb, mb) pair is a plausible 1-based
+    // projector index. This resolves the ambiguity where a triplet file
+    // with nProj diagonal entries has exactly nProj^2 tokens (e.g. 3
+    // projectors with 3 diagonal triplets = 9 tokens): a flat matrix of
+    // floats is essentially never index-clean, while real triplets always
+    // are.
+    let tripletClean = false;
+    if (nProj > 0 && tokens.length % 3 === 0) {
+      tripletClean = true;
+      for (let k = 0; k < tokens.length; k += 3) {
+        const nb = tokens[k];
+        const mb = tokens[k + 1];
+        if (
+          !Number.isInteger(nb) ||
+          !Number.isInteger(mb) ||
+          nb < 1 ||
+          mb < 1 ||
+          nb > nProj ||
+          mb > nProj
+        ) {
+          tripletClean = false;
+          break;
+        }
+      }
+    }
+
+    if (tripletClean) {
+      for (let k = 0; k < tokens.length; k += 3) {
+        dij.push([tokens[k], tokens[k + 1], tokens[k + 2]]);
+      }
+    }
     // Flat matrix format: tokens.length == nProj^2, row-major
-    if (nProj > 0 && tokens.length === nProj * nProj) {
+    else if (nProj > 0 && tokens.length === nProj * nProj) {
       for (let i = 0; i < nProj; i++) {
         for (let j = 0; j < nProj; j++) {
           dij.push([i + 1, j + 1, tokens[i * nProj + j]]);
         }
       }
     }
-    // Triplet format: tokens.length % 3 == 0, each triplet is (i, j, value)
+    // Lenient fallback: token count divisible by 3, parsed as triplets
+    // even when the indices look out of range (legacy tolerance).
     else if (tokens.length % 3 === 0) {
       for (let k = 0; k < tokens.length; k += 3) {
         dij.push([tokens[k], tokens[k + 1], tokens[k + 2]]);
@@ -177,33 +248,10 @@ function parseNonlocal(node: XmlNode): PseudopotentialNonlocal {
     ? parseAugmentation(node["PP_AUGMENTATION"])
     : undefined;
 
-  // nqf from PP_NONLOCAL or PP_AUGMENTATION attributes
+  // nqf lives on the augmentation block; mirror it for convenience.
   const nqf = augmentation?.nqf ?? undefined;
 
   return { betas, dij, nqf, augmentation };
-}
-
-function parseAugmentation(node: XmlNode): AugmentationData {
-  return {
-    qWithL: attr(node, "q_with_l") ? attrBool(node, "q_with_l") : undefined,
-    nqf: attr(node, "nqf") ? attrInt(node, "nqf") : undefined,
-    shape: attr(node, "shape") || undefined,
-    rMatchAugfun: attr(node, "r_match_augfun")
-      ? attrNum(node, "r_match_augfun")
-      : undefined,
-    irc: attr(node, "irc") ? attrInt(node, "irc") : undefined,
-    lmaxAug: attr(node, "l_max_aug") ? attrInt(node, "l_max_aug") : undefined,
-    q: node["PP_Q"] ? parseData(textOf(node["PP_Q"])) : undefined,
-    multipoles: node["PP_MULTIPOLES"]
-      ? parseData(textOf(node["PP_MULTIPOLES"]))
-      : undefined,
-    qfcoeff: node["PP_QFCOEFF"]
-      ? parseData(textOf(node["PP_QFCOEFF"]))
-      : undefined,
-    rinner: node["PP_RINNER"]
-      ? parseData(textOf(node["PP_RINNER"]))
-      : undefined,
-  };
 }
 
 function parsePswfcNode(node: XmlNode): PseudopotentialWfc {
@@ -233,7 +281,18 @@ function parseFullWfcNode(node: XmlNode): FullWfc {
   };
 }
 
+/** Parse PP_PAW, including any non-standard PP_AEWFC/PP_PSWFC children. */
 function parsePaw(node: XmlNode): PawData {
+  const innerAeWfcs: FullWfc[] = [];
+  const innerPsWfcs: FullWfc[] = [];
+  for (const [key, val] of entries(node)) {
+    if (key === "PP_AEWFC" || key.startsWith("PP_AEWFC.")) {
+      for (const wfc of toArray(val)) innerAeWfcs.push(parseFullWfcNode(wfc));
+    }
+    if (key === "PP_PSWFC" || key.startsWith("PP_PSWFC.")) {
+      for (const wfc of toArray(val)) innerPsWfcs.push(parseFullWfcNode(wfc));
+    }
+  }
   return {
     pawDataFormat: attrInt(node, "paw_data_format"),
     coreEnergy: attrNum(node, "core_energy"),
@@ -246,16 +305,19 @@ function parsePaw(node: XmlNode): PawData {
     aeVloc: node["PP_AE_VLOC"]
       ? parseData(textOf(node["PP_AE_VLOC"]))
       : new Float64Array(0),
-    aeWfcs: [],
-    psWfcs: [],
+    aeWfcs: innerAeWfcs,
+    psWfcs: innerPsWfcs,
   };
 }
 
-function parseGipaw(node: XmlNode): GipawData {
+function parseGipaw(
+  node: XmlNode,
+  tag: "PP_GIPAW" | "PP_GIPAW_RECONSTRUCTION",
+): GipawData {
   const coreOrbitals: GipawData["coreOrbitals"] = [];
   const coreOrbsSection = node["PP_GIPAW_CORE_ORBITALS"];
   if (coreOrbsSection) {
-    for (const [key, val] of Object.entries(coreOrbsSection)) {
+    for (const [key, val] of entries(coreOrbsSection)) {
       if (key.startsWith("PP_GIPAW_CORE_ORBITAL.")) {
         for (const co of toArray(val)) {
           coreOrbitals.push({
@@ -271,7 +333,7 @@ function parseGipaw(node: XmlNode): GipawData {
   const orbitals: GipawData["orbitals"] = [];
   const orbsSection = node["PP_GIPAW_ORBITALS"];
   if (orbsSection) {
-    for (const [key, val] of Object.entries(orbsSection)) {
+    for (const [key, val] of entries(orbsSection)) {
       if (key.startsWith("PP_GIPAW_ORBITAL.")) {
         for (const orb of toArray(val)) {
           orbitals.push({
@@ -289,8 +351,8 @@ function parseGipaw(node: XmlNode): GipawData {
     }
   }
 
-  let vlocAe = new Float64Array(0);
-  let vlocPs = new Float64Array(0);
+  let vlocAe: Float64Array = new Float64Array(0);
+  let vlocPs: Float64Array = new Float64Array(0);
   const vlocalSection = node["PP_GIPAW_VLOCAL"];
   if (vlocalSection) {
     vlocAe = vlocalSection["GIPAW_VLOCAL_AE"]
@@ -302,6 +364,7 @@ function parseGipaw(node: XmlNode): GipawData {
   }
 
   return {
+    tag,
     gipawDataFormat: attrInt(node, "gipaw_data_format"),
     coreOrbitals,
     orbitals,
@@ -310,53 +373,74 @@ function parseGipaw(node: XmlNode): GipawData {
   };
 }
 
+function parseRelWfc(node: XmlNode): RelativisticWfc {
+  return {
+    jchi: attrNum(node, "jchi"),
+    index: attr(node, "index") ? attrInt(node, "index") : undefined,
+    els: attr(node, "els") || undefined,
+    nn: attr(node, "nn") ? attrInt(node, "nn") : undefined,
+    lchi: attr(node, "lchi") ? attrInt(node, "lchi") : undefined,
+    oc: attr(node, "oc") ? attrNum(node, "oc") : undefined,
+    chi: parseOptionalData(textOf(node)),
+  };
+}
+
+function parseRelBeta(node: XmlNode): RelativisticBeta {
+  return {
+    jjj: attrNum(node, "jjj"),
+    index: attr(node, "index") ? attrInt(node, "index") : undefined,
+    lll: attr(node, "lll") ? attrInt(node, "lll") : undefined,
+    beta: parseOptionalData(textOf(node)),
+  };
+}
+
 function parseSpinOrbit(node: XmlNode): SpinOrbitData {
-  const relWfcs: SpinOrbitData["relWfcs"] = [];
-  for (const wfc of toArray(node["PP_RELWFC"])) {
-    relWfcs.push({
-      jchi: attrNum(wfc, "jchi"),
-      index: attr(wfc, "index") ? attrInt(wfc, "index") : undefined,
-      els: attr(wfc, "els") || undefined,
-      nn: attr(wfc, "nn") ? attrInt(wfc, "nn") : undefined,
-      lchi: attr(wfc, "lchi") ? attrInt(wfc, "lchi") : undefined,
-      oc: attr(wfc, "oc") ? attrNum(wfc, "oc") : undefined,
-    });
+  const relWfcs: RelativisticWfc[] = [];
+  const relBetas: RelativisticBeta[] = [];
+  for (const [key, val] of entries(node)) {
+    if (key === "PP_RELWFC" || key.startsWith("PP_RELWFC.")) {
+      for (const wfc of toArray(val)) relWfcs.push(parseRelWfc(wfc));
+    }
+    if (key === "PP_RELBETA" || key.startsWith("PP_RELBETA.")) {
+      for (const beta of toArray(val)) relBetas.push(parseRelBeta(beta));
+    }
   }
-
-  const relBetas: SpinOrbitData["relBetas"] = [];
-  for (const beta of toArray(node["PP_RELBETA"])) {
-    relBetas.push({
-      jjj: attrNum(beta, "jjj"),
-      index: attr(beta, "index") ? attrInt(beta, "index") : undefined,
-      lll: attr(beta, "lll") ? attrInt(beta, "lll") : undefined,
-    });
-  }
-
   return { relWfcs, relBetas };
+}
+
+/** Extract raw PP_INPUTFILE content (may hold non-XML generator input). */
+function extractInputFile(text: string): string | undefined {
+  const m = text.match(/<PP_INPUTFILE>([\s\S]*?)<\/PP_INPUTFILE>/);
+  if (!m) return undefined;
+  const content = m[1].trim();
+  return content || undefined;
 }
 
 // ── Main parser ────────────────────────────────────────────────────
 
 /**
- * Parse a UPF v2.0.1 pseudopotential string into a Pseudopotential object.
+ * Parse a UPF v2.0.1 pseudopotential string into a first-class
+ * Pseudopotential object.
  *
  * @param text - The complete UPF file content as a string.
  * @returns A parsed Pseudopotential object.
  * @throws If the text is not valid UPF v2.0.1 format.
  */
 export function fromUPF(text: string): Pseudopotential {
-  const parser = new XMLParser(parserOptions);
-  const doc = parser.parse(text);
+  const doc = parseXml(text);
 
   const upf: XmlNode = doc?.UPF;
   if (!upf) {
     throw new Error("Not a UPF file: missing <UPF> root element");
   }
 
-  const version = (attr(upf, "version") || "2.0.1") as "2.0.1";
+  const version = ((attr(upf, "version") || "2.0.1") as UPFVersion);
 
   // PP_INFO (optional, plain text)
   const info = upf["PP_INFO"] ? textOf(upf["PP_INFO"]).trim() || undefined : undefined;
+
+  // PP_INPUTFILE (optional, raw text — may contain generator input)
+  const inputFile = extractInputFile(text);
 
   // PP_HEADER (required, self-closing tag with attributes)
   if (!upf["PP_HEADER"]) {
@@ -382,7 +466,7 @@ export function fromUPF(text: string): Pseudopotential {
   // PP_SEMILOCAL (optional)
   let semilocal: Pseudopotential["semilocal"] | undefined;
   if (upf["PP_SEMILOCAL"]) {
-    semilocal = toArray(upf["PP_SEMILOCAL"]["PP_VNL"]).map((vnl: XmlNode) => ({
+    semilocal = toArray<XmlNode>(upf["PP_SEMILOCAL"]["PP_VNL"]).map((vnl: XmlNode) => ({
       l: attrInt(vnl, "L"),
       j: attr(vnl, "J") ? attrNum(vnl, "J") : undefined,
       vnl: parseData(textOf(vnl)),
@@ -399,7 +483,7 @@ export function fromUPF(text: string): Pseudopotential {
   const pswfcRaw = upf["PP_PSWFC"];
   const pswfc: PseudopotentialWfc[] = [];
   if (pswfcRaw) {
-    for (const [key, val] of Object.entries(pswfcRaw)) {
+    for (const [key, val] of entries(pswfcRaw)) {
       if (key === "PP_CHI" || key.startsWith("PP_CHI.")) {
         for (const chi of toArray(val)) {
           pswfc.push(parsePswfcNode(chi));
@@ -412,8 +496,8 @@ export function fromUPF(text: string): Pseudopotential {
   let fullWfc: FullWfc[] | undefined;
   if (upf["PP_FULL_WFC"]) {
     const wfcs: FullWfc[] = [];
-    for (const [key, val] of Object.entries(upf["PP_FULL_WFC"])) {
-      if (key.startsWith("PP_AEWFC")) {
+    for (const [key, val] of entries(upf["PP_FULL_WFC"])) {
+      if (key === "PP_AEWFC" || key.startsWith("PP_AEWFC")) {
         for (const wfc of toArray(val)) {
           wfcs.push(parseFullWfcNode(wfc));
         }
@@ -433,9 +517,9 @@ export function fromUPF(text: string): Pseudopotential {
 
   // PP_GIPAW (optional — tag may be PP_GIPAW or PP_GIPAW_RECONSTRUCTION)
   const gipaw = upf["PP_GIPAW"]
-    ? parseGipaw(upf["PP_GIPAW"])
+    ? parseGipaw(upf["PP_GIPAW"], "PP_GIPAW")
     : upf["PP_GIPAW_RECONSTRUCTION"]
-      ? parseGipaw(upf["PP_GIPAW_RECONSTRUCTION"])
+      ? parseGipaw(upf["PP_GIPAW_RECONSTRUCTION"], "PP_GIPAW_RECONSTRUCTION")
       : undefined;
 
   // PP_SPIN_ORB (optional)
@@ -443,22 +527,36 @@ export function fromUPF(text: string): Pseudopotential {
     ? parseSpinOrbit(upf["PP_SPIN_ORB"])
     : undefined;
 
-  // Populate paw.aeWfcs/psWfcs from top-level sections (UPF v2.0.1 spec:
-  // PP_FULL_WFC and PP_PSWFC are siblings of PP_PAW, not children).
-  if (paw && fullWfc && fullWfc.length > 0) {
-    paw.aeWfcs = fullWfc;
-  }
-  if (paw && pswfc.length > 0) {
-    paw.psWfcs = pswfc.map((w) => ({
-      l: w.l,
-      label: w.label ?? "",
-      aewfc: w.chi,
-    }));
+  // Merge any non-standard inner PAW wavefunctions into the top-level lists
+  // (UPF v2.0.1 spec keeps PP_FULL_WFC / PP_PSWFC as siblings of PP_PAW, but
+  // some generators nest PP_AEWFC / PP_PSWFC inside PP_PAW).
+  if (paw) {
+    if (paw.aeWfcs.length > 0) {
+      fullWfc = [...(fullWfc ?? []), ...paw.aeWfcs];
+    }
+    if (paw.psWfcs.length > 0 && pswfc.length === 0) {
+      for (const w of paw.psWfcs) {
+        pswfc.push({ l: w.l, occupation: 0, label: w.label, chi: w.aewfc });
+      }
+    }
+    paw.aeWfcs = fullWfc ?? [];
+    paw.psWfcs =
+      paw.psWfcs.length > 0
+        ? paw.psWfcs
+        : pswfc.map((w) => ({
+            l: w.l,
+            label: w.label ?? "",
+            aewfc: w.chi,
+          }));
   }
 
   return {
+    format: "UPF2",
     version,
+    units: { ...CANONICAL_UNITS },
+    provenance: { sourceFormat: "UPF2" },
     info,
+    inputFile,
     header,
     mesh,
     nlcc,
@@ -477,7 +575,7 @@ export function fromUPF(text: string): Pseudopotential {
 // ── Serializer ─────────────────────────────────────────────────────
 
 /**
- * Serialize a Pseudopotential object back to UPF v2.0.1 format.
+ * Serialize a first-class Pseudopotential object back to UPF v2.0.1 format.
  *
  * @param pp - The pseudopotential to serialize.
  * @returns The UPF file content as a string.
@@ -485,7 +583,7 @@ export function fromUPF(text: string): Pseudopotential {
 export function toUPF(pp: Pseudopotential): string {
   const lines: string[] = [];
 
-  lines.push(`<UPF version="${pp.version}">`);
+  lines.push(`<UPF version="${pp.version ?? "2.0.1"}">`);
   lines.push("");
 
   // PP_INFO
@@ -496,11 +594,13 @@ export function toUPF(pp: Pseudopotential): string {
     lines.push("");
   }
 
-  // PP_HEADER
+  // PP_HEADER: header fields take precedence; provenance creator/date fill
+  // in for objects arriving from formats without header equivalents (PSML,
+  // FHI), so generator stamps survive a hub conversion.
   lines.push("<PP_HEADER");
-  lines.push(`  generated="${escapeXmlAttr(pp.header.generated ?? "")}"`);
+  lines.push(`  generated="${escapeXmlAttr(pp.header.generated ?? pp.provenance.creator ?? "")}"`);
   lines.push(`  author="${escapeXmlAttr(pp.header.author ?? "")}"`);
-  lines.push(`  date="${escapeXmlAttr(pp.header.date ?? "")}"`);
+  lines.push(`  date="${escapeXmlAttr(pp.header.date ?? pp.provenance.date ?? "")}"`);
   lines.push(`  comment="${escapeXmlAttr(pp.header.comment ?? "")}"`);
   lines.push(`  element="${pp.header.element}"`);
   lines.push(`  pseudo_type="${pp.header.pseudoType}"`);
@@ -574,12 +674,15 @@ export function toUPF(pp: Pseudopotential): string {
   for (let i = 0; i < pp.nonlocal.betas.length; i++) {
     const beta = pp.nonlocal.betas[i];
     const betaAttrs = [
-      `index="${i + 1}"`,
       `angular_momentum="${beta.angularMomentum}"`,
       `label="${beta.label}"`,
     ];
+    // Preserve document order without inventing attributes: only write
+    // index when the source carried one.
+    if (beta.index != null) betaAttrs.unshift(`index="${beta.index}"`);
     if (beta.cutoffRadiusIndex != null) betaAttrs.push(`cutoff_radius_index="${beta.cutoffRadiusIndex}"`);
     if (beta.cutoffRadius != null) betaAttrs.push(`cutoff_radius="${formatFortranNumber(beta.cutoffRadius)}"`);
+    if (beta.normConservingRadius != null) betaAttrs.push(`norm_conserving_radius="${formatFortranNumber(beta.normConservingRadius)}"`);
     betaAttrs.push(`ultrasoft_cutoff_radius="${formatFortranNumber(beta.ultrasoftCutoffRadius)}"`);
     lines.push(`<PP_BETA ${betaAttrs.join(" ")}>`);
     lines.push(formatDataArray(beta.beta));
@@ -597,10 +700,14 @@ export function toUPF(pp: Pseudopotential): string {
     const augAttrs: string[] = [];
     if (aug.qWithL != null) augAttrs.push(`q_with_l="${aug.qWithL ? "T" : "F"}"`);
     if (aug.nqf != null) augAttrs.push(`nqf="${aug.nqf}"`);
+    if (aug.nqlc != null) augAttrs.push(`nqlc="${aug.nqlc}"`);
     if (aug.shape != null) augAttrs.push(`shape="${aug.shape}"`);
     if (aug.rMatchAugfun != null) augAttrs.push(`r_match_augfun="${formatFortranNumber(aug.rMatchAugfun)}"`);
+    if (aug.cutoffR != null) augAttrs.push(`cutoff_r="${formatFortranNumber(aug.cutoffR)}"`);
+    if (aug.cutoffRIndex != null) augAttrs.push(`cutoff_r_index="${aug.cutoffRIndex}"`);
     if (aug.irc != null) augAttrs.push(`irc="${aug.irc}"`);
     if (aug.lmaxAug != null) augAttrs.push(`l_max_aug="${aug.lmaxAug}"`);
+    if (aug.augmentationEpsilon != null) augAttrs.push(`augmentation_epsilon="${formatFortranNumber(aug.augmentationEpsilon)}"`);
     lines.push(`<PP_AUGMENTATION ${augAttrs.join(" ")}>`);
     if (aug.q) {
       lines.push("<PP_Q>");
@@ -621,6 +728,13 @@ export function toUPF(pp: Pseudopotential): string {
       lines.push("<PP_RINNER>");
       lines.push(formatDataArray(aug.rinner));
       lines.push("</PP_RINNER>");
+    }
+    if (aug.qijl) {
+      for (const q of aug.qijl) {
+        lines.push(`<PP_QIJL.${q.i}.${q.j}.${q.l}>`);
+        lines.push(formatDataArray(q.qijl));
+        lines.push(`</PP_QIJL.${q.i}.${q.j}.${q.l}>`);
+      }
     }
     lines.push("</PP_AUGMENTATION>");
   }
@@ -669,7 +783,8 @@ export function toUPF(pp: Pseudopotential): string {
   lines.push("</PP_RHOATOM>");
   lines.push("");
 
-  // PP_PAW (optional)
+  // PP_PAW (optional): block holds OCCUPATIONS / AE_NLCC / AE_VLOC only;
+  // wavefunctions live in the top-level PP_PSWFC / PP_FULL_WFC sections.
   if (pp.paw) {
     lines.push(`<PP_PAW paw_data_format="${pp.paw.pawDataFormat}" core_energy="${formatFortranNumber(pp.paw.coreEnergy)}">`);
     if (pp.paw.occupations.length > 0) {
@@ -687,27 +802,14 @@ export function toUPF(pp: Pseudopotential): string {
       lines.push(formatDataArray(pp.paw.aeVloc));
       lines.push("</PP_AE_VLOC>");
     }
-    if (pp.paw.aeWfcs.length > 0) {
-      for (const wfc of pp.paw.aeWfcs) {
-        lines.push(`<PP_AEWFC l="${wfc.l}" label="${wfc.label}">`);
-        lines.push(formatDataArray(wfc.aewfc));
-        lines.push("</PP_AEWFC>");
-      }
-    }
-    if (pp.paw.psWfcs.length > 0) {
-      for (const wfc of pp.paw.psWfcs) {
-        lines.push(`<PP_PSWFC l="${wfc.l}" label="${wfc.label}">`);
-        lines.push(formatDataArray(wfc.aewfc));
-        lines.push("</PP_PSWFC>");
-      }
-    }
     lines.push("</PP_PAW>");
     lines.push("");
   }
 
-  // PP_GIPAW (optional)
+  // PP_GIPAW (optional): preserve the original tag variant.
   if (pp.gipaw) {
-    lines.push(`<PP_GIPAW gipaw_data_format="${pp.gipaw.gipawDataFormat}">`);
+    const tag = pp.gipaw.tag ?? "PP_GIPAW";
+    lines.push(`<${tag} gipaw_data_format="${pp.gipaw.gipawDataFormat}">`);
     if (pp.gipaw.coreOrbitals.length > 0) {
       lines.push(`<PP_GIPAW_CORE_ORBITALS number_of_core_orbitals="${pp.gipaw.coreOrbitals.length}">`);
       for (let i = 0; i < pp.gipaw.coreOrbitals.length; i++) {
@@ -747,7 +849,49 @@ export function toUPF(pp: Pseudopotential): string {
       }
       lines.push("</PP_GIPAW_VLOCAL>");
     }
-    lines.push("</PP_GIPAW>");
+    lines.push(`</${tag}>`);
+    lines.push("");
+  }
+
+  // PP_SPIN_ORB (optional)
+  if (pp.spinOrbit) {
+    lines.push("<PP_SPIN_ORB>");
+    let relIdx = 1;
+    for (const wfc of pp.spinOrbit.relWfcs) {
+      const attrs = [
+        `index="${wfc.index ?? relIdx}"`,
+        `jchi="${formatFortranNumber(wfc.jchi)}"`,
+      ];
+      if (wfc.els != null) attrs.push(`els="${escapeXmlAttr(wfc.els)}"`);
+      if (wfc.nn != null) attrs.push(`nn="${wfc.nn}"`);
+      if (wfc.lchi != null) attrs.push(`lchi="${wfc.lchi}"`);
+      if (wfc.oc != null) attrs.push(`oc="${formatFortranNumber(wfc.oc)}"`);
+      lines.push(`<PP_RELWFC ${attrs.join(" ")}>`);
+      if (wfc.chi && wfc.chi.length > 0) lines.push(formatDataArray(wfc.chi));
+      lines.push("</PP_RELWFC>");
+      relIdx++;
+    }
+    let betaIdx = 1;
+    for (const beta of pp.spinOrbit.relBetas) {
+      const attrs = [
+        `index="${beta.index ?? betaIdx}"`,
+        `jjj="${formatFortranNumber(beta.jjj)}"`,
+      ];
+      if (beta.lll != null) attrs.push(`lll="${beta.lll}"`);
+      lines.push(`<PP_RELBETA ${attrs.join(" ")}>`);
+      if (beta.beta && beta.beta.length > 0) lines.push(formatDataArray(beta.beta));
+      lines.push("</PP_RELBETA>");
+      betaIdx++;
+    }
+    lines.push("</PP_SPIN_ORB>");
+    lines.push("");
+  }
+
+  // PP_INPUTFILE (optional, verbatim)
+  if (pp.inputFile) {
+    lines.push("<PP_INPUTFILE>");
+    lines.push(pp.inputFile);
+    lines.push("</PP_INPUTFILE>");
     lines.push("");
   }
 

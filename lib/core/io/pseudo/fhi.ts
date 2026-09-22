@@ -1,11 +1,21 @@
 /**
- * FHI98PP (.cpi / .fhi) pseudopotential parser and serializer.
+ * FHI98PP (.cpi / .fhi) pseudopotential adapter.
+ *
+ * Converts between FHI text and the first-class Pseudopotential object
+ * (canonical units Ry / Bohr).
  *
  * The FHI format stores norm-conserving pseudopotentials in semilocal form
- * on a logarithmic radial grid. Units: Hartree (energy), Bohr (length).
+ * on a logarithmic radial grid. Native units: Hartree (energy), Bohr
+ * (length) — energies are converted to Ry on parse (×2) and back on
+ * serialize (×0.5).
  *
  * Grid formula: r(i) = (exp(dx * i) - 1) / Z_eff
  * Stored data: V_l(r) = r * [V_nl(r) + Z_ion/r] (semilocal with Coulomb tail)
+ *
+ * Loss notes: raw .cpi carries no element symbol or XC name; those fields
+ * stay empty. Only semilocal KB-free data is representable, so objects with
+ * projectors/D_ij/US/PAW lose that data here; `canWriteFHI()` reports
+ * whether conversion is safe.
  *
  * References:
  * - Fuchs & Scheffler, Comput. Phys. Commun. 119, 67 (1999)
@@ -14,11 +24,16 @@
 
 import type {
   Pseudopotential,
-  PseudopotentialHeader,
   PseudopotentialMesh,
   PseudopotentialLocal,
   PseudopotentialNonlocal,
 } from "../../pseudopotential/pseudopotential";
+
+import { CANONICAL_UNITS } from "../../pseudopotential/pseudopotential";
+import {
+  RY_TO_HA,
+  haArrayToRy,
+} from "../../pseudopotential/units";
 
 import {
   parseFortranNumber,
@@ -28,7 +43,36 @@ import {
   parseIntSafe,
 } from "./fortran-helpers";
 
-import { guessElement } from "./elements";
+import { guessElement, pspxcToFunctional } from "./elements";
+
+export interface FHIConversionCheck {
+  ok: boolean;
+  reasons: string[];
+}
+
+/**
+ * Report whether a first-class pseudopotential can be written as FHI.
+ * FHI stores norm-conserving semilocal data only.
+ */
+export function canWriteFHI(pp: Pseudopotential): FHIConversionCheck {
+  const reasons: string[] = [];
+  if (pp.header.isUltrasoft || pp.header.isPaw || pp.header.pseudoType === "PAW") {
+    reasons.push(`pseudoType ${pp.header.pseudoType} is not norm-conserving`);
+  }
+  if (pp.nonlocal.betas.length > 0 || pp.nonlocal.dij.length > 0) {
+    reasons.push("KB projectors/D_ij have no FHI representation");
+  }
+  if (pp.nonlocal.augmentation) {
+    reasons.push("augmentation data has no FHI representation");
+  }
+  if (pp.header.hasSo || pp.spinOrbit) {
+    reasons.push("spin-orbit data has no FHI representation");
+  }
+  if (pp.paw || pp.fullWfc) {
+    reasons.push("PAW data has no FHI representation");
+  }
+  return { ok: reasons.length === 0, reasons };
+}
 
 /**
  * Parse an FHI98PP pseudopotential file — auto-detects format.
@@ -138,14 +182,15 @@ function parseCpi(text: string): Pseudopotential {
     rab,
   };
 
-  // Convert semilocal to local potential (l=0 channel is typically the local part)
-  // For FHI format, V_0 is the l=0 semilocal potential which includes the local part
+  // Convert semilocal potentials Hartree → Ry. The l=0 channel doubles as
+  // the local part (the FHI format has no separate local potential).
+  const semilocalRy = semilocal.map(haArrayToRy);
   const local: PseudopotentialLocal = {
-    vloc: semilocal.length > 0 ? semilocal[0] : new Float64Array(r.length),
+    vloc: semilocalRy.length > 0 ? semilocalRy[0] : new Float64Array(r.length),
   };
 
   // Store semilocal potentials
-  const semilocalPotentials = semilocal.map((vnl, l) => ({
+  const semilocalPotentials = semilocalRy.map((vnl, l) => ({
     l,
     vnl,
   }));
@@ -161,7 +206,8 @@ function parseCpi(text: string): Pseudopotential {
 
   return {
     format: "CPI",
-    version: "2.0.1",
+    units: { ...CANONICAL_UNITS },
+    provenance: { sourceFormat: "CPI" },
     header: {
       element: "",
       pseudoType: "NC",
@@ -201,35 +247,55 @@ function parseCpi(text: string): Pseudopotential {
  * Skips the 7 ABINIT header lines, then parses the .cpi body.
  */
 function parseFhiHeader(text: string): Pseudopotential {
-  // Skip 7 ABINIT header lines, then parse as .cpi
   const allLines = text.split("\n");
+  if (allLines.length < 8) {
+    throw new Error("FHI file too short to parse (.fhi needs 7 header lines)");
+  }
+  // Skip 7 ABINIT header lines, then parse as .cpi
   const cpiContent = allLines.slice(7).join("\n");
   const pp = parseCpi(cpiContent);
 
-  // Extract metadata from ABINIT header
-  if (allLines.length >= 3) {
-    const line2 = allLines[1].trim().split(/\s+/);
-    if (line2.length >= 1) {
-      const zatom = parseFloat(line2[0]);
-      if (zatom > 0) pp.header.element = guessElement(zatom);
-    }
-    if (line2.length >= 2) {
-      pp.header.zValence = parseFloat(line2[1]);
-    }
+  pp.provenance = {
+    ...pp.provenance,
+    notes: "parsed from .fhi (ABINIT format 6) envelope",
+  };
 
-    const line3 = allLines[2].trim().split(/\s+/);
-    if (line3.length >= 3) {
-      // pspcod should be 6 for FHI
-      const pspxc = parseIntSafe(line3[1]);
-      pp.header.xcCode = pspxc;
-    }
+  // Extract metadata from ABINIT header
+  const line2 = allLines[1].trim().split(/\s+/);
+  if (line2.length >= 1) {
+    const zatom = parseFloat(line2[0]);
+    if (zatom > 0) pp.header.element = guessElement(zatom);
+  }
+  if (line2.length >= 2) {
+    pp.header.zValence = parseFloat(line2[1]);
+  }
+
+  const line3 = allLines[2].trim().split(/\s+/);
+  if (line3.length >= 3) {
+    // pspcod should be 6 for FHI
+    const pspxc = parseIntSafe(line3[1]);
+    pp.header.xcCode = pspxc;
+    pp.header.functional = pspxcToFunctional(pspxc);
+  }
+  if (line3.length >= 6) {
+    pp.header.r2well = parseFortranNumber(line3[5]);
+  }
+
+  const line4 = allLines[3].trim().split(/\s+/);
+  if (line4.length >= 3) {
+    pp.header.rchrg = parseFortranNumber(line4[0]);
+    pp.header.fchrg = parseFortranNumber(line4[1]);
+    pp.header.qchrg = parseFortranNumber(line4[2]);
   }
 
   return pp;
 }
 
 /**
- * Serialize a Pseudopotential to FHI .cpi format.
+ * Serialize a first-class Pseudopotential to FHI .cpi format.
+ *
+ * Energies are written in Hartree (native .cpi units). The .cpi body carries
+ * no element or functional metadata.
  */
 export function toFHI(pp: Pseudopotential): string {
   const lines: string[] = [];
@@ -256,20 +322,20 @@ export function toFHI(pp: Pseudopotential): string {
       formatFortranNumber(r[i], 20),
     ];
 
-    // Semilocal potentials or local potential
+    // Semilocal potentials (Ry → Ha) or local potential for all channels
     if (pp.semilocal && pp.semilocal.length > 0) {
       for (let l = 0; l <= pp.header.lMax; l++) {
         const sl = pp.semilocal.find((s) => s.l === l);
-        parts.push(formatFortranNumber(sl ? sl.vnl[i] : 0, 20));
+        parts.push(formatFortranNumber((sl ? sl.vnl[i] : 0) * RY_TO_HA, 20));
       }
     } else {
       // Use local potential for all channels
       for (let l = 0; l <= pp.header.lMax; l++) {
-        parts.push(formatFortranNumber(pp.local.vloc[i], 20));
+        parts.push(formatFortranNumber(pp.local.vloc[i] * RY_TO_HA, 20));
       }
     }
 
-    // NLCC data
+    // NLCC data (densities are unit-free)
     if (pp.nlcc && i < pp.nlcc.length) {
       parts.push(formatFortranNumber(pp.nlcc[i], 20));
     }
@@ -279,5 +345,3 @@ export function toFHI(pp: Pseudopotential): string {
 
   return lines.join("\n");
 }
-
-

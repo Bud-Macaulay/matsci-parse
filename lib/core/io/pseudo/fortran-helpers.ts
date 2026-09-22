@@ -24,10 +24,14 @@ export function parseIntSafe(s: string): number {
   return Number.parseInt(s.trim(), 10);
 }
 
-/** Format a number in Fortran D-notation. */
+/** Format a number in Fortran D-notation. Preserves negative zero. */
 export function formatFortranNumber(n: number, width = 20): string {
-  const s = n.toExponential(15);
-  const d = s.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
+  // 17 significant digits: the minimum that round-trips any double
+  // bit-exactly (some generators, e.g. atompaw, write 17 digits).
+  const s = n.toExponential(16);
+  // toExponential drops the sign of -0; restore it for round-trip fidelity.
+  const signed = Object.is(n, -0) && !s.startsWith("-") ? `-${s}` : s;
+  const d = signed.replace(/e/, "D").replace(/e\+/, "D+").replace(/e-/, "D-");
   return d.padStart(width);
 }
 

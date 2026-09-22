@@ -1,29 +1,40 @@
 /**
- * PSML (PSeudopotential Markup Language) pseudopotential parser and serializer.
+ * PSML (PSeudopotential Markup Language) pseudopotential adapter.
+ *
+ * Converts between PSML text and the first-class Pseudopotential object
+ * (canonical units Ry / Bohr).
  *
  * PSML is an XML-based format for norm-conserving pseudopotentials,
  * created by the ESL (Electronic Structure Library) initiative.
- * Units: Hartree (energy), Bohr (length) — mandatory per schema.
+ * Native units: Hartree (energy), Bohr (length) — mandatory per schema.
+ * Energies are converted to Ry on parse (×2) and back on serialize (×0.5).
+ *
+ * Loss notes: PSML stores only the diagonal KB energies (ekb); off-diagonal
+ * D_ij couplings have no representation. PAW/US/augmentation/spin-orbit
+ * data cannot round-trip; use `canWritePSML()` to check first.
  *
  * Reference: https://siesta-project.github.io/psml-docs/
  * Schema: http://esl.cecam.org/PSML/ns/1.2
  */
 
-import { XMLParser, XMLBuilder } from "fast-xml-parser";
-
 import type {
   Pseudopotential,
   PseudopotentialHeader,
   PseudopotentialMesh,
-  PseudopotentialLocal,
   PseudopotentialNonlocal,
   BetaProjector,
   PseudopotentialWfc,
   Provenance,
 } from "../../pseudopotential/pseudopotential";
 
+import { CANONICAL_UNITS } from "../../pseudopotential/pseudopotential";
 import {
-  parseFortranNumber,
+  RY_TO_HA,
+  haToRy,
+  haArrayToRy,
+} from "../../pseudopotential/units";
+
+import {
   parseFloat64Array,
   formatFortranNumber,
   formatDataArray,
@@ -36,64 +47,59 @@ import {
   attrInt,
   textOf,
   toArray,
+  parseXml,
 } from "./xml-helpers";
 
 import { guessElement, elementToZ } from "./elements";
 
-const PSML_NS = "http://esl.cecam.org/PSML/ns/1.2";
-const PSML_NS_11 = "http://esl.cecam.org/PSML/ns/1.1";
-
-function localName(name: string): string {
-  // Strip namespace URI if present
-  const idx = name.indexOf(":");
-  return idx >= 0 ? name.substring(idx + 1) : name;
+export interface PSMLConversionCheck {
+  ok: boolean;
+  reasons: string[];
 }
 
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  isArray: (name) => {
-    const ln = localName(name);
-    return (
-      ln === "provenance" ||
-      ln === "slps" ||
-      ln === "proj" ||
-      ln === "pswf" ||
-      ln === "shell" ||
-      ln === "functional"
-    );
-  },
-});
-
-const builder = new XMLBuilder({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  format: true,
-  suppressBooleanAttributes: false,
-});
+/**
+ * Report whether a first-class pseudopotential can be written as PSML.
+ * PSML supports norm-conserving data only.
+ */
+export function canWritePSML(pp: Pseudopotential): PSMLConversionCheck {
+  const reasons: string[] = [];
+  if (pp.header.isUltrasoft || pp.header.isPaw || pp.header.pseudoType !== "NC") {
+    reasons.push(`pseudoType ${pp.header.pseudoType} is not norm-conserving`);
+  }
+  if (pp.nonlocal.augmentation) {
+    reasons.push("augmentation data has no PSML representation");
+  }
+  if (pp.header.hasSo || pp.spinOrbit) {
+    reasons.push("spin-orbit data has no PSML representation");
+  }
+  if (pp.paw || pp.fullWfc || pp.gipaw) {
+    reasons.push("PAW/GIPAW data has no PSML representation");
+  }
+  return { ok: reasons.length === 0, reasons };
+}
 
 /**
- * Parse a PSML pseudopotential file.
+ * Parse a PSML pseudopotential file into a first-class Pseudopotential.
  */
 export function fromPSML(text: string): Pseudopotential {
-  const parsed = parser.parse(text) as XmlNode;
+  const parsed = parseXml(text);
 
   // Find root element (may have namespace prefix)
-  const root = parsed["psml"] ?? parsed[`${PSML_NS}:psml`] ?? parsed;
+  const root = parsed["psml"] ?? parsed[`${"http://esl.cecam.org/PSML/ns/1.2"}:psml`] ?? parsed;
 
   // Provenance
   const provenanceData = root["provenance"];
-  let provenance: Provenance | undefined;
+  let creator: string | undefined;
+  let date: string | undefined;
   if (provenanceData) {
     const provArr = toArray(provenanceData);
     if (provArr.length > 0) {
       const first = provArr[0];
-      provenance = {
-        creator: attr(first, "creator"),
-        date: attr(first, "date"),
-      };
+      creator = attr(first, "creator") || undefined;
+      date = attr(first, "date") || undefined;
     }
   }
+  const provenance: Provenance = { sourceFormat: "PSML", creator, date };
 
   // Pseudo-atom spec
   const spec = root["pseudo-atom-spec"] ?? {};
@@ -112,7 +118,7 @@ export function fromPSML(text: string): Pseudopotential {
 
   // Grid
   const gridNode = root["grid"];
-  let r = new Float64Array(0);
+  let r: Float64Array = new Float64Array(0);
   if (gridNode) {
     const gridData = gridNode["grid-data"];
     if (gridData) r = parseFloat64Array(textOf(gridData));
@@ -133,15 +139,15 @@ export function fromPSML(text: string): Pseudopotential {
     rab,
   };
 
-  // Local potential
+  // Local potential (Hartree → Ry)
   const localNode = root["local-potential"];
-  let localVloc = new Float64Array(r.length);
+  let localVloc: Float64Array = new Float64Array(r.length);
   if (localNode) {
     const dataNode = localNode["radfunc"]?.["data"];
-    if (dataNode) localVloc = parseFloat64Array(textOf(dataNode));
+    if (dataNode) localVloc = haArrayToRy(parseFloat64Array(textOf(dataNode)));
   }
 
-  // Semilocal potentials
+  // Semilocal potentials (Hartree → Ry)
   const slNode = root["semilocal-potentials"];
   const semilocalPotentials: Pseudopotential["semilocal"] = [];
   const slSet = toArray(slNode);
@@ -150,45 +156,46 @@ export function fromPSML(text: string): Pseudopotential {
     for (const slps of slpsNodes) {
       const l = lFromLetter(attr(slps, "l"));
       const dataNode = slps["radfunc"]?.["data"];
-      const vnl = dataNode ? parseFloat64Array(textOf(dataNode)) : new Float64Array(r.length);
+      const vnl = dataNode
+        ? haArrayToRy(parseFloat64Array(textOf(dataNode)))
+        : new Float64Array(r.length);
       semilocalPotentials.push({ l, vnl });
     }
   }
 
-  // Nonlocal projectors
+  // Nonlocal projectors (Hartree → Ry)
   const nlNode = root["nonlocal-projectors"];
   const betas: BetaProjector[] = [];
   const nlSet = toArray(nlNode);
+  const ekbByIdx = new Map<number, number>();
   if (nlSet.length > 0) {
     const projNodes = toArray(nlSet[0]["proj"]);
+    let idx = 1;
     for (const proj of projNodes) {
       const l = lFromLetter(attr(proj, "l"));
       const ekb = attrNum(proj, "ekb");
+      ekbByIdx.set(idx, ekb);
       const dataNode = proj["radfunc"]?.["data"];
-      const betaData = dataNode ? parseFloat64Array(textOf(dataNode)) : new Float64Array(r.length);
+      const betaData = dataNode
+        ? haArrayToRy(parseFloat64Array(textOf(dataNode)))
+        : new Float64Array(r.length);
       betas.push({
         angularMomentum: l,
         ultrasoftCutoffRadius: 0,
-        label: `${l}${String.fromCharCode(115 + l)}`,
+        label: `${l}${lToLetter(l)}`,
         beta: betaData,
       });
-    }
-  }
-
-  // Build D_ij from ekb values (diagonal)
-  const dij: Array<[number, number, number]> = [];
-  const nlSetForEkb = toArray(nlNode);
-  if (nlSetForEkb.length > 0) {
-    const projNodes = toArray(nlSetForEkb[0]["proj"]);
-    let idx = 1;
-    for (const proj of projNodes) {
-      const ekb = attrNum(proj, "ekb");
-      dij.push([idx, idx, ekb]);
       idx++;
     }
   }
 
-  // Pseudo wavefunctions
+  // Build D_ij from ekb values (diagonal; PSML stores no off-diagonal data)
+  const dij: Array<[number, number, number]> = [];
+  for (const [idx, ekb] of ekbByIdx) {
+    dij.push([idx, idx, haToRy(ekb)]);
+  }
+
+  // Pseudo wavefunctions (dimensionless radial functions — no conversion)
   const pswfcNodes = toArray(root["pseudo-wave-functions"]);
   const pswfc: PseudopotentialWfc[] = [];
   if (pswfcNodes.length > 0) {
@@ -201,22 +208,22 @@ export function fromPSML(text: string): Pseudopotential {
       pswfc.push({
         l,
         occupation: 0,
-        label: `${n}${String.fromCharCode(115 + l)}`,
+        label: `${n}${lToLetter(l)}`,
         n,
         chi,
       });
     }
   }
 
-  // Valence charge (store as rhoatom)
+  // Valence charge (density — no conversion; store as rhoatom)
   const vcNode = root["valence-charge"];
-  let rhoatom = new Float64Array(r.length);
+  let rhoatom: Float64Array = new Float64Array(r.length);
   if (vcNode) {
     const dataNode = vcNode["radfunc"]?.["data"];
     if (dataNode) rhoatom = parseFloat64Array(textOf(dataNode));
   }
 
-  // Core charge (NLCC)
+  // Core charge (NLCC, density — no conversion)
   const ccNode = root["pseudocore-charge"];
   let nlcc: Float64Array | undefined;
   if (ccNode) {
@@ -226,7 +233,7 @@ export function fromPSML(text: string): Pseudopotential {
 
   return {
     format: "PSML",
-    version: "2.0.1",
+    units: { ...CANONICAL_UNITS },
     provenance,
     header: {
       element,
@@ -267,7 +274,8 @@ export function fromPSML(text: string): Pseudopotential {
 }
 
 /**
- * Serialize a Pseudopotential to PSML format.
+ * Serialize a first-class Pseudopotential to PSML format.
+ * Energies are written in Hartree (mandatory per the PSML schema).
  */
 export function toPSML(pp: Pseudopotential): string {
   const r = pp.mesh.r;
@@ -276,10 +284,13 @@ export function toPSML(pp: Pseudopotential): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" ?>\n`;
   xml += `<psml version="1.2" energy_unit="hartree" length_unit="bohr" uuid="matsci-parse">\n`;
 
-  // Provenance
-  if (pp.provenance) {
-    const provCreator = pp.provenance.creator ?? "matsci-parse";
-    const provDate = pp.provenance.date ?? new Date().toISOString().split("T")[0];
+  // Provenance: provenance fields take precedence; fall back to the UPF
+  // header equivalents so generator stamps survive a hub conversion.
+  {
+    const provCreator =
+      pp.provenance.creator ?? pp.header.generated ?? pp.header.author ?? "matsci-parse";
+    const provDate =
+      pp.provenance.date ?? pp.header.date ?? new Date().toISOString().split("T")[0];
     xml += `  <provenance creator="${provCreator}" date="${provDate}">\n`;
     xml += `    <annotation type="generated-by" value="matsci-parse pseudopotential library" />\n`;
     xml += `  </provenance>\n`;
@@ -303,38 +314,41 @@ export function toPSML(pp: Pseudopotential): string {
   xml += `    </grid-data>\n`;
   xml += `  </grid>\n`;
 
-  // Local potential
+  const ha = (v: number): string => formatFortranNumber(v * RY_TO_HA).trim();
+
+  // Local potential (Ry → Ha)
   xml += `  <local-potential>\n`;
   xml += `    <radfunc>\n`;
   xml += `      <data npts="${npts}">\n`;
-  xml += `        ${formatDataArray(pp.local.vloc)}\n`;
+  xml += `        ${Array.from(pp.local.vloc).map(ha).join("  ")}\n`;
   xml += `      </data>\n`;
   xml += `    </radfunc>\n`;
   xml += `  </local-potential>\n`;
 
-  // Semilocal potentials
+  // Semilocal potentials (Ry → Ha)
   if (pp.semilocal && pp.semilocal.length > 0) {
     xml += `  <semilocal-potentials set="scalar_relativistic">\n`;
     for (const sl of pp.semilocal) {
       xml += `    <slps l="${lToLetter(sl.l)}" n="${sl.l + 1}" rc="0">\n`;
       xml += `      <radfunc>\n`;
-      xml += `        <data npts="${npts}">${formatDataArray(sl.vnl)}</data>\n`;
+      xml += `        <data npts="${npts}">${Array.from(sl.vnl).map(ha).join("  ")}</data>\n`;
       xml += `      </radfunc>\n`;
       xml += `    </slps>\n`;
     }
     xml += `  </semilocal-potentials>\n`;
   }
 
-  // Nonlocal projectors
-  if (pp.nonlocal.betas.length > 0) {
+  // Nonlocal projectors (Ry → Ha); ekb from diagonal D_ij entries.
+  const nonlocal: PseudopotentialNonlocal = pp.nonlocal;
+  if (nonlocal.betas.length > 0) {
     xml += `  <nonlocal-projectors set="scalar_relativistic">\n`;
     let idx = 1;
-    for (const beta of pp.nonlocal.betas) {
-      const ekbEntry = pp.nonlocal.dij.find(([nb]) => nb === idx);
-      const ekb = ekbEntry ? ekbEntry[2] : 1.0;
+    for (const beta of nonlocal.betas) {
+      const ekbEntry = nonlocal.dij.find(([nb, mb]) => nb === idx && mb === idx);
+      const ekb = ekbEntry ? ekbEntry[2] * RY_TO_HA : 1.0;
       xml += `    <proj l="${lToLetter(beta.angularMomentum)}" seq="${idx}" ekb="${formatFortranNumber(ekb).trim()}" type="kb">\n`;
       xml += `      <radfunc>\n`;
-      xml += `        <data npts="${npts}">${formatDataArray(beta.beta)}</data>\n`;
+      xml += `        <data npts="${npts}">${Array.from(beta.beta).map(ha).join("  ")}</data>\n`;
       xml += `      </radfunc>\n`;
       xml += `    </proj>\n`;
       idx++;
@@ -342,7 +356,7 @@ export function toPSML(pp: Pseudopotential): string {
     xml += `  </nonlocal-projectors>\n`;
   }
 
-  // Pseudo wavefunctions
+  // Pseudo wavefunctions (dimensionless — no conversion)
   if (pp.pswfc.length > 0) {
     xml += `  <pseudo-wave-functions set="pseudo">\n`;
     for (const wfc of pp.pswfc) {
@@ -383,7 +397,5 @@ function lFromLetter(letter: string): number {
 }
 
 function lToLetter(l: number): string {
-  return String.fromCharCode(115 + l); // 115 = 's'
+  return "spdfg"[l] ?? String(l);
 }
-
-

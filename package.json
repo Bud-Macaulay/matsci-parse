@@ -45,7 +45,24 @@
   },
   "dependencies": {
     "@spglib/moyo-wasm": "^0.18.0",
-    "fast-xml-parser": "^5.10.1",
+    "txml": "^6.0.3",
     "voro3d": "^0.0.7"
-  }
+  },
+  "description": "A TypeScript library and web toolset for parsing, transforming, and analyzing atomistic materials science data.",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bud-Macaulay/matsci-parse.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Bud-Macaulay/matsci-parse/issues"
+  },
+  "homepage": "https://github.com/Bud-Macaulay/matsci-parse#readme"
 }

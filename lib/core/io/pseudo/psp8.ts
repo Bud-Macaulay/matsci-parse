@@ -1,24 +1,36 @@
 /**
- * PSP8 (ABINIT format 8) pseudopotential parser and serializer.
+ * PSP8 (ABINIT format 8) pseudopotential adapter.
  *
  * PSP8 is a norm-conserving pseudopotential format produced by ONCVPSP
- * and used widely in the ABINIT/PseudoDojo ecosystem.
+ * and used widely in the ABINIT/PseudoDojo ecosystem. This adapter converts
+ * between PSP8 text and the first-class Pseudopotential object (canonical
+ * units Ry / Bohr).
  *
- * Units: Hartree (energy), Bohr (length).
+ * Native units: Hartree (energy), Bohr (length). Energies are converted to
+ * Ry on parse (×2) and back to Hartree on serialize (×0.5).
  * Grid: Linear, r(i) = (i-1) * dr, starting at r=0.
+ *
+ * Loss notes: PSP8 carries only KB projectors (no semilocal, no PAW, no
+ * augmentation charge, no pseudo-wavefunctions). US/PAW objects cannot be
+ * faithfully written; `canWritePSP8()` reports whether conversion is safe.
  *
  * Reference: https://docs.abinit.org/developers/psp8_info/
  */
 
 import type {
   Pseudopotential,
-  PseudopotentialHeader,
   PseudopotentialMesh,
   PseudopotentialLocal,
   PseudopotentialNonlocal,
   BetaProjector,
-  PseudopotentialWfc,
 } from "../../pseudopotential/pseudopotential";
+
+import { CANONICAL_UNITS } from "../../pseudopotential/pseudopotential";
+import {
+  RY_TO_HA,
+  haToRy,
+  haArrayToRy,
+} from "../../pseudopotential/units";
 
 import {
   parseFortranNumber,
@@ -28,10 +40,40 @@ import {
   parseIntSafe,
 } from "./fortran-helpers";
 
-import { guessElement, elementToZ } from "./elements";
+import { guessElement, elementToZ, pspxcToFunctional, functionalToPspxc } from "./elements";
+
+export interface PSP8ConversionCheck {
+  ok: boolean;
+  reasons: string[];
+}
 
 /**
- * Parse a PSP8 pseudopotential file.
+ * Report whether a first-class pseudopotential can be written as PSP8.
+ * PSP8 supports norm-conserving KB data only: no US/PAW, no augmentation,
+ * no spin-orbit coupling, no semilocal potentials.
+ */
+export function canWritePSP8(pp: Pseudopotential): PSP8ConversionCheck {
+  const reasons: string[] = [];
+  if (pp.header.isUltrasoft || pp.header.isPaw || pp.header.pseudoType !== "NC") {
+    reasons.push(`pseudoType ${pp.header.pseudoType} is not norm-conserving`);
+  }
+  if (pp.nonlocal.augmentation) {
+    reasons.push("augmentation data has no PSP8 representation");
+  }
+  if (pp.header.hasSo || pp.spinOrbit) {
+    reasons.push("spin-orbit data has no PSP8 representation");
+  }
+  if (pp.semilocal && pp.semilocal.length > 0) {
+    reasons.push("semilocal potentials are not written to PSP8");
+  }
+  if (pp.paw || pp.fullWfc) {
+    reasons.push("PAW data has no PSP8 representation");
+  }
+  return { ok: reasons.length === 0, reasons };
+}
+
+/**
+ * Parse a PSP8 pseudopotential file into a first-class Pseudopotential.
  *
  * Structure:
  * Header (6-7 lines):
@@ -76,6 +118,7 @@ export function fromPSP8(text: string): Pseudopotential {
   const lmax = parseIntSafe(line3[2]);
   const lloc = parseIntSafe(line3[3]);
   const mmax = parseIntSafe(line3[4]);
+  const r2well = line3.length > 5 ? parseFortranNumber(line3[5]) : undefined;
 
   // Line 4: rchrg, fchrg, qchrg
   const line4 = allLines[lineIdx++].trim().split(/\s+/);
@@ -102,41 +145,59 @@ export function fromPSP8(text: string): Pseudopotential {
     }
   }
 
-  // Build linear radial grid
+  const hasSo = extensionSwitch === 2 || extensionSwitch === 3;
+  const hasRhoatom = extensionSwitch === 1 || extensionSwitch === 3;
+
+  // Read the radial grid from the first data block (all blocks share it).
+  // We collect r(i) here as blocks are consumed, then validate at the end.
   const rValues = new Float64Array(mmax);
-  for (let i = 0; i < mmax; i++) {
-    rValues[i] = i * (mmax > 1 ? (rValues[mmax - 1] || 1.0) / (mmax - 1) : 0);
-  }
-  // We'll fill in actual r values from data blocks
+
+  const readDataBlock = (
+    cols: number,
+    skipHeader = true,
+  ): { headerParts: string[]; grid: Float64Array; data: Float64Array[] } => {
+    const headerParts = skipHeader
+      ? allLines[lineIdx++].trim().split(/\s+/)
+      : [];
+    const grid = new Float64Array(mmax);
+    const data: Float64Array[] = [];
+    for (let p = 0; p < cols; p++) data.push(new Float64Array(mmax));
+    for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
+      const parts = allLines[lineIdx++].trim().split(/\s+/);
+      if (parts.length >= 2) grid[i] = parseFortranNumber(parts[1]);
+      for (let p = 0; p < cols && p + 2 < parts.length; p++) {
+        data[p][i] = parseFortranNumber(parts[p + 2]);
+      }
+    }
+    return { headerParts, grid, data };
+  };
 
   // Parse projector blocks and local potential
   const betas: BetaProjector[] = [];
-  let localVloc = new Float64Array(mmax);
+  let localVloc: Float64Array = new Float64Array(mmax);
   const ekbValues: number[][] = [];
+  let gridSet = false;
+
+  const adoptGrid = (grid: Float64Array): void => {
+    if (!gridSet) {
+      rValues.set(grid);
+      gridSet = true;
+    }
+  };
 
   // Data blocks appear in l order. If lloc <= lmax, the local potential
   // replaces the projector block at position lloc.
   for (let l = 0; l <= lmax; l++) {
     if (l === lloc && lloc <= lmax) {
-      // This is the local potential block
-      // Header line: just the l value
-      const headerLine = allLines[lineIdx++].trim();
-      // Data: mmax lines of (index, r, vloc)
-      const vlocValues = new Float64Array(mmax);
-      for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
-        const parts = allLines[lineIdx++].trim().split(/\s+/);
-        if (parts.length >= 3) {
-          const idx = parseIntSafe(parts[0]);
-          if (i === 0) rValues[i] = parseFortranNumber(parts[1]);
-          if (i > 0) rValues[i] = parseFortranNumber(parts[1]);
-          vlocValues[i] = parseFortranNumber(parts[2]);
-        }
-      }
-      localVloc = vlocValues;
+      // Local potential block: header line carries just the l value.
+      const { headerParts, grid, data } = readDataBlock(1);
+      void headerParts;
+      adoptGrid(grid);
+      localVloc = data[0];
     } else if (nproj[l] > 0) {
-      // Projector block
-      // Header line: l ekb(1) ekb(2) ...
-      const headerParts = allLines[lineIdx++].trim().split(/\s+/);
+      // Projector block: header line is "l ekb(1) ekb(2) ...".
+      const { headerParts, grid, data } = readDataBlock(nproj[l]);
+      adoptGrid(grid);
       const blockL = parseIntSafe(headerParts[0]);
       const ekb: number[] = [];
       for (let p = 1; p < headerParts.length; p++) {
@@ -144,126 +205,28 @@ export function fromPSP8(text: string): Pseudopotential {
       }
       ekbValues.push(ekb);
 
-      // Data: mmax lines of (index, r, projector_1, projector_2, ...)
-      const projectorData: Float64Array[] = [];
-      for (let p = 0; p < nproj[l]; p++) {
-        projectorData.push(new Float64Array(mmax));
-      }
-
-      for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
-        const parts = allLines[lineIdx++].trim().split(/\s+/);
-        if (parts.length >= 3) {
-          if (i === 0) rValues[i] = parseFortranNumber(parts[1]);
-          if (i > 0) rValues[i] = parseFortranNumber(parts[1]);
-          for (let p = 0; p < nproj[l] && p + 2 < parts.length; p++) {
-            projectorData[p][i] = parseFortranNumber(parts[p + 2]);
-          }
-        }
-      }
-
-      // Create one beta projector per ekb value
+      // Create one beta projector per ekb value (Ha → Ry).
       for (let p = 0; p < nproj[l]; p++) {
         betas.push({
-          angularMomentum: l,
+          angularMomentum: Number.isNaN(blockL) ? l : blockL,
           ultrasoftCutoffRadius: 0,
           label: `${l}${"spdf"[l] ?? l}`,
-          beta: projectorData[p],
+          beta: haArrayToRy(data[p]),
         });
       }
-    } else {
-      // No projectors for this l, and not local channel — skip (shouldn't happen)
     }
   }
 
   // If lloc > lmax, local potential comes after all projector blocks
   if (lloc > lmax) {
-    // Header line
-    const headerLine = allLines[lineIdx++].trim();
-    const vlocValues = new Float64Array(mmax);
-    for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
-      const parts = allLines[lineIdx++].trim().split(/\s+/);
-      if (parts.length >= 3) {
-        if (i === 0) rValues[i] = parseFortranNumber(parts[1]);
-        if (i > 0) rValues[i] = parseFortranNumber(parts[1]);
-        vlocValues[i] = parseFortranNumber(parts[2]);
-      }
-    }
-    localVloc = vlocValues;
+    const { grid, data } = readDataBlock(1);
+    adoptGrid(grid);
+    localVloc = data[0];
   }
+  localVloc = haArrayToRy(localVloc);
 
-  // Parse SO projector blocks (extension_switch == 2 or 3)
-  if (extensionSwitch === 2 || extensionSwitch === 3) {
-    for (let l = 1; l <= lmax; l++) {
-      if (nprojso[l - 1] > 0) {
-        // Header line: l ekbso(1) ekbso(2) ...
-        const soHeaderParts = allLines[lineIdx++].trim().split(/\s+/);
-        const soEkb: number[] = [];
-        for (let p = 1; p < soHeaderParts.length; p++) {
-          soEkb.push(parseFortranNumber(soHeaderParts[p]));
-        }
-        // Data: mmax lines of (index, r, beta_so_1, beta_so_2, ...)
-        const nProjSo = nprojso[l - 1];
-        const soProjectorData: Float64Array[] = [];
-        for (let p = 0; p < nProjSo; p++) {
-          soProjectorData.push(new Float64Array(mmax));
-        }
-        for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
-          const parts = allLines[lineIdx++].trim().split(/\s+/);
-          for (let p = 0; p < nProjSo && p + 2 < parts.length; p++) {
-            soProjectorData[p][i] = parseFortranNumber(parts[p + 2]);
-          }
-        }
-        // Add SO projectors with "so" label suffix
-        for (let p = 0; p < nProjSo; p++) {
-          betas.push({
-            angularMomentum: l,
-            ultrasoftCutoffRadius: 0,
-            label: `${l}${"spdf"[l] ?? l}-so`,
-            beta: soProjectorData[p],
-          });
-        }
-      }
-    }
-  }
-
-  // Parse NLCC block if present
-  let nlcc: Float64Array | undefined;
-  if (fchrg > 0) {
-    nlcc = new Float64Array(mmax);
-    for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
-      const parts = allLines[lineIdx++].trim().split(/\s+/);
-      if (parts.length >= 3) {
-        nlcc[i] = parseFortranNumber(parts[2]);
-      }
-    }
-  }
-
-  // Parse pseudo valence charge block if extension_switch == 1 or 3
-  const rhoatom = new Float64Array(mmax);
-  if (extensionSwitch === 1 || extensionSwitch === 3) {
-    for (let i = 0; i < mmax && lineIdx < allLines.length; i++) {
-      const parts = allLines[lineIdx++].trim().split(/\s+/);
-      if (parts.length >= 3) {
-        rhoatom[i] = parseFortranNumber(parts[2]);
-      }
-    }
-  }
-
-  // Build mesh
-  const rmax = rValues[mmax - 1] || 0;
-  const dr = mmax > 1 ? rmax / (mmax - 1) : 0;
-  const rab = new Float64Array(mmax).fill(dr);
-
-  const mesh: PseudopotentialMesh = {
-    gridType: "linear",
-    rmax,
-    r: rValues,
-    rab,
-  };
-
-  // Build D_ij matrix from ekb values
-  // For single projectors per l: dij[i][i] = ekb[i]
-  // For multiple projectors: dij is block-diagonal
+  // Build D_ij matrix (Ha → Ry) from ekb values.
+  // For single projectors per l: dij[i][i] = ekb[i]; block-diagonal otherwise.
   const dij: Array<[number, number, number]> = [];
   let projIdx = 1;
   let ekbIdx = 0;
@@ -274,13 +237,65 @@ export function fromPSP8(text: string): Pseudopotential {
       const ekbL = ekbValues[ekbIdx++] ?? [];
       for (let i = 0; i < nProjL; i++) {
         for (let j = 0; j < nProjL; j++) {
-          const val = i === j ? (ekbL[i] ?? 1.0) : 0;
+          const val = i === j ? haToRy(ekbL[i] ?? 1.0) : 0;
           dij.push([projIdx + i, projIdx + j, val]);
         }
       }
       projIdx += nProjL;
     }
   }
+
+  // Parse SO projector blocks (extension_switch == 2 or 3).
+  // ekbso values are stored as diagonal D_ij entries for the "-so" projectors.
+  if (hasSo) {
+    for (let l = 1; l <= lmax; l++) {
+      const nProjSo = nprojso[l - 1] ?? 0;
+      if (nProjSo > 0) {
+        const { headerParts, data } = readDataBlock(nProjSo);
+        const soEkb: number[] = [];
+        for (let p = 1; p < headerParts.length; p++) {
+          soEkb.push(parseFortranNumber(headerParts[p]));
+        }
+        for (let p = 0; p < nProjSo; p++) {
+          betas.push({
+            angularMomentum: l,
+            ultrasoftCutoffRadius: 0,
+            label: `${l}${"spdf"[l] ?? l}-so`,
+            beta: haArrayToRy(data[p]),
+          });
+          dij.push([projIdx + p, projIdx + p, haToRy(soEkb[p] ?? 1.0)]);
+        }
+        projIdx += nProjSo;
+      }
+    }
+  }
+
+  // Parse NLCC block if present (no header line — mmax bare data lines)
+  let nlcc: Float64Array | undefined;
+  if (fchrg > 0) {
+    const { data } = readDataBlock(1, false);
+    nlcc = data[0];
+  }
+
+  // Parse pseudo valence charge block if extension_switch == 1 or 3
+  // (no header line — mmax bare data lines)
+  const rhoatom = new Float64Array(mmax);
+  if (hasRhoatom) {
+    const { data } = readDataBlock(1, false);
+    rhoatom.set(data[0]);
+  }
+
+  // Build mesh (linear grid, Bohr)
+  const rmax = rValues[mmax - 1] || 0;
+  const dr = mmax > 1 && rmax > 0 ? rValues[1] - rValues[0] : 0;
+  const rab = new Float64Array(mmax).fill(dr);
+
+  const mesh: PseudopotentialMesh = {
+    gridType: "linear",
+    rmax,
+    r: rValues,
+    rab,
+  };
 
   // Guess element from zatom
   const element = guessElement(zatom);
@@ -290,7 +305,8 @@ export function fromPSP8(text: string): Pseudopotential {
 
   return {
     format: "PSP8",
-    version: "2.0.1",
+    units: { ...CANONICAL_UNITS },
+    provenance: { sourceFormat: "PSP8", creator: title, date: pspd },
     header: {
       element,
       generated: title,
@@ -300,7 +316,7 @@ export function fromPSP8(text: string): Pseudopotential {
       isUltrasoft: false,
       isPaw: false,
       isCoulomb: false,
-      hasSo: extensionSwitch === 2 || extensionSwitch === 3,
+      hasSo,
       hasWfc: false,
       hasGipaw: false,
       pawAsGipaw: false,
@@ -318,33 +334,61 @@ export function fromPSP8(text: string): Pseudopotential {
       numberOfProj: betas.length,
       xcCode: pspxc,
       extensionSwitch,
+      r2well,
+      rchrg,
+      fchrg,
+      qchrg,
     },
     mesh,
-    local: { vloc: localVloc },
-    nonlocal: { betas, dij },
+    local: { vloc: localVloc } satisfies PseudopotentialLocal,
+    nonlocal: { betas, dij } satisfies PseudopotentialNonlocal,
     pswfc: [],
     rhoatom,
-    nlcc: nlcc,
+    nlcc,
   };
 }
 
 /**
- * Serialize a Pseudopotential to PSP8 format.
+ * Serialize a first-class Pseudopotential to PSP8 format.
+ *
+ * Energies (vloc, projectors, ekb) are written back in Hartree. Only
+ * norm-conserving data is supported; use `canWritePSP8()` to check first.
  */
 export function toPSP8(pp: Pseudopotential): string {
   const lines: string[] = [];
 
   const lmax = pp.header.lMax;
   const mmax = pp.mesh.r.length;
-  const lloc = pp.header.lLocal ?? 0;
-  const nproj: number[] = new Array(lmax + 1).fill(0);
+  // QE uses lLocal < 0 for "no explicit local channel"; PSP8 has no such
+  // notion, so map it to "separate local block" (lloc > lmax), which carries
+  // the same semantics (local potential tabulated on its own).
+  const rawLloc = pp.header.lLocal ?? 0;
+  const lloc = rawLloc < 0 ? lmax + 1 : rawLloc;
 
-  // Count projectors per l channel
-  for (const beta of pp.nonlocal.betas) {
-    if (beta.angularMomentum <= lmax) {
+  // Split betas into regular and spin-orbit groups (label suffix "-so").
+  const isSoBeta = (b: BetaProjector): boolean => b.label.endsWith("-so");
+  const regularBetas = pp.nonlocal.betas.filter((b) => !isSoBeta(b));
+  const soBetas = pp.nonlocal.betas.filter(isSoBeta);
+
+  const nproj: number[] = new Array(lmax + 1).fill(0);
+  for (const beta of regularBetas) {
+    if (beta.angularMomentum <= lmax && beta.angularMomentum >= 0) {
       nproj[beta.angularMomentum]++;
     }
   }
+  const nprojso: number[] = new Array(Math.max(lmax, 0)).fill(0);
+  for (const beta of soBetas) {
+    if (beta.angularMomentum >= 1 && beta.angularMomentum <= lmax) {
+      nprojso[beta.angularMomentum - 1]++;
+    }
+  }
+
+  // extension_switch: prefer the stored value; derive it for objects from
+  // formats without the concept (e.g. UPF) from the data actually present.
+  const hasRhoatomData = pp.rhoatom.some((v) => v !== 0);
+  const extensionSwitch =
+    pp.header.extensionSwitch ??
+    (hasRhoatomData ? 1 : 0) + (soBetas.length > 0 ? 2 : 0);
 
   // Header
   const zatom = elementToZ(pp.header.element);
@@ -353,31 +397,38 @@ export function toPSP8(pp: Pseudopotential): string {
   lines.push(
     `${zatom.toFixed(4).padStart(12)} ${pp.header.zValence.toFixed(4).padStart(12)} ${pspd.padStart(8)}`,
   );
+  // XC code: prefer the stored value; reverse-map the functional string for
+  // objects arriving via formats that only carry the name (e.g. UPF).
+  const pspxc =
+    pp.header.xcCode ?? functionalToPspxc(pp.header.functional) ?? 0;
   lines.push(
-    `     8 ${pp.header.xcCode ?? 0} ${lmax} ${lloc} ${mmax}     0`,
+    `     8 ${pspxc} ${lmax} ${lloc} ${mmax} ${pp.header.r2well ?? 0}`,
   );
-  const rchrg = 0;
-  const fchrg = pp.header.coreCorrection ? 1.0 : 0.0;
-  const qchrg = 0;
+  const rchrg = pp.header.rchrg ?? 0;
+  const fchrg =
+    pp.header.fchrg ?? (pp.nlcc ? 1.0 : pp.header.coreCorrection ? 1.0 : 0.0);
+  const qchrg = pp.header.qchrg ?? 0;
   lines.push(`${rchrg.toFixed(4).padStart(12)} ${fchrg.toFixed(4).padStart(12)} ${qchrg.toFixed(4).padStart(12)}`);
   lines.push(` ${nproj.join("  ")}`);
-  lines.push(`     ${pp.header.extensionSwitch ?? 0}`);
+  lines.push(`     ${extensionSwitch}`);
+  if (extensionSwitch === 2 || extensionSwitch === 3) {
+    lines.push(` ${nprojso.join("  ")}`);
+  }
 
-  // Projector blocks
+  // Projector blocks (regular). ekb recovered from diagonal D_ij entries.
   const ekb = pp.nonlocal.dij;
+  const ekbOf = (globalIdx: number): number => {
+    const entry = ekb.find(([nb, mb]) => nb === globalIdx && mb === globalIdx);
+    return entry ? entry[2] * RY_TO_HA : 1.0;
+  };
+
   let projOffset = 1;
   for (let l = 0; l <= lmax; l++) {
     if (l === lloc && lloc <= lmax) continue;
-    if (nproj[l] === 0) continue;
+    const lBetas = regularBetas.filter((b) => b.angularMomentum === l);
+    if (lBetas.length === 0) continue;
 
-    // Find ekb values for this l channel using global projector indices
-    const lBetas = pp.nonlocal.betas.filter((b) => b.angularMomentum === l);
-    const ekbValues = lBetas.map((_, i) => {
-      const globalIdx = projOffset + i;
-      const entry = ekb.find(([nb, mb]) => nb === globalIdx && mb === globalIdx);
-      return entry ? entry[2] : 1.0;
-    });
-
+    const ekbValues = lBetas.map((_, i) => ekbOf(projOffset + i));
     lines.push(`   ${l}  ${ekbValues.map((e) => formatFortranNumber(e)).join(" ")}`);
 
     for (let i = 0; i < mmax; i++) {
@@ -386,7 +437,7 @@ export function toPSP8(pp: Pseudopotential): string {
         formatFortranNumber(pp.mesh.r[i]),
       ];
       for (const beta of lBetas) {
-        parts.push(formatFortranNumber(beta.beta[i] ?? 0));
+        parts.push(formatFortranNumber((beta.beta[i] ?? 0) * RY_TO_HA));
       }
       lines.push(parts.join(" "));
     }
@@ -394,12 +445,33 @@ export function toPSP8(pp: Pseudopotential): string {
     projOffset += lBetas.length;
   }
 
-  // Local potential block
+  // Local potential block (Hartree)
   lines.push(`   ${lloc}`);
   for (let i = 0; i < mmax; i++) {
     lines.push(
-      `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.local.vloc[i])}`,
+      `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.local.vloc[i] * RY_TO_HA)}`,
     );
+  }
+
+  // SO projector blocks
+  if (extensionSwitch === 2 || extensionSwitch === 3) {
+    for (let l = 1; l <= lmax; l++) {
+      const lBetas = soBetas.filter((b) => b.angularMomentum === l);
+      if (lBetas.length === 0) continue;
+      const ekbValues = lBetas.map((_, i) => ekbOf(projOffset + i));
+      lines.push(`   ${l}  ${ekbValues.map((e) => formatFortranNumber(e)).join(" ")}`);
+      for (let i = 0; i < mmax; i++) {
+        const parts = [
+          (i + 1).toString().padStart(5),
+          formatFortranNumber(pp.mesh.r[i]),
+        ];
+        for (const beta of lBetas) {
+          parts.push(formatFortranNumber((beta.beta[i] ?? 0) * RY_TO_HA));
+        }
+        lines.push(parts.join(" "));
+      }
+      projOffset += lBetas.length;
+    }
   }
 
   // NLCC block
@@ -412,7 +484,7 @@ export function toPSP8(pp: Pseudopotential): string {
   }
 
   // Pseudo valence charge block (if extension_switch == 1 or 3)
-  if (pp.header.extensionSwitch === 1 || pp.header.extensionSwitch === 3) {
+  if (extensionSwitch === 1 || extensionSwitch === 3) {
     for (let i = 0; i < mmax; i++) {
       lines.push(
         `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.rhoatom[i])}`,
@@ -421,18 +493,4 @@ export function toPSP8(pp: Pseudopotential): string {
   }
 
   return lines.join("\n");
-}
-
-
-
-function pspxcToFunctional(pspxc: number): string {
-  const map: Record<number, string> = {
-    1: "LDA (PW)",
-    2: "LDA (PW92)",
-    7: "PW92",
-    11: "PBE",
-    14: "PBEsol",
-    23: "B3LYP",
-  };
-  return map[pspxc] ?? `xc=${pspxc}`;
 }
