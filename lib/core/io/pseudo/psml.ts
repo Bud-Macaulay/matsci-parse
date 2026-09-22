@@ -163,7 +163,7 @@ export function fromPSML(text: string): Pseudopotential {
     }
   }
 
-  // Nonlocal projectors (Hartree → Ry)
+  // Nonlocal projectors (dimensionless shapes — no conversion)
   const nlNode = root["nonlocal-projectors"];
   const betas: BetaProjector[] = [];
   const nlSet = toArray(nlNode);
@@ -177,7 +177,7 @@ export function fromPSML(text: string): Pseudopotential {
       ekbByIdx.set(idx, ekb);
       const dataNode = proj["radfunc"]?.["data"];
       const betaData = dataNode
-        ? haArrayToRy(parseFloat64Array(textOf(dataNode)))
+        ? parseFloat64Array(textOf(dataNode))
         : new Float64Array(r.length);
       betas.push({
         angularMomentum: l,
@@ -315,6 +315,7 @@ export function toPSML(pp: Pseudopotential): string {
   xml += `  </grid>\n`;
 
   const ha = (v: number): string => formatFortranNumber(v * RY_TO_HA).trim();
+  const raw = (v: number): string => formatFortranNumber(v).trim();
 
   // Local potential (Ry → Ha)
   xml += `  <local-potential>\n`;
@@ -338,7 +339,7 @@ export function toPSML(pp: Pseudopotential): string {
     xml += `  </semilocal-potentials>\n`;
   }
 
-  // Nonlocal projectors (Ry → Ha); ekb from diagonal D_ij entries.
+  // Nonlocal projectors (shapes unconverted; ekb from diagonal D_ij).
   const nonlocal: PseudopotentialNonlocal = pp.nonlocal;
   if (nonlocal.betas.length > 0) {
     xml += `  <nonlocal-projectors set="scalar_relativistic">\n`;
@@ -348,7 +349,7 @@ export function toPSML(pp: Pseudopotential): string {
       const ekb = ekbEntry ? ekbEntry[2] * RY_TO_HA : 1.0;
       xml += `    <proj l="${lToLetter(beta.angularMomentum)}" seq="${idx}" ekb="${formatFortranNumber(ekb).trim()}" type="kb">\n`;
       xml += `      <radfunc>\n`;
-      xml += `        <data npts="${npts}">${Array.from(beta.beta).map(ha).join("  ")}</data>\n`;
+      xml += `        <data npts="${npts}">${Array.from(beta.beta).map(raw).join("  ")}</data>\n`;
       xml += `      </radfunc>\n`;
       xml += `    </proj>\n`;
       idx++;

@@ -17,4 +17,16 @@ describe("makeRadialGrid", () => {
     expect(r[49]).toBeCloseTo(10);
     expect(rab[10]).toBeCloseTo(10 / 49);
   });
+
+  it("collapses single-point grids to the endpoint", () => {
+    for (const type of ["log", "linear"] as const) {
+      const { r, rab } = makeRadialGrid({ npts: 1, rmax: 20, type });
+      expect(Array.from(r)).toEqual([20]);
+      expect(Array.from(rab)).toEqual([0]);
+    }
+  });
+
+  it("rejects empty grids", () => {
+    expect(() => makeRadialGrid({ npts: 0, rmax: 20 })).toThrow("npts >= 1");
+  });
 });

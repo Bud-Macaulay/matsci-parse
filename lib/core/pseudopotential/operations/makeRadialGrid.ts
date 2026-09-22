@@ -18,6 +18,13 @@ export function makeRadialGrid(options: RadialGridOptions): {
   rab: Float64Array;
 } {
   const { npts, rmax, type = "log" } = options;
+  if (!Number.isInteger(npts) || npts < 1) {
+    throw new Error(`makeRadialGrid requires npts >= 1, got ${npts}`);
+  }
+  // A single-point grid is just the endpoint with zero weight.
+  if (npts === 1) {
+    return { r: new Float64Array([rmax]), rab: new Float64Array([0]) };
+  }
   const r = new Float64Array(npts);
   const rab = new Float64Array(npts);
   if (type === "linear") {

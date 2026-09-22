@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { fromFHI, toFHI } from "@/core/io/pseudo/fhi";
+import { fromFHI, toFHI, canWriteFHI } from "@/core/io/pseudo/fhi";
+import { fromUPF } from "@/core/io/pseudo/upf";
 
 import {
   realHFhi,
@@ -9,6 +10,7 @@ import {
   realOFhi,
   realLiFhi,
 } from "./teststrings/fhi";
+import { heNcUpf, hUsppUpf, oPawUpf } from "./teststrings/upf";
 
 describe("FHI parser", () => {
   describe("error handling", () => {
@@ -199,6 +201,108 @@ describe("FHI parser", () => {
       const cpi = toFHI(a);
       const b = fromFHI(cpi);
       expect(b.header.zValence).toBeCloseTo(a.header.zValence);
+    });
+  });
+
+  describe("raw .cpi edge cases", () => {
+    const zeros = Array.from(
+      { length: 9 },
+      () => "  0.0000    0.0000    0.0000   0.0000",
+    );
+
+    it("throws on numeric input that is too short", () => {
+      expect(() => fromFHI("1.0000 2\n3")).toThrow("too short");
+    });
+
+    it("skips short junk lines in the header scan and data block", () => {
+      const text = [
+        "4.0000  2",
+        ...zeros.slice(0, 8),
+        "oops",
+        zeros[8],
+        "  3  0.01",
+        "junk",
+        "  1  0.01  -1.0  -0.9",
+        "  2  0.02  -0.8  -0.7",
+        "  3  0.03  -0.6  -0.5",
+      ].join("\n");
+      const pp = fromFHI(text);
+      expect(pp.mesh.r.length).toBe(3);
+      expect(Array.from(pp.local.vloc)).toEqual([-2.0, -1.6, -1.2]);
+    });
+
+    it("reads NLCC columns and writes them back", () => {
+      const text = [
+        "4.0000  2",
+        ...zeros,
+        "  3  0.01",
+        "  1  0.01  -1.0  -0.9  0.001",
+        "  2  0.02  -0.8  -0.7  0.002",
+        "  3  0.03  -0.6  -0.5  0.003",
+      ].join("\n");
+      const a = fromFHI(text);
+      expect(a.header.coreCorrection).toBe(true);
+      expect(Array.from(a.nlcc!)).toEqual([0.001, 0.002, 0.003]);
+      expect(fromFHI(toFHI(a))).toEqual(a);
+    });
+
+    it("handles a degenerate single-channel mesh", () => {
+      const text = ["4.0000  0", ...zeros, "  1  0.01"].join("\n");
+      const pp = fromFHI(text);
+      expect(pp.mesh.r.length).toBe(0);
+      expect(pp.local.vloc.length).toBe(0);
+    });
+  });
+
+  describe("toFHI from non-FHI objects", () => {
+    it("replicates the local potential across channels", () => {
+      const a = fromUPF(heNcUpf);
+      expect(a.semilocal).toBeUndefined();
+      const b = fromFHI(toFHI(a));
+      expect(b.semilocal!.length).toBe(1);
+      expect(Array.from(b.semilocal![0].vnl)).toEqual(Array.from(b.local.vloc));
+    });
+
+    it("omits channels missing from semilocal", () => {
+      const a = fromFHI(realCFhi);
+      const dropped = {
+        ...a,
+        semilocal: a.semilocal!.filter((s) => s.l !== 1),
+      };
+      const b = fromFHI(toFHI(dropped));
+      expect(Array.from(b.semilocal!.find((s) => s.l === 1)!.vnl)).toEqual(
+        new Array(b.mesh.r.length).fill(0),
+      );
+    });
+
+    it("defaults a missing dx to 0.01", () => {
+      const a = fromUPF(heNcUpf);
+      const b = fromFHI(toFHI({ ...a, mesh: { ...a.mesh, dx: undefined } }));
+      expect(b.mesh.dx).toBeCloseTo(0.01);
+    });
+  });
+
+  describe("canWriteFHI", () => {
+    it("accepts norm-conserving semilocal objects", () => {
+      expect(canWriteFHI(fromFHI(realCFhi)).ok).toBe(true);
+    });
+
+    it("rejects US/PAW/KB content with reasons", () => {
+      expect(canWriteFHI(fromUPF(hUsppUpf)).ok).toBe(false);
+      const kb = canWriteFHI(fromUPF(heNcUpf));
+      expect(kb.ok).toBe(false);
+      expect(kb.reasons.join(" ")).toContain("KB projectors");
+    });
+
+    it("rejects spin-orbit and PAW data with reasons", () => {
+      const base = fromFHI(realCFhi);
+      const so = {
+        ...base,
+        header: { ...base.header, hasSo: true },
+        spinOrbit: { relWfcs: [], relBetas: [] },
+      };
+      expect(canWriteFHI(so).reasons.join(" ")).toContain("spin-orbit");
+      expect(canWriteFHI(fromUPF(oPawUpf)).reasons.join(" ")).toContain("PAW");
     });
   });
 });

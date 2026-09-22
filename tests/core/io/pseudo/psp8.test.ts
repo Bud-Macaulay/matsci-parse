@@ -67,16 +67,16 @@ describe("PSP8 parser", () => {
       expect(pp.mesh.r[9]).toBeCloseTo(0.09);
     });
 
-    it("s-projector data matches PseudoDojo values (×2 for Ry)", () => {
+    it("s-projector data matches PseudoDojo values", () => {
       const pp = fromPSP8(realHPsp8);
-      expect(pp.nonlocal.betas[0].beta[0]).toBeCloseTo(-4.8696255250391e-8 * 2);
-      expect(pp.nonlocal.betas[0].beta[1]).toBeCloseTo(0.25608705663206 * 2);
+      expect(pp.nonlocal.betas[0].beta[0]).toBeCloseTo(-4.8696255250391e-8);
+      expect(pp.nonlocal.betas[0].beta[1]).toBeCloseTo(0.25608705663206);
     });
 
-    it("p-projector data matches PseudoDojo values (×2 for Ry)", () => {
+    it("p-projector data matches PseudoDojo values", () => {
       const pp = fromPSP8(realHPsp8);
-      expect(pp.nonlocal.betas[2].beta[0]).toBeCloseTo(-2.7904952299984e-6 * 2);
-      expect(pp.nonlocal.betas[2].beta[5]).toBeCloseTo(-0.17133980226378 * 2);
+      expect(pp.nonlocal.betas[2].beta[0]).toBeCloseTo(-2.7904952299984e-6);
+      expect(pp.nonlocal.betas[2].beta[5]).toBeCloseTo(-0.17133980226378);
     });
 
     it("nonlinear core corrections are absent", () => {
@@ -113,7 +113,7 @@ describe("PSP8 parser", () => {
     it("s-projector radial dependence decays correctly", () => {
       const pp = fromPSP8(realCPsp8);
       const s0 = pp.nonlocal.betas[0].beta;
-      expect(s0[0]).toBeCloseTo(-8.0352424713936e-10 * 2);
+      expect(s0[0]).toBeCloseTo(-8.0352424713936e-10);
       expect(s0[5]).toBeGreaterThan(s0[0]);
     });
   });

@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import { validate } from "@/core/pseudopotential/validate";
 import { fromUPF } from "@/core/io/pseudo/upf";
+import { fromFHI } from "@/core/io/pseudo/fhi";
 
-import { heNcUpf, hUsppUpf } from "../io/pseudo/teststrings/upf";
+import { heNcUpf, hUsppUpf, oPawUpf } from "../io/pseudo/teststrings/upf";
+import { realCFhi } from "../io/pseudo/teststrings/fhi";
 
 describe("validate", () => {
   it("accepts well-formed parsed objects", () => {
@@ -63,5 +65,81 @@ describe("validate", () => {
     const pp = fromUPF(heNcUpf);
     pp.header.isPaw = true;
     expect(validate(pp).join("\n")).toContain("paw data is missing");
+  });
+
+  it("flags every structural mismatch class", () => {
+    const emptyMesh = {
+      ...fromUPF(heNcUpf),
+      mesh: {
+        gridType: "custom" as const,
+        rmax: 0,
+        r: new Float64Array(0),
+        rab: new Float64Array(0),
+      },
+    };
+    expect(validate(emptyMesh).join("\n")).toContain("mesh.r is empty");
+
+    const meshSize = fromUPF(heNcUpf);
+    meshSize.header.meshSize = 3;
+    expect(validate(meshSize).join("\n")).toContain("header.meshSize");
+
+    const rho = fromUPF(heNcUpf);
+    rho.rhoatom = new Float64Array(3);
+    expect(validate(rho).join("\n")).toContain("rhoatom length");
+
+    const nlcc = fromUPF(heNcUpf);
+    nlcc.nlcc = new Float64Array(3);
+    expect(validate(nlcc).join("\n")).toContain("nlcc length");
+
+    const nwfc = fromUPF(heNcUpf);
+    nwfc.header.numberOfWfc = 7;
+    expect(validate(nwfc).join("\n")).toContain("header.numberOfWfc");
+
+    const chi = fromUPF(heNcUpf);
+    chi.pswfc[0] = { ...chi.pswfc[0], chi: new Float64Array(3) };
+    expect(validate(chi).join("\n")).toContain("pswfc[0] chi length");
+
+    const sl = fromFHI(realCFhi);
+    sl.semilocal![0] = { ...sl.semilocal![0], vnl: new Float64Array(3) };
+    expect(validate(sl).join("\n")).toContain("semilocal[0]");
+
+    const ae = fromUPF(oPawUpf);
+    ae.fullWfc![0] = { ...ae.fullWfc![0], aewfc: new Float64Array(3) };
+    expect(validate(ae).join("\n")).toContain("fullWfc[0]");
+
+    const mb = fromUPF(heNcUpf);
+    mb.nonlocal.dij.push([2, 9, 0.5]);
+    expect(validate(mb).join("\n")).toContain("out-of-range mb=9");
+
+    const nan = fromUPF(heNcUpf);
+    nan.nonlocal.dij.push([1, 1, Number.NaN]);
+    expect(validate(nan).join("\n")).toContain("is NaN");
+  });
+
+  it("flags augmentation and PAW data issues", () => {
+    const q = fromUPF(hUsppUpf);
+    q.nonlocal.augmentation!.q = new Float64Array(0);
+    expect(validate(q).join("\n")).toContain("augmentation.q is empty");
+
+    const refs = fromUPF(hUsppUpf);
+    refs.nonlocal.augmentation!.qijl![0] = {
+      ...refs.nonlocal.augmentation!.qijl![0],
+      i: 99,
+    };
+    expect(validate(refs).join("\n")).toContain("out-of-range projectors");
+
+    const vloc = fromUPF(oPawUpf);
+    vloc.paw!.aeVloc = new Float64Array(3);
+    expect(validate(vloc).join("\n")).toContain("paw.aeVloc length");
+
+    const nlccPaw = fromUPF(oPawUpf);
+    nlccPaw.paw!.aeNlcc = new Float64Array(3);
+    expect(validate(nlccPaw).join("\n")).toContain("paw.aeNlcc length");
+  });
+
+  it("warns on missing spin-orbit data", () => {
+    const pp = fromUPF(heNcUpf);
+    pp.header.hasSo = true;
+    expect(validate(pp).join("\n")).toContain("spinOrbit data is missing");
   });
 });

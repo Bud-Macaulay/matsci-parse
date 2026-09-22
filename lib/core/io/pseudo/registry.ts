@@ -46,7 +46,11 @@ export function detectFormat(text: string): PseudopotentialFormat {
   const lines = nonEmptyLines(text);
   if (lines.length === 0) throw new Error("Cannot detect format of empty input");
 
-  const first = lines[0].trim();
+  // First content line (skipping #-comments, which lead GTH files and our
+  // own serializer output).
+  const content = lines.filter((l) => !l.trim().startsWith("#"));
+  const first = (content[0] ?? lines[0]).trim();
+  if (/^[A-Z][a-z]?\s+\S*HGH/i.test(first)) return "HGH";
   if (/^[A-Z][a-z]?\s+\S*(GTH|HGH)/i.test(first)) return "GTH";
 
   if (lines.length >= 3 && /^\s*8\s+\d+/.test(lines[2])) return "PSP8";

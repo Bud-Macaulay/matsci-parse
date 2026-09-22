@@ -81,6 +81,57 @@ export function resampleLinear(
       }
     : undefined;
 
+  const resampleIfPresent = (
+    arr: Float64Array | undefined,
+  ): Float64Array | undefined =>
+    arr && arr.length > 0 ? resampleArray(oldR, arr, newR) : arr;
+
+  const paw = pp.paw
+    ? {
+        ...pp.paw,
+        aeNlcc: resampleIfPresent(pp.paw.aeNlcc) ?? pp.paw.aeNlcc,
+        aeVloc: resampleIfPresent(pp.paw.aeVloc) ?? pp.paw.aeVloc,
+        aeWfcs: pp.paw.aeWfcs.map((wfc) => ({
+          ...wfc,
+          aewfc: resampleArray(oldR, wfc.aewfc, newR),
+        })),
+        psWfcs: pp.paw.psWfcs.map((wfc) => ({
+          ...wfc,
+          aewfc: resampleArray(oldR, wfc.aewfc, newR),
+        })),
+      }
+    : undefined;
+
+  const gipaw = pp.gipaw
+    ? {
+        ...pp.gipaw,
+        coreOrbitals: pp.gipaw.coreOrbitals.map((co) => ({
+          ...co,
+          orbital: resampleArray(oldR, co.orbital, newR),
+        })),
+        orbitals: pp.gipaw.orbitals.map((orb) => ({
+          ...orb,
+          aeOrbital: resampleArray(oldR, orb.aeOrbital, newR),
+          psOrbital: resampleArray(oldR, orb.psOrbital, newR),
+        })),
+        vlocAe: resampleIfPresent(pp.gipaw.vlocAe) ?? pp.gipaw.vlocAe,
+        vlocPs: resampleIfPresent(pp.gipaw.vlocPs) ?? pp.gipaw.vlocPs,
+      }
+    : undefined;
+
+  const spinOrbit = pp.spinOrbit
+    ? {
+        relWfcs: pp.spinOrbit.relWfcs.map((wfc) => ({
+          ...wfc,
+          chi: wfc.chi ? resampleArray(oldR, wfc.chi, newR) : undefined,
+        })),
+        relBetas: pp.spinOrbit.relBetas.map((beta) => ({
+          ...beta,
+          beta: beta.beta ? resampleArray(oldR, beta.beta, newR) : undefined,
+        })),
+      }
+    : undefined;
+
   return {
     ...pp,
     header: {
@@ -101,6 +152,9 @@ export function resampleLinear(
     pswfc,
     fullWfc,
     rhoatom: resampleArray(oldR, pp.rhoatom, newR),
+    paw,
+    gipaw,
+    spinOrbit,
     provenance: {
       ...pp.provenance,
       notes: [

@@ -205,13 +205,15 @@ export function fromPSP8(text: string): Pseudopotential {
       }
       ekbValues.push(ekb);
 
-      // Create one beta projector per ekb value (Ha → Ry).
+      // Create one beta projector per ekb value. Beta arrays are
+      // L2-normalized shapes and stay in file units; energies (ekb, vloc)
+      // convert separately.
       for (let p = 0; p < nproj[l]; p++) {
         betas.push({
           angularMomentum: Number.isNaN(blockL) ? l : blockL,
           ultrasoftCutoffRadius: 0,
           label: `${l}${"spdf"[l] ?? l}`,
-          beta: haArrayToRy(data[p]),
+          beta: data[p],
         });
       }
     }
@@ -261,7 +263,7 @@ export function fromPSP8(text: string): Pseudopotential {
             angularMomentum: l,
             ultrasoftCutoffRadius: 0,
             label: `${l}${"spdf"[l] ?? l}-so`,
-            beta: haArrayToRy(data[p]),
+            beta: data[p],
           });
           dij.push([projIdx + p, projIdx + p, haToRy(soEkb[p] ?? 1.0)]);
         }
@@ -424,7 +426,16 @@ export function toPSP8(pp: Pseudopotential): string {
 
   let projOffset = 1;
   for (let l = 0; l <= lmax; l++) {
-    if (l === lloc && lloc <= lmax) continue;
+    if (l === lloc && lloc <= lmax) {
+      // Local potential replaces the block at the lloc position.
+      lines.push(`   ${l}`);
+      for (let i = 0; i < mmax; i++) {
+        lines.push(
+          `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.local.vloc[i] * RY_TO_HA)}`,
+        );
+      }
+      continue;
+    }
     const lBetas = regularBetas.filter((b) => b.angularMomentum === l);
     if (lBetas.length === 0) continue;
 
@@ -437,7 +448,7 @@ export function toPSP8(pp: Pseudopotential): string {
         formatFortranNumber(pp.mesh.r[i]),
       ];
       for (const beta of lBetas) {
-        parts.push(formatFortranNumber((beta.beta[i] ?? 0) * RY_TO_HA));
+        parts.push(formatFortranNumber(beta.beta[i] ?? 0));
       }
       lines.push(parts.join(" "));
     }
@@ -445,12 +456,15 @@ export function toPSP8(pp: Pseudopotential): string {
     projOffset += lBetas.length;
   }
 
-  // Local potential block (Hartree)
-  lines.push(`   ${lloc}`);
-  for (let i = 0; i < mmax; i++) {
-    lines.push(
-      `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.local.vloc[i] * RY_TO_HA)}`,
-    );
+  // Local potential block (Hartree) — only when it does not replace a
+  // channel block above (lloc > lmax means a separate trailing block).
+  if (lloc > lmax) {
+    lines.push(`   ${lloc}`);
+    for (let i = 0; i < mmax; i++) {
+      lines.push(
+        `${(i + 1).toString().padStart(5)} ${formatFortranNumber(pp.mesh.r[i])} ${formatFortranNumber(pp.local.vloc[i] * RY_TO_HA)}`,
+      );
+    }
   }
 
   // SO projector blocks
@@ -466,7 +480,7 @@ export function toPSP8(pp: Pseudopotential): string {
           formatFortranNumber(pp.mesh.r[i]),
         ];
         for (const beta of lBetas) {
-          parts.push(formatFortranNumber((beta.beta[i] ?? 0) * RY_TO_HA));
+          parts.push(formatFortranNumber(beta.beta[i] ?? 0));
         }
         lines.push(parts.join(" "));
       }

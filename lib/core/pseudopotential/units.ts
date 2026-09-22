@@ -71,12 +71,14 @@ export function ryArrayToHa(values: Float64Array): Float64Array {
  *
  * Converted (energies, in Ry canonically):
  * header.totalPsenergy / wfcCutoff / rhoCutoff, local.vloc, semilocal vnl,
- * beta projector arrays, D_ij values, wfc pseudoEnergy, paw.coreEnergy,
- * paw.aeVloc, gth.cexpPpl / hprj / kprj.
+ * D_ij values, wfc pseudoEnergy, paw.coreEnergy, paw.aeVloc,
+ * gth.cexpPpl / hprj / kprj.
  *
- * NOT converted (lengths, densities, dimensionless):
+ * NOT converted (lengths, densities, dimensionless shapes):
  * mesh r/rab/rmax/dx/xmin/zmesh, cutoff radii, rhoatom, nlcc, occupations,
- * chi/aewfc wavefunctions (dimensionless radial functions), gth rLoc/rPs/nElec.
+ * chi/aewfc wavefunctions and beta projectors (L²-normalized shapes, plus
+ * their Gaussian tails reach denormal magnitudes that no scaling round-trips
+ * bit-exactly), gth rLoc/rPs/nElec.
  */
 
 /**
@@ -91,9 +93,6 @@ export function scaleHaToRy(pp: Pseudopotential): Pseudopotential {
   pp.local.vloc = haArrayToRy(pp.local.vloc);
   if (pp.semilocal) {
     for (const sl of pp.semilocal) sl.vnl = haArrayToRy(sl.vnl);
-  }
-  for (const beta of pp.nonlocal.betas) {
-    beta.beta = haArrayToRy(beta.beta);
   }
   for (const entry of pp.nonlocal.dij) entry[2] = haToRy(entry[2]);
   for (const wfc of pp.pswfc) {
@@ -125,9 +124,6 @@ export function scaleRyToHa(pp: Pseudopotential): Pseudopotential {
   pp.local.vloc = ryArrayToHa(pp.local.vloc);
   if (pp.semilocal) {
     for (const sl of pp.semilocal) sl.vnl = ryArrayToHa(sl.vnl);
-  }
-  for (const beta of pp.nonlocal.betas) {
-    beta.beta = ryArrayToHa(beta.beta);
   }
   for (const entry of pp.nonlocal.dij) entry[2] = ryToHa(entry[2]);
   for (const wfc of pp.pswfc) {

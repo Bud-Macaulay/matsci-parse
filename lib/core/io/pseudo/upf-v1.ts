@@ -239,6 +239,10 @@ export function fromUPFv1(text: string): Pseudopotential {
     }
   }
 
+  // Parse PP_NLCC section (optional)
+  const nlccSection = extractSection(text, "PP_NLCC");
+  const nlcc = nlccSection ? parseFloat64Array(nlccSection) : undefined;
+
   // Parse PP_RHOATOM section
   const rhoatomSection = extractSection(text, "PP_RHOATOM");
   const rhoatom = rhoatomSection ? parseFloat64Array(rhoatomSection) : new Float64Array(meshSize);
@@ -273,6 +277,7 @@ export function fromUPFv1(text: string): Pseudopotential {
       numberOfProj,
     },
     mesh,
+    nlcc,
     local,
     nonlocal,
     pswfc,

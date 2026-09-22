@@ -478,8 +478,10 @@ export function toGTH(pp: Pseudopotential): string {
   for (let l = 0; l < gth.hprj.length; l++) {
     const h = gth.hprj[l];
     const nprj = h.length;
+    // An empty padding entry (no k data for this channel) takes the legacy
+    // layout; only channels with actual k values go inline.
     const k = gth.kprj?.[l];
-    if (k) {
+    if (k && k.length > 0) {
       // k-matrix inline on the channel line so the parser recovers it.
       const hVals: string[] = [];
       for (let i = 0; i < nprj; i++) {
