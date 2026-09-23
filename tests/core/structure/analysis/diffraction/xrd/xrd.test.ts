@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { createLattice } from "@/core/lattice/lattice";
 import { Structure } from "@/core/structure/structure";
-import { calculateXrdPattern, XrdOptions } from "@/core/structure/analysis/diffraction/xrd";
+import { calculateXrdPattern, XrdOptions } from "@/core/structure/analysis/diffraction/xrd/xrd";
 
 interface FixtureSite {
   symbol: string;

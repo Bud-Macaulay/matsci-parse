@@ -2,7 +2,7 @@ import { bench, describe } from "vitest";
 import { readFileSync } from "node:fs";
 import { createLattice } from "@/core/lattice/lattice";
 import { Structure } from "@/core/structure/structure";
-import { calculateXrdPattern } from "@/core/structure/analysis/diffraction/xrd";
+import { calculateXrdPattern } from "@/core/structure/analysis/diffraction/xrd/xrd";
 
 const fixtures = JSON.parse(
   readFileSync(new URL("./fixtures/xrd_fixtures.json", import.meta.url), "utf-8"),

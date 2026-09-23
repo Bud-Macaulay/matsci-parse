@@ -1,21 +1,12 @@
-import { Lattice } from "../../../lattice/lattice";
-import { lengths } from "../../../lattice/lengths";
-import { reciprocalLatticeCrystallographic } from "../../../lattice/reciprocalLatticeCrystallographic";
-import { isHexagonal } from "../../../lattice/properties/isHexagonal";
-import { Structure } from "../../structure";
-import { PeriodicTable } from "../../../data/periodictable/atomicData";
-import { ATOMIC_SCATTERING_PARAMS } from "./atomicScattering";
-import { MillerFamily, getUniqueFamilies } from "./uniqueFamilies";
+import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
+import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
+import { Structure } from "../../../structure";
+import { PeriodicTable } from "../../../../data/periodictable/atomicData";
+import { ATOMIC_SCATTERING_PARAMS } from "../../../../data/scattering/atomicScattering";
+import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
 import { resolveWavelength } from "./wavelengths";
-
-/** Tolerance in two-theta degrees within which peaks are merged. */
-export const TWO_THETA_TOL = 1e-5;
-
-/** Peaks with scaled intensity below this are treated as systematic absences. */
-export const SCALED_INTENSITY_TOL = 1e-3;
-
-/** Numerical tolerance matching pymatgen's sphere search cutoff. */
-const SPHERE_TOL = 1e-8;
+import { pointsInSphere, twoThetaRangeToRadii } from "../reciprocalPoints";
+import { SCALED_INTENSITY_TOL, TWO_THETA_TOL } from "../constants";
 
 /** Prefactor in the Waasmaier-Kirfel scattering factor formula. */
 const SCATTERING_PREFACTOR = 41.78214;
@@ -95,50 +86,6 @@ function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<s
   });
 }
 
-interface ReciprocalPoint {
-  h: number;
-  k: number;
-  l: number;
-  g: number;
-}
-
-/** Enumerate reciprocal lattice points within maxR of the origin.
- * Uses pymatgen's search box ceil((maxR + 0.15) * |a|) per direct-lattice
- * direction and keeps points with |g| < maxR + 1e-8. */
-function pointsInSphere(direct: Lattice, recip: Lattice, maxR: number, minR: number): ReciprocalPoint[] {
-  const m = recip.basis.data;
-  const [l0, l1, l2] = lengths(direct);
-
-  const n0 = Math.ceil((maxR + 0.15) * l0);
-  const n1 = Math.ceil((maxR + 0.15) * l1);
-  const n2 = Math.ceil((maxR + 0.15) * l2);
-
-  const points: ReciprocalPoint[] = [];
-
-  for (let h = -n0; h <= n0; h++) {
-    for (let k = -n1; k <= n1; k++) {
-      for (let l = -n2; l <= n2; l++) {
-        if (h === 0 && k === 0 && l === 0) {
-          continue;
-        }
-
-        const x = h * m[0] + k * m[3] + l * m[6];
-        const y = h * m[1] + k * m[4] + l * m[7];
-        const z = h * m[2] + k * m[5] + l * m[8];
-        const g = Math.sqrt(x * x + y * y + z * z);
-
-        if (g < maxR + SPHERE_TOL && (minR === 0 || g >= minR)) {
-          points.push({ h, k, l, g });
-        }
-      }
-    }
-  }
-
-  points.sort((a, b) => a.g - b.g || b.h - a.h || b.k - a.k || b.l - a.l);
-
-  return points;
-}
-
 /** Compute the X-ray powder diffraction pattern of a crystal structure.
  *
  * Ports pymatgen's XRDCalculator formalism (De Graef & McHenry, ch. 11-12):
@@ -159,13 +106,7 @@ export function calculateXrdPattern(structure: Structure, options?: XrdOptions):
 
   const DEG = 180 / Math.PI;
 
-  let minR = 0;
-  let maxR = 2 / wavelength;
-
-  if (range !== null) {
-    minR = (2 * Math.sin(((range[0] / 2) * Math.PI) / 180)) / wavelength;
-    maxR = (2 * Math.sin(((range[1] / 2) * Math.PI) / 180)) / wavelength;
-  }
+  const [minR, maxR] = twoThetaRangeToRadii(range, wavelength);
 
   const sites = expandSites(structure, debyeWallerFactors);
   const hex = isHexagonal(structure.lattice);
