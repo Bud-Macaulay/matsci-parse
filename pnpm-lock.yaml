@@ -17,9 +17,6 @@ importers:
       txml:
         specifier: 6.0.3
         version: 6.0.3(patch_hash=4072360d1a6050dcced39e996f95ed7efff96a56b66c0abceda487f036caf39a)
-      voro3d:
-        specifier: ^0.0.7
-        version: 0.0.7
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -1760,9 +1757,6 @@ packages:
       jsdom:
         optional: true
 
-  voro3d@0.0.7:
-    resolution: {integrity: sha512-V/3XsTN+2xr2FqPgzS6nm117MfawmfMWJ2zHD1dYcsTpwboIeu9vAguFIeS3sJ3eqP7dN/kHSGxWY4Xhf37siw==}
-
   w3c-xmlserializer@5.0.0:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
@@ -3227,8 +3221,6 @@ snapshots:
       jsdom: 29.1.1
     transitivePeerDependencies:
       - msw
-
-  voro3d@0.0.7: {}
 
   w3c-xmlserializer@5.0.0:
     dependencies:

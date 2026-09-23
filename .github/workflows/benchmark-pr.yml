@@ -21,7 +21,7 @@ jobs:
         run: pnpm install
 
       - name: Run benchmarks on base (${{ github.base_ref }})
-        run: npx vitest bench --run --outputJson=/tmp/base-results.json
+        run: pnpx vitest bench --run --outputJson=/tmp/base-results.json
 
       - uses: actions/checkout@v4
         with:
@@ -29,4 +29,4 @@ jobs:
           fetch-depth: 0
 
       - name: Run benchmarks on HEAD and compare
-        run: npx vitest bench --run --compare=/tmp/base-results.json
+        run: pnpx vitest bench --run --compare=/tmp/base-results.json
