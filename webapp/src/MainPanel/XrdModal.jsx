@@ -133,7 +133,7 @@ export default function XrdModal({ structure }) {
         title="Calculate the X-ray powder diffraction pattern of this structure"
         className="buttonSimple border border-indigo-400 bg-indigo-200! text-indigo-700!"
       >
-        calcXRD
+        calculate diffraction
       </button>
 
       <Modal
