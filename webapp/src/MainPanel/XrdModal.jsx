@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
-import { calculateXrdPattern, WAVELENGTHS } from "matsci-parse";
+import {
+  calculateXrdPattern,
+  calculateNdPattern,
+  WAVELENGTHS,
+} from "matsci-parse";
 
 import Modal from "../common/Modal";
 import DownloadDropdown from "../common/DownloadDropdown";
@@ -35,7 +39,9 @@ function toCsv(pattern) {
 
 export default function XrdModal({ structure }) {
   const [open, setOpen] = useState(false);
+  const [technique, setTechnique] = useState("xray");
   const [wavelength, setWavelength] = useState("CuKa");
+  const [ndWavelength, setNdWavelength] = useState(1.54184);
   const [minTheta, setMinTheta] = useState(0);
   const [maxTheta, setMaxTheta] = useState(90);
   const [hover, setHover] = useState(null);
@@ -46,10 +52,16 @@ export default function XrdModal({ structure }) {
       const lo = Math.max(0, Math.min(minTheta, maxTheta - 0.5));
       const hi = Math.min(180, Math.max(maxTheta, minTheta + 0.5));
       const t0 = performance.now();
-      const result = calculateXrdPattern(structure, {
-        wavelength,
-        twoThetaRange: [lo, hi],
-      });
+      const result =
+        technique === "neutron"
+          ? calculateNdPattern(structure, {
+              wavelength: ndWavelength,
+              twoThetaRange: [lo, hi],
+            })
+          : calculateXrdPattern(structure, {
+              wavelength,
+              twoThetaRange: [lo, hi],
+            });
       return {
         pattern: result,
         error: null,
@@ -59,7 +71,7 @@ export default function XrdModal({ structure }) {
       console.error("XrdModal:", e);
       return { pattern: null, error: e?.message ?? String(e), calcMs: null };
     }
-  }, [open, structure, wavelength, minTheta, maxTheta]);
+  }, [open, structure, technique, wavelength, ndWavelength, minTheta, maxTheta]);
 
   const handleOpen = useCallback(() => {
     setHover(null);
@@ -127,25 +139,64 @@ export default function XrdModal({ structure }) {
       <Modal
         open={open}
         onClose={handleClose}
-        title="X-ray diffraction pattern"
+        title={
+          technique === "neutron"
+            ? "Neutron diffraction pattern"
+            : "X-ray diffraction pattern"
+        }
         maxWidth="max-w-4xl"
       >
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
-            <label className="flex items-center gap-2 select-none">
-              <span className="text-gray-400">Radiation</span>
-              <select
-                value={wavelength}
-                onChange={(e) => setWavelength(e.target.value)}
-                className="border border-gray-300 rounded px-1.5 py-1 font-mono bg-white"
-              >
-                {WAVELENGTH_KEYS.map((k) => (
-                  <option key={k} value={k}>
-                    {k} ({WAVELENGTHS[k].toFixed(5)} Å)
-                  </option>
-                ))}
-              </select>
-            </label>
+            <span className="flex items-center rounded border border-gray-300 overflow-hidden select-none">
+              {[
+                ["xray", "X-ray"],
+                ["neutron", "Neutron"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setTechnique(key)}
+                  className={`px-2 py-1 ${
+                    technique === key
+                      ? "bg-indigo-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+            {technique === "neutron" ? (
+              <label className="flex items-center gap-2 select-none">
+                <span className="text-gray-400">Wavelength (Å)</span>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={5}
+                  step={0.01}
+                  value={ndWavelength}
+                  onChange={(e) =>
+                    setNdWavelength(parseFloat(e.target.value) || 0)
+                  }
+                  className="border border-gray-300 rounded px-1.5 py-1 font-mono w-24 bg-white"
+                />
+              </label>
+            ) : (
+              <label className="flex items-center gap-2 select-none">
+                <span className="text-gray-400">Radiation</span>
+                <select
+                  value={wavelength}
+                  onChange={(e) => setWavelength(e.target.value)}
+                  className="border border-gray-300 rounded px-1.5 py-1 font-mono bg-white"
+                >
+                  {WAVELENGTH_KEYS.map((k) => (
+                    <option key={k} value={k}>
+                      {k} ({WAVELENGTHS[k].toFixed(5)} Å)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="flex items-center gap-2 select-none">
               <span className="text-gray-400">2θ min</span>
               <input
@@ -188,15 +239,15 @@ export default function XrdModal({ structure }) {
               <DownloadDropdown
                 items={[
                   {
-                    key: "xrd-csv",
+                    key: "pattern-csv",
                     label: "Pattern (CSV)",
-                    filename: "xrd_pattern.csv",
+                    filename: `${technique === "neutron" ? "nd" : "xrd"}_pattern.csv`,
                     serialize: () => toCsv(pattern),
                   },
                   {
-                    key: "xrd-json",
+                    key: "pattern-json",
                     label: "Pattern (JSON)",
-                    filename: "xrd_pattern.json",
+                    filename: `${technique === "neutron" ? "nd" : "xrd"}_pattern.json`,
                     serialize: () => JSON.stringify(pattern, null, 2),
                   },
                 ]}
@@ -207,7 +258,9 @@ export default function XrdModal({ structure }) {
 
           {error && (
             <div className="flex items-center justify-center text-sm text-red-500 py-16">
-              Failed to calculate the XRD pattern: {error}
+              Failed to calculate the{" "}
+              {technique === "neutron" ? "neutron diffraction" : "XRD"} pattern:{" "}
+              {error}
             </div>
           )}
 
