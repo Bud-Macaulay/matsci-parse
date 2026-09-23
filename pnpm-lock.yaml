@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  txml: 4072360d1a6050dcced39e996f95ed7efff96a56b66c0abceda487f036caf39a
+
 importers:
 
   .:
@@ -12,8 +15,8 @@ importers:
         specifier: ^0.18.0
         version: 0.18.0
       txml:
-        specifier: ^6.0.3
-        version: 6.0.3
+        specifier: 6.0.3
+        version: 6.0.3(patch_hash=4072360d1a6050dcced39e996f95ed7efff96a56b66c0abceda487f036caf39a)
       voro3d:
         specifier: ^0.0.7
         version: 0.0.7
@@ -3117,7 +3120,7 @@ snapshots:
     dependencies:
       typescript: 7.0.2
 
-  txml@6.0.3: {}
+  txml@6.0.3(patch_hash=4072360d1a6050dcced39e996f95ed7efff96a56b66c0abceda487f036caf39a): {}
 
   type-check@0.4.0:
     dependencies:
