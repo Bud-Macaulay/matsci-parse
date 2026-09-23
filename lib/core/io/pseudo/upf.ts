@@ -88,14 +88,17 @@ function parseHeader(node: XmlNode): PseudopotentialHeader {
 
 function parseMesh(node: XmlNode): PseudopotentialMesh {
   const dx = attr(node, "dx") ? attrNum(node, "dx") : undefined;
+  const r = parseData(textOf(node["PP_R"]));
+  // rmax omitted by some generators (e.g. atompaw): fall back to the mesh.
+  const rmaxAttr = attr(node, "rmax") ? attrNum(node, "rmax") : undefined;
   return {
     gridType: dx != null ? "logarithmic" : "custom",
     dx,
     mesh: attr(node, "mesh") ? attrInt(node, "mesh") : undefined,
     xmin: attr(node, "xmin") ? attrNum(node, "xmin") : undefined,
-    rmax: attrNum(node, "rmax"),
+    rmax: rmaxAttr ?? (r.length > 0 ? r[r.length - 1] : 0),
     zmesh: attr(node, "zmesh") ? attrNum(node, "zmesh") : undefined,
-    r: parseData(textOf(node["PP_R"])),
+    r,
     rab: parseData(textOf(node["PP_RAB"])),
   };
 }
@@ -596,7 +599,11 @@ export function toUPF(pp: Pseudopotential): string {
 
   // PP_HEADER: header fields take precedence; provenance creator/date fill
   // in for objects arriving from formats without header equivalents (PSML,
-  // FHI), so generator stamps survive a hub conversion.
+  // FHI), so generator stamps survive a hub conversion. Mesh and count
+  // fields are recomputed so output is always self-consistent.
+  const meshSize = pp.mesh.r.length;
+  const numberOfWfc = pp.pswfc.length;
+  const numberOfProj = pp.nonlocal.betas.length;
   lines.push("<PP_HEADER");
   lines.push(`  generated="${escapeXmlAttr(pp.header.generated ?? pp.provenance.creator ?? "")}"`);
   lines.push(`  author="${escapeXmlAttr(pp.header.author ?? "")}"`);
@@ -621,9 +628,9 @@ export function toUPF(pp: Pseudopotential): string {
   lines.push(`  l_max="${pp.header.lMax}"`);
   lines.push(`  l_max_rho="${pp.header.lMaxRho}"`);
   lines.push(`  l_local="${pp.header.lLocal}"`);
-  lines.push(`  mesh_size="${pp.header.meshSize}"`);
-  lines.push(`  number_of_wfc="${pp.header.numberOfWfc}"`);
-  lines.push(`  number_of_proj="${pp.header.numberOfProj}"/>`);
+  lines.push(`  mesh_size="${meshSize}"`);
+  lines.push(`  number_of_wfc="${numberOfWfc}"`);
+  lines.push(`  number_of_proj="${numberOfProj}"/>`);
   lines.push("");
 
   // PP_MESH

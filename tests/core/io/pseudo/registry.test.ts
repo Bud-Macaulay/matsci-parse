@@ -30,6 +30,18 @@ describe("registry", () => {
       expect(detectFormat("     0\n<PP_HEADER>\n'H'\n</PP_HEADER>")).toBe("UPF1");
     });
 
+    it("detects preamble-less Vanderbilt UPF1 (SSSP uspp style)", () => {
+      const text = [
+        "<PP_INFO>",
+        "Generated using Vanderbilt code",
+        "</PP_INFO>",
+        "<PP_HEADER>",
+        "  V                    Element",
+        "</PP_HEADER>",
+      ].join("\n");
+      expect(detectFormat(text)).toBe("UPF1");
+    });
+
     it("detects PSP8", () => {
       expect(detectFormat(realHPsp8)).toBe("PSP8");
     });

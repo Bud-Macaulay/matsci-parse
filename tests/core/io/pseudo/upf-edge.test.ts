@@ -128,6 +128,33 @@ describe("UPF nested PAW wavefunctions", () => {
   });
 });
 
+describe("UPF mesh and header canonicalization", () => {
+  it("infers rmax from the mesh when the attribute is absent", () => {
+    // mesh3 carries no PP_MESH attributes at all (atompaw style).
+    const text = skeleton([mesh3, local3, nonlocal1, rho3].join("\n"));
+    const pp = fromUPF(text);
+    expect(pp.mesh.rmax).toBeCloseTo(0.03);
+    expect(toUPF(pp)).toContain('rmax="');
+  });
+
+  it("recomputes mesh and count fields on serialize", () => {
+    const pp = fromUPF(heNcUpf);
+    const stale = {
+      ...pp,
+      header: {
+        ...pp.header,
+        meshSize: 1,
+        numberOfWfc: 99,
+        numberOfProj: 99,
+      },
+    };
+    const out = toUPF(stale);
+    expect(out).toContain(`mesh_size="${pp.mesh.r.length}"`);
+    expect(out).toContain(`number_of_wfc="${pp.pswfc.length}"`);
+    expect(out).toContain(`number_of_proj="${pp.nonlocal.betas.length}"`);
+  });
+});
+
 describe("UPF full augmentation attributes", () => {
   it("round-trips every augmentation field", () => {
     const base = fromUPF(hUsppUpf);

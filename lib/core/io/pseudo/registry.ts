@@ -9,6 +9,8 @@
 
 import type { Pseudopotential, PseudopotentialFormat } from "../../pseudopotential/pseudopotential";
 
+export type { PseudopotentialFormat };
+
 import { fromUPF, toUPF } from "./upf";
 import { fromUPFv1, toUPFv1 } from "./upf-v1";
 import { fromPSP8, toPSP8, canWritePSP8 } from "./psp8";

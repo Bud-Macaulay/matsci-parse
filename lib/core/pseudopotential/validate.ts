@@ -42,7 +42,13 @@ export function validate(pp: Pseudopotential): string[] {
     );
   }
   pp.nonlocal.betas.forEach((beta, i) => {
-    if (beta.beta.length !== n) {
+    // Projectors may be stored truncated to cutoffRadiusIndex (standard for
+    // UPF v1 and allowed alongside full-mesh storage); anything else is
+    // inconsistent.
+    if (
+      beta.beta.length !== n &&
+      beta.beta.length !== (beta.cutoffRadiusIndex ?? n)
+    ) {
       issues.push(
         `beta[${i}] (l=${beta.angularMomentum}) length ${beta.beta.length} != mesh size ${n}`,
       );

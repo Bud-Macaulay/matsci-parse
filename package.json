@@ -23,7 +23,8 @@
     "coverage": "vitest run --coverage",
     "docs": "typedoc --skipErrorChecking",
     "typecheck": "tsc --noEmit",
-    "roundtrip:external": "vitest run tests/core/io/pseudo/roundtrip-external.test.ts --reporter=verbose"
+    "roundtrip:external": "vitest run tests/core/io/pseudo/roundtrip-external.test.ts --reporter=verbose",
+    "pseudo:typecheck": "tsc --noEmit -p pseudo-webapp/tsconfig.json"
   },
   "packageManager": "pnpm@11.5.3",
   "devDependencies": {
@@ -35,6 +36,7 @@
     "eslint": "^10.9.1",
     "globals": "^17.2.0",
     "jsdom": "^29.0.2",
+    "jszip": "^3.10.2",
     "rollup-plugin-visualizer": "^7.0.1",
     "typedoc": "^0.28.19",
     "typescript": "^7.0.2",

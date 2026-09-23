@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "paths": {
+      "matsci-parse": ["../lib/main.ts"],
+      "@/*": ["../lib/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

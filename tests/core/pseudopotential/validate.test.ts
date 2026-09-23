@@ -44,6 +44,21 @@ describe("validate", () => {
     expect(validate(pp).join("\n")).toContain("beta[0]");
   });
 
+  it("accepts betas truncated to cutoffRadiusIndex (UPF v1 style)", () => {
+    const pp = fromUPF(heNcUpf);
+    pp.nonlocal.betas[0] = {
+      ...pp.nonlocal.betas[0],
+      beta: pp.nonlocal.betas[0].beta.slice(0, 100),
+      cutoffRadiusIndex: 100,
+    };
+    expect(validate(pp)).toEqual([]);
+    pp.nonlocal.betas[0] = {
+      ...pp.nonlocal.betas[0],
+      cutoffRadiusIndex: 99,
+    };
+    expect(validate(pp).join("\n")).toContain("beta[0]");
+  });
+
   it("flags augmentation qijl length mismatch", () => {
     const pp = fromUPF(hUsppUpf);
     pp.nonlocal.augmentation!.qijl![0] = {

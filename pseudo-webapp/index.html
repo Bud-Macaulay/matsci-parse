@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pseudo-webapp · pseudopotential interconverter</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>pseudo-webapp</h1>
+      <p>Pseudopotential interconverter · UPF1 / UPF2 / PSP8 / PSML / CPI / GTH — powered by matsci-parse</p>
+    </header>
+    <main>
+      <section class="panel">
+        <h2>1 · Input</h2>
+        <div id="dropzone" tabindex="0">
+          <p>Drop pseudopotential files or a .zip here, or</p>
+          <input type="file" id="fileInput" multiple accept=".upf,.psp8,.psml,.fhi,.cpi,.xml,.gth,.hgh,.in,.zip" />
+        </div>
+        <ul id="fileList"></ul>
+        <div id="sourceMeta" class="meta"><p class="hint">No file loaded.</p></div>
+        <div id="sourceIssues"></div>
+      </section>
+      <section class="panel">
+        <h2>2 · Target</h2>
+        <label>Format
+          <select id="targetFormat">
+            <option value="UPF2" selected>UPF2 (.upf) — lossless hub</option>
+            <option value="UPF1">UPF1 (.upf) — legacy</option>
+            <option value="PSP8">PSP8 (.psp8) — norm-conserving only</option>
+            <option value="PSML">PSML (.psml) — norm-conserving only</option>
+            <option value="CPI">CPI (.cpi) — semilocal only</option>
+            <option value="GTH">GTH (.gth) — analytical params only</option>
+          </select>
+        </label>
+        <div id="targetWarnings"></div>
+        <div class="row">
+          <button id="convertBtn" disabled>Convert all</button>
+          <button id="downloadBtn" disabled>Download ZIP</button>
+        </div>
+        <div id="outputMeta" class="meta"></div>
+        <h2>Output preview</h2>
+        <pre id="preview"><span class="hint">Nothing converted yet.</span></pre>
+      </section>
+    </main>
+    <footer>
+      <p>In-memory units are Rydberg / Bohr (UPF-native). Hartree-based formats convert on parse and back on serialize. GTH input converts its first entry only.</p>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

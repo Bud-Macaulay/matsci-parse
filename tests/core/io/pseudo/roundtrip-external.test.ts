@@ -103,6 +103,8 @@ if (existsSync(upfDir)) {
         // UPF is the lossless hub: the full object must survive bit-exactly.
         expect(reparsed).toEqual(parsed);
         expect(reparsed.header.element).toBe(parsed.header.element);
+        // Output is canonical: re-serializing is byte-identical.
+        expect(toUPF(reparsed)).toBe(serialized);
       });
     });
   });
