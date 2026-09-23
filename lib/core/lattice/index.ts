@@ -12,3 +12,5 @@ export * from "./reciprocalLatticeCrystallographic";
 export * from "./kspacingToGrid";
 
 export * from "./create";
+
+export * from "./properties";
