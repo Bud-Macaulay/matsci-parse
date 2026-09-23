@@ -1,19 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { createLattice } from "@/core/lattice/lattice";
 import { Structure } from "@/core/structure/structure";
 import { calculateNdPattern, NdOptions } from "@/core/structure/analysis/diffraction/neutron/neutron";
-
-interface FixtureSite {
-  symbol: string;
-  occu: number;
-  frac: [number, number, number];
-}
-
-interface FixtureStructure {
-  lattice: number[][];
-  sites: FixtureSite[];
-}
+import {
+  CsCl,
+  LiFePO4,
+  Li10GeP2S12,
+  Graphite,
+} from "../xrd/teststrings/structures";
 
 interface FixtureHkl {
   hkl: number[];
@@ -27,27 +21,19 @@ interface FixturePattern {
   d_spacings: number[];
 }
 
-const xrdFixtures = JSON.parse(
-  readFileSync(
-    new URL("../xrd/fixtures/xrd_fixtures.json", import.meta.url),
-    "utf-8",
-  ),
-) as Record<string, { structure: FixtureStructure }>;
+const structures: Record<string, Structure> = {
+  CsCl,
+  LiFePO4,
+  Li10GeP2S12,
+  Graphite,
+};
 
 const ndFixtures = JSON.parse(
   readFileSync(new URL("./fixtures/nd_fixtures.json", import.meta.url), "utf-8"),
 ) as Record<string, Record<string, FixturePattern>>;
 
 function toStructure(name: string): Structure {
-  const f = xrdFixtures[name].structure;
-
-  return {
-    lattice: createLattice(f.lattice.flat()),
-    sites: f.sites.map((s) => ({
-      species: { symbol: s.symbol, properties: { occu: s.occu } },
-      frac: [...s.frac],
-    })),
-  };
+  return structures[name];
 }
 
 /** Relative tolerance: pymatgen parity up to libm last-ulp differences. */
@@ -146,7 +132,7 @@ describe("calculateNdPattern pymatgen parity", () => {
   });
 
   it("rejects elements without scattering lengths", () => {
-    const structure = toStructure("CsCl");
+    const structure: Structure = structuredClone(CsCl);
 
     structure.sites[0].species.symbol = "Cm";
 
