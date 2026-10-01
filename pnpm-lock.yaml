@@ -12,8 +12,8 @@ importers:
   .:
     dependencies:
       '@spglib/moyo-wasm':
-        specifier: ^0.18.0
-        version: 0.18.0
+        specifier: ^0.21.0
+        version: 0.21.0
       txml:
         specifier: 6.0.3
         version: 6.0.3(patch_hash=4072360d1a6050dcced39e996f95ed7efff96a56b66c0abceda487f036caf39a)
@@ -646,8 +646,8 @@ packages:
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
 
-  '@spglib/moyo-wasm@0.18.0':
-    resolution: {integrity: sha512-xFilBO8piFZ/Z99nimN8oAljLo/2q1qGaUQV7T5ZvA+D2LGnz6W3Xj0ghD70/YpWYCtvg1DtymHLaQChk/F36Q==}
+  '@spglib/moyo-wasm@0.21.0':
+    resolution: {integrity: sha512-VP9B0VbzzdP5ZSUkMzSQj3T7SmhGxFHWZm0GyNidTesfuX+wIvu15l4EcwSlLPYkFyGXC6S6kAd2nObCvASk2w==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2225,7 +2225,7 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.0.2': {}
 
-  '@spglib/moyo-wasm@0.18.0': {}
+  '@spglib/moyo-wasm@0.21.0': {}
 
   '@standard-schema/spec@1.1.0': {}
 
