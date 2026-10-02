@@ -29,13 +29,14 @@ describe("species properties", () => {
     const species = getSpecies(structure);
 
     expect(species).toHaveLength(2);
-    expect(species.map((s) => s.symbol)).toEqual(["Si", "O"]);
+    // Periodic-table order (O, Z=8 before Si, Z=14), not insertion order.
+    expect(species.map((s) => s.symbol)).toEqual(["O", "Si"]);
   });
 
   it("gets unique elements", () => {
     const elements = getElements(structure);
 
-    expect(elements).toEqual(["Si", "O"]);
+    expect(elements).toEqual(["O", "Si"]);
   });
 
   it("counts species", () => {

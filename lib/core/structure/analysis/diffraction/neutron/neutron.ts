@@ -1,7 +1,7 @@
 import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
 import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
 import { Structure } from "../../../structure";
-import { NEUTRON_SCATTERING_LENGTHS } from "../../../../data/scattering/neutronScattering";
+import { getNeutronScatteringLength } from "../../../../data/periodictable/neutronScattering";
 import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
 import { pointsInSphere, twoThetaRangeToRadii } from "../reciprocalPoints";
 import { SCALED_INTENSITY_TOL, TWO_THETA_TOL } from "../constants";
@@ -42,7 +42,7 @@ interface ExpandedSite {
 function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<string, number>>): ExpandedSite[] {
   return structure.sites.map((site) => {
     const symbol = site.species.symbol;
-    const length = NEUTRON_SCATTERING_LENGTHS[symbol];
+    const length = getNeutronScatteringLength(symbol);
 
     if (length === undefined) {
       throw new Error(

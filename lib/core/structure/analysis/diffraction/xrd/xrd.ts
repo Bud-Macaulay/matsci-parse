@@ -1,8 +1,8 @@
 import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
 import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
 import { Structure } from "../../../structure";
-import { PeriodicTable } from "../../../../data/periodictable/atomicData";
-import { ATOMIC_SCATTERING_PARAMS } from "../../../../data/scattering/atomicScattering";
+import { SymbolToAtomicNumber } from "../../../../data/periodictable/atomicData";
+import { getXrayScatteringParams } from "../../../../data/periodictable/xrayScattering";
 import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
 import { resolveWavelength } from "./wavelengths";
 import { pointsInSphere, twoThetaRangeToRadii } from "../reciprocalPoints";
@@ -45,10 +45,6 @@ interface ExpandedSite {
   fz: number;
 }
 
-const SYMBOL_TO_Z = new Map<string, number>(
-  Object.values(PeriodicTable).map((el) => [el.symbol, el.atomicNumber]),
-);
-
 function occupancyOf(site: Structure["sites"][number]): number {
   const occu = site.species.properties?.occu;
 
@@ -58,7 +54,7 @@ function occupancyOf(site: Structure["sites"][number]): number {
 function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<string, number>>): ExpandedSite[] {
   return structure.sites.map((site) => {
     const symbol = site.species.symbol;
-    const coeffs = ATOMIC_SCATTERING_PARAMS[symbol];
+    const coeffs = getXrayScatteringParams(symbol);
 
     if (coeffs === undefined) {
       throw new Error(
@@ -66,7 +62,7 @@ function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<s
       );
     }
 
-    const z = SYMBOL_TO_Z.get(symbol);
+    const z = SymbolToAtomicNumber.get(symbol);
 
     if (z === undefined) {
       throw new Error(`Unable to calculate XRD pattern as there is no atomic number for ${symbol}.`);

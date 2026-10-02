@@ -9,7 +9,11 @@
  * Values ported from pymatgen's atomic_scattering_params.json
  * (MIT licensed, Materials Project; fits from D. Waasmaier and
  * A. Kirfel, Acta Crystallographica A51, 416-431 (1995)).
+ *
+ * Isotope labels are not tabulated (X-ray scattering is element-resolved);
+ * use {@link getXrayScatteringParams} for isotope-tolerant lookup.
  */
+import { elementSymbolOf } from "./isotopes";
 export const ATOMIC_SCATTERING_PARAMS: Readonly<Record<string, ReadonlyArray<readonly [number, number]>>> = {
   Ac: [[6.278, 28.323], [5.195, 4.949], [2.321, 0.557], [0, 0]],
   Ag: [[2.036, 61.497], [3.272, 11.824], [2.511, 2.846], [0.837, 0.327]],
@@ -109,5 +113,21 @@ export const ATOMIC_SCATTERING_PARAMS: Readonly<Record<string, ReadonlyArray<rea
   Y: [[4.129, 27.548], [3.012, 5.088], [1.179, 0.591], [0, 0]],
   Yb: [[5.529, 28.927], [4.533, 5.144], [1.945, 0.578], [0, 0]],
   Zn: [[1.942, 54.162], [1.95, 12.518], [1.619, 2.416], [0.543, 0.33]],
-  Zr: [[4.105, 28.492], [3.144, 5.277], [1.229, 0.601], [0, 0]],
+   Zr: [[4.105, 28.492], [3.144, 5.277], [1.229, 0.601], [0, 0]],
 };
+
+/** Look up Waasmaier-Kirfel coefficients, tolerating isotope labels.
+ *
+ * X-ray scattering is element-resolved, so isotope symbols fall back to
+ * their element entry (`"13C"` → `"C"`, `"T"` → `"H"`).
+ * @param symbol - Element or isotope symbol.
+ * @returns The coefficient pairs, or undefined for unknown symbols. */
+export function getXrayScatteringParams(
+  symbol: string,
+): ReadonlyArray<readonly [number, number]> | undefined {
+  const direct = ATOMIC_SCATTERING_PARAMS[symbol];
+
+  if (direct !== undefined) return direct;
+
+  return ATOMIC_SCATTERING_PARAMS[elementSymbolOf(symbol)];
+}

@@ -19,38 +19,38 @@ describe("cellMass", () => {
   it("simple cubic Na", () => {
     const s = fromPOSCAR(simpleCubic);
 
-    expect(cellMass(s)).toBeCloseTo(22.99);
+    expect(cellMass(s)).toBeCloseTo(22.98976928);
   });
 
   it("simple hexagonal Na", () => {
     const s = fromPOSCAR(simpleHexagonal);
 
-    expect(cellMass(s)).toBeCloseTo(22.99);
+    expect(cellMass(s)).toBeCloseTo(22.98976928);
   });
 
   it("diamond", () => {
     const s = fromPOSCAR(diamondCPOSCAR);
 
-    expect(cellMass(s)).toBeCloseTo(48.044);
+    expect(cellMass(s)).toBeCloseTo(48.0428);
   });
 
   it("layered LiCoO2", () => {
     const s = fromPOSCAR(layeredStructure);
 
-    expect(cellMass(s)).toBeCloseTo(6.94 + 58.933 + 2 * 15.999);
+    expect(cellMass(s)).toBeCloseTo(6.941 + 58.933195 + 2 * 15.9994);
   });
 
   it("mc3d_10007", () => {
     const s = fromPOSCAR(mc3d_10007);
 
-    expect(cellMass(s)).toBeCloseTo(16 * 118.71 + 4 * 102.91);
+    expect(cellMass(s)).toBeCloseTo(16 * 118.71 + 4 * 102.9055);
   });
 
   it("mc3d_1011", () => {
     const s = fromPOSCAR(mc3d_1011);
 
     expect(cellMass(s)).toBeCloseTo(
-      6 * 6.94 + 2 * 40.078 + 2 * 54.938 + 6 * 14.007,
+      6 * 6.941 + 2 * 40.078 + 2 * 54.938045 + 6 * 14.0067,
     );
   });
 

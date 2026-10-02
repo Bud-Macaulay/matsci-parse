@@ -17,8 +17,17 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, "lib/main.ts"),
-      fileName: "index",
+      entry: {
+        index: resolve(__dirname, "lib/main.ts"),
+        // Data-only entry: dependency-free, importable without the rest
+        // of the library (e.g. `matsci-parse/periodictable`).
+        periodictable: resolve(
+          __dirname,
+          "lib/core/data/periodictable/index.ts",
+        ),
+      },
+      fileName: (format, entryName) =>
+        entryName === "index" ? "index.js" : `${entryName}.js`,
       formats: ["es"],
     },
     sourcemap: true,

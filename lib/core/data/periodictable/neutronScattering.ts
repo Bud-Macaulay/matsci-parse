@@ -8,7 +8,11 @@
  * Values ported from pymatgen's neutron_scattering_length.json
  * (MIT licensed, Materials Project; table cited from the Neutron Data
  * Booklet, 2nd ed., Old City Press, 2003).
+ *
+ * Use {@link getNeutronScatteringLength} for isotope-tolerant lookup with
+ * fallback to the natural-abundance element value.
  */
+import { parseSpeciesSymbol } from "./isotopes";
 export const NEUTRON_SCATTERING_LENGTHS: Readonly<Record<string, number>> = {
   "100Mo": 6.73,
   "102Pd": 7.7,
@@ -347,3 +351,30 @@ export const NEUTRON_SCATTERING_LENGTHS: Readonly<Record<string, number>> = {
   "Zn": 5.68,
   "Zr": 7.16,
 };
+
+/** Look up a neutron coherent scattering length, tolerating isotope labels.
+ *
+ * Exact per-isotope entries win (`"1H"`, `"13C"`); otherwise the symbol
+ * falls back to the natural-abundance element value (`"14C"` → `"C"`,
+ * `"D"` → `"2H"`, `"T"` → `"3H"`).
+ * @param symbol - Element or isotope symbol.
+ * @returns The scattering length, or undefined for unknown symbols. */
+export function getNeutronScatteringLength(symbol: string): number | undefined {
+  const direct = NEUTRON_SCATTERING_LENGTHS[symbol];
+
+  if (direct !== undefined) return direct;
+
+  const parsed = parseSpeciesSymbol(symbol);
+
+  if (parsed.atomicNumber === undefined) return undefined;
+
+  if (parsed.element === "H" && parsed.massNumber === 2) {
+    return NEUTRON_SCATTERING_LENGTHS["2H"];
+  }
+
+  if (parsed.element === "H" && parsed.massNumber === 3) {
+    return NEUTRON_SCATTERING_LENGTHS["3H"];
+  }
+
+  return NEUTRON_SCATTERING_LENGTHS[parsed.element];
+}

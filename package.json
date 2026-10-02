@@ -2,15 +2,19 @@
   "name": "matsci-parse",
   "version": "0.16.4",
   "type": "module",
-  "main": "dist/main.js",
-  "module": "dist/main.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "files": [
     "dist"
   ],
   "exports": {
     ".": {
       "import": "./dist/index.js"
-    }
+    },
+    "./periodictable": {
+      "import": "./dist/periodictable.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "dev": "vite",
