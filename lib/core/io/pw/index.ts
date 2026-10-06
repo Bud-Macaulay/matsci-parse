@@ -317,7 +317,10 @@ export function toPW(structure: Structure, options?: QEOptions): string {
   const elec = { ...QE_DEFAULTS.electrons, ...options?.electrons };
 
   // --- derive card data from Structure ---
-  const speciesOrder = collectSpecies(structure.sites);
+  // First-appearance order: QE writes species-grouped blocks.
+  const speciesOrder = [
+    ...new Set(structure.sites.map((site) => site.species.symbol)),
+  ];
   const species = buildAtomicSpecies(speciesOrder, options?.pseudo?.pseudos);
   const positions = buildAtomicPositions(structure);
   const cell = buildCellParameters(structure.lattice);
@@ -357,20 +360,6 @@ export function toPW(structure: Structure, options?: QEOptions): string {
 //  Card builders — Structure + options → typed card data
 // ──────────────────────────────────────────────────────────────────────
 
-/** Collect unique species in first-appearance order. */
-function collectSpecies(sites: Site[]): string[] {
-  const seen = new Set<string>();
-  const order: string[] = [];
-  for (const site of sites) {
-    const sym = site.species.symbol;
-    if (!seen.has(sym)) {
-      seen.add(sym);
-      order.push(sym);
-    }
-  }
-  return order;
-}
-
 /** Build ATOMIC_SPECIES rows from species order + pseudopotential map. */
 function buildAtomicSpecies(
   speciesOrder: string[],
@@ -400,7 +389,10 @@ function buildAtomicPositions(structure: Structure): AtomicPositionEntry[] {
     }
   }
 
-  const speciesOrder = collectSpecies(structure.sites);
+  // First-appearance order: QE writes species-grouped blocks.
+  const speciesOrder = [
+    ...new Set(structure.sites.map((site) => site.species.symbol)),
+  ];
   const entries: AtomicPositionEntry[] = [];
 
   for (const sym of speciesOrder) {

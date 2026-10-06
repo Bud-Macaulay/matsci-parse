@@ -1,6 +1,7 @@
 import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
 import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
 import { Structure } from "../../../structure";
+import { occupancyOf } from "../../../../site/occupancy";
 import { SymbolToAtomicNumber } from "../../../../data/periodictable/atomicData";
 import { getXrayScatteringParams } from "../../../../data/periodictable/xrayScattering";
 import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
@@ -43,12 +44,6 @@ interface ExpandedSite {
   fx: number;
   fy: number;
   fz: number;
-}
-
-function occupancyOf(site: Structure["sites"][number]): number {
-  const occu = site.species.properties?.occu;
-
-  return typeof occu === "number" ? occu : 1;
 }
 
 function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<string, number>>): ExpandedSite[] {

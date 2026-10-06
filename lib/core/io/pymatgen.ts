@@ -46,21 +46,9 @@ export interface PymatgenStructure {
   [key: string]: unknown;
 }
 
-function flattenMatrix(matrix: number[][]): number[] {
-  const out: number[] = [];
-
-  for (const row of matrix) {
-    for (const v of row) {
-      out.push(v);
-    }
-  }
-
-  return out;
-}
-
 /** Deserializes a pymatgen `Structure` JSON object into a Structure. */
 export function fromPymatgen(data: PymatgenStructure): Structure {
-  const lattice = createLattice(new Float64Array(flattenMatrix(data.lattice.matrix)));
+  const lattice = createLattice(new Float64Array(data.lattice.matrix.flat()));
 
   const sites = data.sites.map((site) => {
     const primary = site.species[0];

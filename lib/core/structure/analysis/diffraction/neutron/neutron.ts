@@ -1,6 +1,7 @@
 import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
 import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
 import { Structure } from "../../../structure";
+import { occupancyOf } from "../../../../site/occupancy";
 import { getNeutronScatteringLength } from "../../../../data/periodictable/neutronScattering";
 import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
 import { pointsInSphere, twoThetaRangeToRadii } from "../reciprocalPoints";
@@ -39,7 +40,10 @@ interface ExpandedSite {
   fz: number;
 }
 
-function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<string, number>>): ExpandedSite[] {
+function expandSites(
+  structure: Structure,
+  debyeWallerFactors: Readonly<Record<string, number>>,
+): ExpandedSite[] {
   return structure.sites.map((site) => {
     const symbol = site.species.symbol;
     const length = getNeutronScatteringLength(symbol);
@@ -50,11 +54,9 @@ function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<s
       );
     }
 
-    const occu = site.species.properties?.occu;
-
     return {
       length,
-      occu: typeof occu === "number" ? occu : 1,
+      occu: occupancyOf(site),
       dw: debyeWallerFactors[symbol] ?? 0,
       fx: site.frac[0],
       fy: site.frac[1],
@@ -75,9 +77,15 @@ function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<s
  * @param structure - Crystal structure with lattice basis rows in angstroms.
  * @param options - Wavelength, range, scaling, Debye-Waller factors.
  * @returns Two-theta positions, intensities, Miller families, d-spacings. */
-export function calculateNdPattern(structure: Structure, options?: NdOptions): NdPattern {
+export function calculateNdPattern(
+  structure: Structure,
+  options?: NdOptions,
+): NdPattern {
   const wavelength = options?.wavelength ?? 1.54184;
-  const range = options?.twoThetaRange === undefined ? ([0, 90] as const) : options.twoThetaRange;
+  const range =
+    options?.twoThetaRange === undefined
+      ? ([0, 90] as const)
+      : options.twoThetaRange;
   const scaled = options?.scaled ?? true;
   const debyeWallerFactors = options?.debyeWallerFactors ?? {};
 
