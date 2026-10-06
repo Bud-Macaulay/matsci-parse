@@ -1,12 +1,67 @@
+import { useState } from "react";
+import { replaceSite, elementBySymbol } from "matsci-parse";
+
 export default function AtomTable({
   structure,
-  editingCell,
-  cellValue,
-  setEditingCell,
-  setCellValue,
-  onCommitEdit,
+  pushUndo,
+  setStructure,
   onRemove,
 }) {
+  // Local edit state: keystrokes re-render only this table,
+  // not MainPanel or the 3D visualizer.
+  const [editingCell, setEditingCell] = useState(null);
+  const [cellValue, setCellValue] = useState("");
+
+  const commitCellEdit = () => {
+    if (!editingCell) return;
+    const { idx, field } = editingCell;
+    const value = cellValue;
+
+    if (field === "species") {
+      const sym = value.trim();
+      if (
+        !sym ||
+        !elementBySymbol[sym] ||
+        sym === structure.sites[idx].species.symbol
+      ) {
+        setEditingCell(null);
+        return;
+      }
+      pushUndo({
+        action: "replace-site",
+        label: `Changed atom ${idx} to ${sym}`,
+      });
+      setStructure(
+        replaceSite(structure, idx, {
+          ...structure.sites[idx],
+          species: { symbol: sym },
+        }),
+      );
+    } else {
+      const num = parseFloat(value);
+      if (isNaN(num)) {
+        setEditingCell(null);
+        return;
+      }
+      const axis = ["x", "y", "z"].indexOf(field);
+      if (num === structure.sites[idx].frac[axis]) {
+        setEditingCell(null);
+        return;
+      }
+
+      pushUndo({
+        action: "edit-coord",
+        label: `Edited atom ${idx} ${field.toUpperCase()}`,
+      });
+      const newFrac = new Float64Array(structure.sites[idx].frac);
+      newFrac[axis] = num;
+      setStructure(
+        replaceSite(structure, idx, { ...structure.sites[idx], frac: newFrac }),
+      );
+    }
+    setEditingCell(null);
+  };
+
   return (
     <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[25%]">
       <div className="overflow-y-auto">
@@ -57,9 +112,9 @@ export default function AtomTable({
                           step={field === "species" ? undefined : "0.001"}
                           value={cellValue}
                           onChange={(e) => setCellValue(e.target.value)}
-                          onBlur={onCommitEdit}
+                          onBlur={commitCellEdit}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") onCommitEdit();
+                            if (e.key === "Enter") commitCellEdit();
                             if (e.key === "Escape") setEditingCell(null);
                           }}
                           onClick={(e) => e.stopPropagation()}

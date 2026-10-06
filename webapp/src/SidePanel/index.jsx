@@ -4,6 +4,52 @@ import { appStore, actions } from "../store/appStore";
 import { fromJSON } from "matsci-parse";
 import BulkSpeciesModal from "./BulkSpeciesModal";
 
+// Local name state: commits to the store on blur/Enter instead of
+// stringifying the whole saved list to localStorage per keystroke.
+function SavedRow({ item, flash, onLoad, onDelete, onRename }) {
+  const [name, setName] = useState(item.name);
+  const dirty = name !== item.name;
+
+  const commit = () => {
+    if (dirty) onRename(item.id, name);
+  };
+
+  return (
+    <div
+      className={`p-2 rounded-md border bg-white hover:shadow-sm transition ${flash ? "duration-800 animate-pulse ring-2  ring-blue-700" : ""}`}
+    >
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.target.blur();
+          if (e.key === "Escape") setName(item.name);
+        }}
+        className="w-full text-sm px-2 py-1 border rounded-md"
+      />
+
+      <div className="flex gap-2 mt-2 text-xs">
+        <button
+          onClick={() => onLoad(item.structure, dirty ? name : item.name)}
+          title="Load this saved structure"
+          className="buttonSimple gray flex-1"
+        >
+          Load
+        </button>
+
+        <button
+          onClick={() => onDelete(item.id)}
+          title="Delete this saved structure"
+          className="buttonSimple red flex-1"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
   const autosave = useStore(appStore, (s) => s.autosave);
   const [flashId, setFlashId] = useState(null);
@@ -143,34 +189,14 @@ export default function SidePanel({ setAutosave, structure, onLoadStructure }) {
           )}
 
           {savedList.map((item) => (
-            <div
+            <SavedRow
               key={item.id}
-              className={`p-2 rounded-md border bg-white hover:shadow-sm transition ${flashId === item.id ? "duration-800 animate-pulse ring-2  ring-blue-700" : ""}`}
-            >
-              <input
-                value={item.name}
-                onChange={(e) => renameSaved(item.id, e.target.value)}
-                className="w-full text-sm px-2 py-1 border rounded-md"
-              />
-
-              <div className="flex gap-2 mt-2 text-xs">
-                <button
-                  onClick={() => loadStructure(item.structure, item.name)}
-                  title="Load this saved structure"
-                  className="buttonSimple gray flex-1"
-                >
-                  Load
-                </button>
-
-                <button
-                  onClick={() => deleteSaved(item.id)}
-                  title="Delete this saved structure"
-                  className="buttonSimple red flex-1"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
+              item={item}
+              flash={flashId === item.id}
+              onLoad={loadStructure}
+              onDelete={deleteSaved}
+              onRename={renameSaved}
+            />
           ))}
         </div>
       </div>

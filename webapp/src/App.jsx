@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 import { useHotkey } from "@tanstack/react-hotkeys";
 
@@ -17,6 +17,16 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  const updateTab = useCallback(
+    (fn) => actions.updateTab(activeTabId, fn),
+    [activeTabId],
+  );
+
+  const handleLoadStructure = useCallback(
+    (parsed, meta) => actions.createTab(parsed, meta),
+    [],
+  );
 
   const handleDrop = async (e) => {
     e.preventDefault();
@@ -85,7 +95,7 @@ export default function App() {
         autosave={autosave}
         setAutosave={actions.setAutosave}
         structure={activeTab?.structure ?? null}
-        onLoadStructure={(parsed, meta) => actions.createTab(parsed, meta)}
+        onLoadStructure={handleLoadStructure}
       />
 
       <main className="flex-1 flex flex-col h-full bg-gray-50">
@@ -114,10 +124,7 @@ export default function App() {
           ))}
         </div>
 
-        <MainPanel
-          tab={activeTab}
-          updateTab={(fn) => actions.updateTab(activeTabId, fn)}
-        />
+        <MainPanel tab={activeTab} updateTab={updateTab} />
       </main>
 
       <ToastContainer />

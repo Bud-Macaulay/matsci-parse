@@ -1,9 +1,36 @@
+import { useMemo } from "react";
 import StructureVisualizer from "mc-react-structure-visualizer";
 import StructureDownload from "../common/structureDownload";
 import QEInputButton from "../common/QEInputButton";
 import { hillFormula, density, volume } from "matsci-parse";
 
 export default function VisualizerPane({ structure, setStructure, pushUndo }) {
+  const stats = useMemo(() => {
+    let formula = "";
+    let vol = "";
+    let dens = "";
+
+    try {
+      formula = hillFormula(structure);
+    } catch {
+      formula = "-";
+    }
+
+    try {
+      vol = `${volume(structure).toFixed(1)} Å³`;
+    } catch {
+      vol = "-";
+    }
+
+    try {
+      const d = density(structure);
+      dens = d > 0 ? `${d.toFixed(3)} amu/Å³` : "-";
+    } catch {
+      dens = "-";
+    }
+
+    return { formula, vol, dens };
+  }, [structure]);
   return (
     <div className="flex-1 bg-white overflow-hidden relative">
       <div className="absolute top-2 left-2 z-10 flex items-start gap-2">
@@ -29,22 +56,11 @@ export default function VisualizerPane({ structure, setStructure, pushUndo }) {
 
       <StructureVisualizer structure={structure} initSupercell={[1, 1, 1]} />
       <div className="absolute bottom-25 right-2 z-10 bg-slate-200/85 backdrop-blur-sm rounded-md px-3 py-1.5 shadow-sm text-xs">
-        <span className="font-medium">{hillFormula(structure)}</span>
+        <span className="font-medium">{stats.formula}</span>
         <span className="text-gray-400 mx-1.5">&middot;</span>
-        <span className="text-gray-500">
-          {volume(structure).toFixed(1)} &#197;&#179;
-        </span>
+        <span className="text-gray-500">{stats.vol}</span>
         <span className="text-gray-400 mx-1.5">&middot;</span>
-        <span className="text-gray-500">
-          {(() => {
-            try {
-              const d = density(structure);
-              return d > 0 ? `${d.toFixed(3)} amu/Å³` : "-";
-            } catch {
-              return "-";
-            }
-          })()}
-        </span>
+        <span className="text-gray-500">{stats.dens}</span>
       </div>
     </div>
   );

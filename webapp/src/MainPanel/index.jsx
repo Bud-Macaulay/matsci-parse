@@ -2,12 +2,10 @@ import { useState, useCallback } from "react";
 import { useHotkey } from "@tanstack/react-hotkeys";
 import {
   canonicalize,
-  replaceSite,
   removeSite,
   replaceSites,
   removeSites,
   findSitesBySpecies,
-  elementBySymbol,
 } from "matsci-parse";
 
 import AtomTable from "./AtomTable";
@@ -26,8 +24,6 @@ import XrdModal from "./XrdModal";
 
 export default function MainPanel({ tab, updateTab }) {
   const [speciesModal, setSpeciesModal] = useState({ open: false, mode: null });
-  const [editingCell, setEditingCell] = useState(null);
-  const [cellValue, setCellValue] = useState("");
 
   const pushUndo = useCallback(
     (meta = {}) => {
@@ -36,7 +32,7 @@ export default function MainPanel({ tab, updateTab }) {
         undoStack: [
           ...t.undoStack,
           { structure: t.structure, timestamp: Date.now(), ...meta },
-        ],
+        ].slice(-50),
         redoStack: [],
       }));
     },
@@ -74,7 +70,7 @@ export default function MainPanel({ tab, updateTab }) {
         undoStack: [
           ...t.undoStack,
           { structure: t.structure, label: last.label, timestamp: Date.now() },
-        ],
+        ].slice(-50),
         structure: last.structure,
       };
     });
@@ -89,56 +85,6 @@ export default function MainPanel({ tab, updateTab }) {
   const { structure, undoStack = [], redoStack = [] } = tab;
 
   if (!structure) return null;
-
-  const commitCellEdit = () => {
-    if (!editingCell) return;
-    const { idx, field } = editingCell;
-    const value = cellValue;
-
-    if (field === "species") {
-      const sym = value.trim();
-      if (
-        !sym ||
-        !elementBySymbol[sym] ||
-        sym === structure.sites[idx].species.symbol
-      ) {
-        setEditingCell(null);
-        return;
-      }
-      pushUndo({
-        action: "replace-site",
-        label: `Changed atom ${idx} to ${sym}`,
-      });
-      setStructure(
-        replaceSite(structure, idx, {
-          ...structure.sites[idx],
-          species: { symbol: sym },
-        }),
-      );
-    } else {
-      const num = parseFloat(value);
-      if (isNaN(num)) {
-        setEditingCell(null);
-        return;
-      }
-      const axis = ["x", "y", "z"].indexOf(field);
-      if (num === structure.sites[idx].frac[axis]) {
-        setEditingCell(null);
-        return;
-      }
-
-      pushUndo({
-        action: "edit-coord",
-        label: `Edited atom ${idx} ${field.toUpperCase()}`,
-      });
-      const newFrac = new Float64Array(structure.sites[idx].frac);
-      newFrac[axis] = num;
-      setStructure(
-        replaceSite(structure, idx, { ...structure.sites[idx], frac: newFrac }),
-      );
-    }
-    setEditingCell(null);
-  };
 
   const remove = (idx) => {
     pushUndo({ action: "remove-site", label: `Removed atom ${idx}` });
@@ -218,11 +164,8 @@ export default function MainPanel({ tab, updateTab }) {
 
           <AtomTable
             structure={structure}
-            editingCell={editingCell}
-            cellValue={cellValue}
-            setEditingCell={setEditingCell}
-            setCellValue={setCellValue}
-            onCommitEdit={commitCellEdit}
+            pushUndo={pushUndo}
+            setStructure={setStructure}
             onRemove={remove}
           />
 
