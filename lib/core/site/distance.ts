@@ -1,10 +1,10 @@
 import { Lattice } from "../lattice/lattice";
 import { Site } from "./site";
-import { cartesian } from "./cartesian";
 import { metricTensor } from "../lattice/metricTensor";
-import { micDisplacement } from "../structure/operations/distance/utils";
-
-import { norm } from "../matrix/operations/vector/norm";
+import {
+  micDisplacement,
+  distanceSquared,
+} from "../structure/operations/distance/utils";
 
 /** Compute the minimum image distance between two sites.
  * @param lattice - The lattice.
@@ -23,12 +23,5 @@ export function distance(lattice: Lattice, a: Site, b: Site): number {
     G,
   );
 
-  const displaced: Site = {
-    species: a.species,
-    frac: dFrac,
-  };
-
-  const dCart = cartesian(lattice, displaced);
-
-  return norm(dCart);
+  return Math.sqrt(distanceSquared(dFrac, G));
 }

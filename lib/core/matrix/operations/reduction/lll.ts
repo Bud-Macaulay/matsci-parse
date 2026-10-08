@@ -53,7 +53,6 @@ export function lll(input: Matrix, delta = 0.75): LllResult {
 
   function orthogonalize() {
     mu.fill(0);
-    for (let i = 0; i < n; i++) mu[i * n + i] = 1;
 
     for (let i = 0; i < n; i++) {
       // copy b[i] into gs[i]

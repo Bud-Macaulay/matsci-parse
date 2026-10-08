@@ -41,10 +41,15 @@ export function micDisplacement(df: Vec3, G: Float64Array): Float64Array {
   const wy = df[1] - Math.round(df[1]);
   const wz = df[2] - Math.round(df[2]);
 
+  const q = (x: number, y: number, z: number): number =>
+    x * (G[0] * x + G[1] * y + G[2] * z) +
+    y * (G[3] * x + G[4] * y + G[5] * z) +
+    z * (G[6] * x + G[7] * y + G[8] * z);
+
   let bx = wx;
   let by = wy;
   let bz = wz;
-  let best = distanceSquared(new Float64Array([wx, wy, wz]), G);
+  let best = q(wx, wy, wz);
 
   for (let i = -1; i <= 1; i++) {
     for (let j = -1; j <= 1; j++) {
@@ -53,7 +58,7 @@ export function micDisplacement(df: Vec3, G: Float64Array): Float64Array {
         const x = wx + i;
         const y = wy + j;
         const z = wz + k;
-        const d = distanceSquared(new Float64Array([x, y, z]), G);
+        const d = q(x, y, z);
         if (d < best) {
           best = d;
           bx = x;
