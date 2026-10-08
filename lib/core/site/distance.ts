@@ -1,6 +1,8 @@
 import { Lattice } from "../lattice/lattice";
 import { Site } from "./site";
 import { cartesian } from "./cartesian";
+import { metricTensor } from "../lattice/metricTensor";
+import { micDisplacement } from "../structure/operations/distance/utils";
 
 import { norm } from "../matrix/operations/vector/norm";
 
@@ -10,15 +12,16 @@ import { norm } from "../matrix/operations/vector/norm";
  * @param b - Second site.
  * @returns Minimum image distance. */
 export function distance(lattice: Lattice, a: Site, b: Site): number {
-  const dFrac: [number, number, number] = [
-    b.frac[0] - a.frac[0],
-    b.frac[1] - a.frac[1],
-    b.frac[2] - a.frac[2],
-  ];
+  const G = metricTensor(lattice).data;
 
-  for (let i = 0; i < 3; i++) {
-    dFrac[i] -= Math.round(dFrac[i]);
-  }
+  const dFrac = micDisplacement(
+    new Float64Array([
+      b.frac[0] - a.frac[0],
+      b.frac[1] - a.frac[1],
+      b.frac[2] - a.frac[2],
+    ]),
+    G,
+  );
 
   const displaced: Site = {
     species: a.species,

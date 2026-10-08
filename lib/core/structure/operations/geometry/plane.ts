@@ -28,9 +28,17 @@ export function planeFromSites(
   j: number,
   k: number,
 ): Plane {
-  // Cartesian displacement vectors
-  const r1 = getDisplacement(structure, i, j);
-  const r2 = getDisplacement(structure, i, k);
+  // getDisplacement returns fractional MIC; cross product needs Cartesian.
+  const m = structure.lattice.basis.data;
+  const toCartesian = (df: Float64Array): Float64Array =>
+    new Float64Array([
+      df[0] * m[0] + df[1] * m[3] + df[2] * m[6],
+      df[0] * m[1] + df[1] * m[4] + df[2] * m[7],
+      df[0] * m[2] + df[1] * m[5] + df[2] * m[8],
+    ]);
+
+  const r1 = toCartesian(getDisplacement(structure, i, j));
+  const r2 = toCartesian(getDisplacement(structure, i, k));
 
   const n = cross(r1, r2);
   const nNorm = norm(n);
