@@ -247,10 +247,12 @@ function latticePointGroup(G: Float64Array): number[][] {
     let preserves = true;
     for (let r = 0; r < 3 && preserves; r++) {
       for (let c = 0; c < 3; c++) {
+        // (Mᵀ·G·M)[r][c]: sites transform as f' = M·f, so Cartesian
+        // lengths fᵀ·G·f are preserved iff Mᵀ·G·M = G.
         let s = 0;
         for (let i = 0; i < 3; i++) {
           for (let j = 0; j < 3; j++) {
-            s += M[r * 3 + i] * G[i * 3 + j] * M[c * 3 + j];
+            s += M[i * 3 + r] * G[i * 3 + j] * M[j * 3 + c];
           }
         }
         if (Math.abs(s - G[r * 3 + c]) > 1e-6) {

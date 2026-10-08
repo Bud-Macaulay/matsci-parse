@@ -253,3 +253,47 @@ describe("supercell equivalence", () => {
     expect(result.maxDistance).toBeGreaterThan(0.01);
   });
 });
+
+describe("skewed-cell lattice rotations", () => {
+  // a=(1,0,0), b=(-1/2,√3/2,0) (γ=120°), c=(0,0,2).
+  const SKEWED = [1, 0, 0, -0.5, 0.8660254037844386, 0, 0, 0, 2];
+
+  // det +1 rotation with Mᵀ·G·M = G but M·G·Mᵀ ≠ G: missed by the
+  // transposed metric check, so this is a false negative without the fix.
+  const M = [0, -1, 0, 1, -1, 0, 0, 0, 1];
+
+  function rot(f: [number, number, number]): [number, number, number] {
+    const wrap = (x: number) => x - Math.floor(x);
+    return [
+      wrap(M[0] * f[0] + M[1] * f[1] + M[2] * f[2]),
+      wrap(M[3] * f[0] + M[4] * f[1] + M[5] * f[2]),
+      wrap(M[6] * f[0] + M[7] * f[1] + M[8] * f[2]),
+    ];
+  }
+
+  function skewedStructure(
+    si: [number, number, number],
+    o: [number, number, number],
+  ): Structure {
+    return {
+      lattice: createLattice(SKEWED),
+      species: [{ symbol: "Si" }, { symbol: "O" }],
+      sites: [
+        { species: { symbol: "Si" }, frac: new Float64Array(si) },
+        { species: { symbol: "O" }, frac: new Float64Array(o) },
+      ],
+    };
+  }
+
+  it("matches structures related by a lattice rotation on a skewed cell", async () => {
+    const a = skewedStructure([0.13, 0.27, 0.31], [0.61, 0.17, 0.72]);
+    const b = skewedStructure(
+      rot([0.13, 0.27, 0.31]),
+      rot([0.61, 0.17, 0.72]),
+    );
+    // tight tolerance: only the true rotation (rms ~ 0) can satisfy this
+    const result = await matchStructures(a, b, 0.01);
+    expect(result.matches).toBe(true);
+    expect(result.rms).toBeCloseTo(0, 10);
+  });
+});
