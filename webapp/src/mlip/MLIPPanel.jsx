@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { cartesian, fractional } from "matsci-parse";
+import { cartesian, fractional, createFIRE } from "matsci-parse";
 
 import { ELEMENT_BY_SYMBOL, massForZ } from "./elements";
 import { createMlipWorker } from "./mlipWorkerClient";
@@ -27,6 +27,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [forceThreshold, setForceThreshold] = useState(0.05);
   const workerRef = useRef(null);
   const structureRef = useRef(structure);
+  const fireCancelRef = useRef(false);
 
   // Keep structure ref in sync
   useEffect(() => {
@@ -182,8 +183,87 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold]);
 
   const handleCancelRelax = useCallback(() => {
+    fireCancelRef.current = true;
     if (workerRef.current) workerRef.current.stop();
   }, []);
+
+  /** Relax with the local FIRE optimizer (lib/core/structure/optimize),
+   * driven by MLIP forces. Updates the structure live so the trajectory
+   * is visible in the visualizer. Positions-only. */
+  const handleFireRelax = useCallback(async () => {
+    if (!structure) return;
+    setRelaxing(true);
+    setRelaxProgress(null);
+    setPredictResult(null);
+    setError("");
+    fireCancelRef.current = false;
+
+    try {
+      const client = await getWorker();
+      const sys = buildSystemArrays(structure);
+      await client.setSystem({
+        ...sys,
+        periodic: true,
+      });
+
+      const fire = createFIRE({ fmax: forceThreshold });
+      let current = structure;
+      let steps = 0;
+      let energy = null;
+      let maxForce = null;
+      let converged = false;
+
+      const cartPositions = (struct) => {
+        const pos = new Float64Array(struct.sites.length * 3);
+        for (let i = 0; i < struct.sites.length; i++) {
+          const c = cartesian(struct.lattice, struct.sites[i]);
+          pos[i * 3] = c[0];
+          pos[i * 3 + 1] = c[1];
+          pos[i * 3 + 2] = c[2];
+        }
+        return pos;
+      };
+
+      while (steps < maxSteps && !fireCancelRef.current) {
+        // Predict at the CURRENT positions — the worker holds the initial
+        // geometry from setSystem, so it must be told where we are.
+        const pred = await client.predict(cartPositions(current));
+        energy = pred.energy;
+        const forces = pred.forces;
+        maxForce = 0;
+        for (let i = 0; i < forces.length; i++) {
+          const a = Math.abs(forces[i]);
+          if (a > maxForce) maxForce = a;
+        }
+        const out = fire.step(current, forces);
+        current = out.structure;
+        steps += 1;
+        converged = out.converged;
+        setStructure(current);
+        setRelaxProgress({ step: steps, energy, maxForce });
+        if (converged) break;
+      }
+
+      if (fireCancelRef.current) return;
+
+      pushUndo({
+        action: "fire-relax",
+        label: `FIRE relaxed (${steps} steps, ${energy?.toFixed(2) ?? "?"} eV)`,
+      });
+      setPredictResult({
+        energy,
+        forces: null,
+        stress: null,
+        timing: 0,
+        numAtoms: current.sites.length,
+      });
+    } catch (err) {
+      setError(`FIRE relaxation failed: ${err?.message ?? err}`);
+    } finally {
+      setRelaxing(false);
+      setRelaxProgress(null);
+    }
+  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold]);
 
   return (
     <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 bg-white">
@@ -282,6 +362,14 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         ) : (
           "Relax"
         )}
+      </button>
+      <button
+        onClick={handleFireRelax}
+        disabled={status !== "ready" || relaxing || !structure}
+        title="Relax with the local FIRE optimizer (live trajectory)"
+        className="w-full px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        Relax (FIRE)
       </button>
 
       {/* Relaxation parameters */}
