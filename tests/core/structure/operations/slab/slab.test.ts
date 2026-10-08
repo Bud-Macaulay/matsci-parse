@@ -79,7 +79,7 @@ describe("reorientToNormal", () => {
     expect(b[8]).toBeCloseTo(0, 8);
   });
 
-  it("preserves Cartesian positions", () => {
+  it("aligns c with the normal and preserves pairwise distances (rigid rotation)", () => {
     const s = cubicSi();
     const normals = [
       new Float64Array([1, 0, 0]),
@@ -90,14 +90,61 @@ describe("reorientToNormal", () => {
     ];
     for (const n of normals) {
       const r = reorientToNormal(s, n);
+      // c parallel to n
+      const b = r.lattice.basis.data;
+      const c = [b[6], b[7], b[8]];
+      const nn = norm(n);
+      const cn = norm(new Float64Array(c));
+      const cos = (c[0] * n[0] + c[1] * n[1] + c[2] * n[2]) / cn / nn;
+      expect(Math.abs(cos)).toBeCloseTo(1, 6);
+      // same c length (rotation, not rescaling)
+      expect(cn).toBeCloseTo(5.43, 8);
+      // rigid: pairwise Cartesian distances unchanged
       for (let i = 0; i < s.sites.length; i++) {
-        const cOrig = toCart(s.lattice, s.sites[i].frac);
-        const cNew = toCart(r.lattice, r.sites[i].frac);
-        for (let j = 0; j < 3; j++) {
-          expect(cNew[j]).toBeCloseTo(cOrig[j], 8);
+        for (let j = i + 1; j < s.sites.length; j++) {
+          const dOrig = norm(
+            new Float64Array([
+              toCart(s.lattice, s.sites[i].frac)[0] -
+                toCart(s.lattice, s.sites[j].frac)[0],
+              toCart(s.lattice, s.sites[i].frac)[1] -
+                toCart(s.lattice, s.sites[j].frac)[1],
+              toCart(s.lattice, s.sites[i].frac)[2] -
+                toCart(s.lattice, s.sites[j].frac)[2],
+            ]),
+          );
+          const dNew = norm(
+            new Float64Array([
+              toCart(r.lattice, r.sites[i].frac)[0] -
+                toCart(r.lattice, r.sites[j].frac)[0],
+              toCart(r.lattice, r.sites[i].frac)[1] -
+                toCart(r.lattice, r.sites[j].frac)[1],
+              toCart(r.lattice, r.sites[i].frac)[2] -
+                toCart(r.lattice, r.sites[j].frac)[2],
+            ]),
+          );
+          expect(dNew).toBeCloseTo(dOrig, 8);
         }
       }
     }
+  });
+
+  it("aligns c with the normal on a skewed cell", () => {
+    const s: Structure = {
+      lattice: createLattice([3, 0, 0, 1, 3, 0, 0.5, 0.5, 4]),
+      sites: [
+        { species: { symbol: "Si" }, frac: new Float64Array([0.1, 0.2, 0.3]) },
+        { species: { symbol: "Si" }, frac: new Float64Array([0.6, 0.15, 0.7]) },
+      ],
+    };
+    const n = new Float64Array([0.2, 0.3, 1]);
+    const r = reorientToNormal(s, n);
+    const b = r.lattice.basis.data;
+    const c = [b[6], b[7], b[8]];
+    const cos =
+      (c[0] * n[0] + c[1] * n[1] + c[2] * n[2]) /
+      norm(new Float64Array(c)) /
+      norm(n);
+    expect(Math.abs(cos)).toBeCloseTo(1, 6);
   });
 });
 
