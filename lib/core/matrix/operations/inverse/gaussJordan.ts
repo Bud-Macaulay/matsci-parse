@@ -1,4 +1,4 @@
-import { Matrix, createMatrix, clone, index } from "../../matrix";
+import { Matrix, createMatrix, clone } from "../../matrix";
 import { EPSILON } from "../../../math/constants";
 
 /** Compute the inverse of a square matrix using Gauss-Jordan elimination with partial pivoting.
@@ -21,24 +21,24 @@ export function gjInverse(m: Matrix): Matrix {
   }
 
   for (let i = 0; i < n; i++) {
-    let pivotIdx = i * n + i;
-
-    // Pivoting
-    if (Math.abs(Adata[pivotIdx]) < EPSILON) {
-      let swapRow = -1;
-      for (let r = i + 1; r < n; r++) {
-        if (Math.abs(Adata[r * n + i]) > EPSILON) {
-          swapRow = r;
-          break;
-        }
+    // Partial pivoting: row with the largest |entry| in this column.
+    let pivotRow = i;
+    let max = Math.abs(Adata[i * n + i]);
+    for (let r = i + 1; r < n; r++) {
+      const v = Math.abs(Adata[r * n + i]);
+      if (v > max) {
+        max = v;
+        pivotRow = r;
       }
-      if (swapRow === -1) {
-        throw new Error("Singular matrix");
-      }
+    }
+    if (max < EPSILON) {
+      throw new Error("Singular matrix");
+    }
 
-      // performant inline swap
+    // performant inline swap
+    if (pivotRow !== i) {
       const r1Offset = i * n;
-      const r2Offset = swapRow * n;
+      const r2Offset = pivotRow * n;
       for (let c = 0; c < n; c++) {
         let tmp = Adata[r1Offset + c];
         Adata[r1Offset + c] = Adata[r2Offset + c];
@@ -48,10 +48,9 @@ export function gjInverse(m: Matrix): Matrix {
         Idata[r1Offset + c] = Idata[r2Offset + c];
         Idata[r2Offset + c] = tmp;
       }
-
-      pivotIdx = i * n + i;
     }
 
+    const pivotIdx = i * n + i;
     const pivot = Adata[pivotIdx];
     const invPivot = 1 / pivot;
 
@@ -67,7 +66,6 @@ export function gjInverse(m: Matrix): Matrix {
       if (r === i) continue;
 
       const factor = Adata[r * n + i];
-      if (Math.abs(factor) < EPSILON) continue;
 
       const rOffset = r * n;
       for (let c = 0; c < n; c++) {

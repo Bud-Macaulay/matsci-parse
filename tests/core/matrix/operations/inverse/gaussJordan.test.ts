@@ -85,6 +85,13 @@ describe("gjInverse", () => {
       const result = multiplyMatrices(A, inv);
       expectIdentity(result);
     });
+
+    it("picks the largest pivot, not the first non-zero (tiny leading pivot)", () => {
+      const A = createMatrix(2, 2, [1e-10, 1, 1, 1]);
+      const inv = gjInverse(A);
+      const result = multiplyMatrices(A, inv);
+      expectIdentity(result);
+    });
   });
 
   describe("numerical edge cases", () => {
