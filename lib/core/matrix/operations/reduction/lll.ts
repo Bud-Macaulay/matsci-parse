@@ -52,6 +52,9 @@ export function lll(input: Matrix, delta = 0.75): LllResult {
   const mu = new Float64Array(n * n); // μ[i][j]
 
   function orthogonalize() {
+    mu.fill(0);
+    for (let i = 0; i < n; i++) mu[i * n + i] = 1;
+
     for (let i = 0; i < n; i++) {
       // copy b[i] into gs[i]
       for (let k = 0; k < n; k++) gs[i * n + k] = b[i * n + k];
@@ -90,10 +93,12 @@ export function lll(input: Matrix, delta = 0.75): LllResult {
         for (let c = 0; c < n; c++) {
           u[k * n + c] -= mjk * u[j * n + c];
         }
-        // update μ
-        for (let i = 0; i <= j; i++) {
+        // update μ: b[k] -= r·b[j] gives μ[k][j] -= r (since μ[j][j] ≡ 1)
+        // and μ[k][l] -= r·μ[j][l] for l < j.
+        for (let i = 0; i < j; i++) {
           mu[k * n + i] -= mjk * mu[j * n + i];
         }
+        mu[k * n + j] -= mjk;
       }
     }
   }
@@ -112,32 +117,9 @@ export function lll(input: Matrix, delta = 0.75): LllResult {
       u[(i + 1) * n + c] = tmp;
     }
 
-    // update μ: swap μ[i][0..i-1] ↔ μ[i+1][0..i-1]
-    for (let j = 0; j < i; j++) {
-      const tmp = mu[i * n + j];
-      mu[i * n + j] = mu[(i + 1) * n + j];
-      mu[(i + 1) * n + j] = tmp;
-    }
-
-    // update μ[i+1][i] using the formula:
-    // μ[i+1][i] = (μ[i][i] * D[i] + μ[i][i-1]² × D[i-1]) / D[i+1]
-    // where D[k] = |gs[k]|²
-    const Di = gsDot(i, i);
-    const Di1 = i > 0 ? gsDot(i - 1, i - 1) : 1;
-    const Di2 = gsDot(i + 1, i + 1);
-    const mii = mu[i * n + i];
-    const mii1 = i > 0 ? mu[i * n + (i - 1)] : 0;
-
-    if (Di2 > 1e-20) {
-      mu[(i + 1) * n + i] = (mii * Di + mii1 * mii1 * Di1) / Di2;
-    } else {
-      mu[(i + 1) * n + i] = 0;
-    }
-
-    // zero out μ[i+1][j] for j < i-1 (they become meaningless after swap)
-    for (let j = 0; j < i - 1; j++) {
-      mu[(i + 1) * n + j] = 0;
-    }
+    // NOTE: μ/gs are stale after a swap and are refreshed by the caller's
+    // orthogonalize(). No incremental μ update here (the previous one divided
+    // by the old |gs|² and zeroed μ[k][j], j<k-1).
   }
 
   // Main loop
