@@ -117,9 +117,6 @@ export function lll(input: Matrix, delta = 0.75): LllResult {
       u[(i + 1) * n + c] = tmp;
     }
 
-    // NOTE: μ/gs are stale after a swap and are refreshed by the caller's
-    // orthogonalize(). No incremental μ update here (the previous one divided
-    // by the old |gs|² and zeroed μ[k][j], j<k-1).
   }
 
   // Main loop
