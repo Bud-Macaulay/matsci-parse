@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 
-import { determineExtBravais } from "@/core/structure/operations/symmetry/brilliounzone/bravais";
+import {
+  determineExtBravais,
+  transformAP,
+} from "@/core/structure/operations/symmetry/brilliounzone/bravais";
+import {
+  getReciprocalCellRows,
+  cellParams,
+  matrixFromRowMajor,
+} from "@/core/structure/operations/symmetry/brilliounzone/seekpathTools";
 
 describe("determineExtBravais", () => {
   it("cP: inversion -> cP1, non-inversion -> cP2", () => {
@@ -92,5 +100,86 @@ describe("determineExtBravais", () => {
     expect(() =>
       determineExtBravais("xx", 1, 4, 5, 6, 90, 90, 90),
     ).toThrow(/Unknown bravais lattice/);
+  });
+});
+
+function cart(f: number[], B: number[][]): number[] {
+  return [
+    f[0] * B[0][0] + f[1] * B[1][0] + f[2] * B[2][0],
+    f[0] * B[0][1] + f[1] * B[1][1] + f[2] * B[2][1],
+    f[0] * B[0][2] + f[1] * B[1][2] + f[2] * B[2][2],
+  ];
+}
+
+describe("transformAP", () => {
+  it("preserves Cartesian positions (round-trip)", async () => {
+    const lattice = [
+      [4, 0, 0],
+      [1, 5, 0],
+      [0.5, 0.7, 6],
+    ];
+    const positions = [
+      [0.1, 0.2, 0.3],
+      [0.6, 0.7, 0.8],
+    ];
+    const out = await transformAP(lattice, positions);
+    for (let n = 0; n < positions.length; n++) {
+      const oldC = cart(positions[n], lattice);
+      const newC = cart(out.positions[n], out.lattice);
+      for (let d = 0; d < 3; d++) {
+        expect(Math.abs(newC[d] - oldC[d])).toBeLessThan(1e-8);
+      }
+    }
+  });
+
+  it("label matches final reciprocal cell (aP2 all-obtuse / aP3 all-acute)", async () => {
+    const lattice = [
+      [4, 0, 0],
+      [1, 5, 0],
+      [0.5, 0.7, 6],
+    ];
+    const out = await transformAP(lattice, [[0.1, 0.2, 0.3]]);
+    const recip = getReciprocalCellRows(matrixFromRowMajor(out.lattice.flat()));
+    const [, , , ca, cb, cg] = cellParams(recip);
+    if (out.extBravais === "aP2") {
+      expect(ca).toBeLessThanOrEqual(1e-9);
+      expect(cb).toBeLessThanOrEqual(1e-9);
+      expect(cg).toBeLessThanOrEqual(1e-9);
+    } else {
+      expect(out.extBravais).toBe("aP3");
+      expect(ca).toBeGreaterThanOrEqual(-1e-9);
+      expect(cb).toBeGreaterThanOrEqual(-1e-9);
+      expect(cg).toBeGreaterThanOrEqual(-1e-9);
+    }
+  });
+
+  it("random triclinic sweep: round-trip + both labels occur", async () => {
+    let s = 987654321;
+    const rand = () => {
+      s = (s * 1664525 + 1013904223) & 0xffffffff;
+      return (s >>> 0) / 0xffffffff;
+    };
+    const labelCount = { aP2: 0, aP3: 0 };
+    let roundTripWorst = 0;
+    const N = 60;
+    for (let t = 0; t < N; t++) {
+      const L = [
+        [2 + 4 * rand(), 0, 0],
+        [4 * rand() - 2, 2 + 4 * rand(), 0],
+        [4 * rand() - 2, 4 * rand() - 2, 2 + 4 * rand()],
+      ];
+      const P = [[rand(), rand(), rand()]];
+      const out = await transformAP(L, P);
+      // round-trip
+      const oldC = cart(P[0], L);
+      const newC = cart(out.positions[0], out.lattice);
+      for (let d = 0; d < 3; d++)
+        roundTripWorst = Math.max(roundTripWorst, Math.abs(newC[d] - oldC[d]));
+      labelCount[out.extBravais as "aP2" | "aP3"]++;
+    }
+    expect(roundTripWorst).toBeLessThan(1e-8);
+    // both labels should appear across random cells (suite breadth)
+    expect(labelCount.aP2).toBeGreaterThan(0);
+    expect(labelCount.aP3).toBeGreaterThan(0);
   });
 });
