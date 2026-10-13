@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   cartesian,
   createFIRE,
@@ -37,6 +37,14 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [cellStrain, setCellStrain] = useState(0.02);
   const [localOpt, setLocalOpt] = useState("lbfgs");
   const cancelRef = useRef(false);
+
+  // Stop a running relaxation when the panel unmounts (modal closed);
+  // otherwise the loop keeps rewriting the structure with no way to cancel.
+  useEffect(() => {
+    return () => {
+      cancelRef.current = true;
+    };
+  }, []);
 
   const loadModelFromBuffer = useCallback(
     async (buffer, source) => {
@@ -169,6 +177,14 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           if (a > maxForce) maxForce = a;
         }
         const out = fire.step(current, forces, stress);
+        if (steps === 0) {
+          // Snapshot the pre-relax structure before the first live update,
+          // so undo (also after a cancel) restores the starting geometry.
+          pushUndo({
+            action: "fire-relax",
+            label: `${optLabel}${relaxCell ? "+cell" : ""} relax`,
+          });
+        }
         current = out.structure;
         steps += 1;
         converged = out.converged;
@@ -185,15 +201,18 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
 
       if (cancelRef.current) return;
 
-      pushUndo({
-        action: "fire-relax",
-        label: `${optLabel}${relaxCell ? "+cell" : ""} relaxed (${steps} steps, ${energy?.toFixed(2) ?? "?"} eV)`,
-      });
+      // The loop's last prediction was at the pre-step geometry; evaluate the
+      // final structure so the displayed energy/forces/stress match it.
+      const finalSys = buildSystemArrays(current);
+      await client.setSystem({ ...finalSys, periodic: true });
+      const t0 = performance.now();
+      const final = await client.predict();
+      const timing = performance.now() - t0;
       setPredictResult({
-        energy,
-        forces: null,
-        stress: null,
-        timing: 0,
+        energy: final.energy,
+        forces: final.forces ? Array.from(final.forces) : null,
+        stress: final.stress ? Array.from(final.stress) : null,
+        timing,
         numAtoms: current.sites.length,
       });
     } catch (err) {

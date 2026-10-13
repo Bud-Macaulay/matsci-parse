@@ -43,14 +43,22 @@ function cartPositions(struct) {
 }
 
 /** Calculator seam: anything returning { energies, forcesList } plugs in.
- * MLIP-backed for now (fixed cell: one setSystem, positions per image). */
-async function calcBandMlip(client, images) {
+ * MLIP-backed for now (fixed cell: one setSystem, positions per image).
+ * The endpoints never move, so their predictions are computed once and
+ * kept in `endpointCache` ({ first, last }) across steps. */
+async function calcBandMlip(client, images, endpointCache) {
   const sys = buildSystemArrays(images[0]);
   await client.setSystem({ ...sys, periodic: true });
+  const last = images.length - 1;
   const energies = [];
   const forcesList = [];
-  for (const img of images) {
-    const pred = await client.predict(cartPositions(img));
+  for (let i = 0; i <= last; i++) {
+    const key = i === 0 ? "first" : i === last ? "last" : null;
+    let pred = key ? endpointCache[key] : null;
+    if (!pred) {
+      pred = await client.predict(cartPositions(images[i]));
+      if (key) endpointCache[key] = pred;
+    }
     energies.push(pred.energy);
     forcesList.push(pred.forces);
   }
@@ -135,6 +143,7 @@ export default function NEBModal({
         inner: {},
       });
       let current = images;
+      const endpointCache = { first: null, last: null };
       let steps = 0;
       let conv = false;
       let lastMax = null;
@@ -142,6 +151,7 @@ export default function NEBModal({
         const { energies: e, forcesList } = await calcBandMlip(
           client,
           current,
+          endpointCache,
         );
         const out = neb.step(current, forcesList, e);
         current = out.images;
