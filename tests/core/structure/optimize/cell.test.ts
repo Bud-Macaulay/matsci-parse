@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createLattice, type Lattice } from "@/core/lattice/lattice";
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import { mul } from "@/core/matrix/operations/mul";
@@ -88,7 +88,6 @@ describe("cell relaxation on a skewed cell", () => {
   });
 
   it.each(OPTIMIZERS)("%s reaches the target cell and positions", (_, make) => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     const opt = make();
     let s = start();
     let converged = false;
@@ -106,20 +105,16 @@ describe("cell relaxation on a skewed cell", () => {
     s.sites.forEach((site, a) => {
       for (let d = 0; d < 3; d++) expect(site.frac[d]).toBeCloseTo(F_TARGET[a][d], 3);
     });
-    vi.restoreAllMocks();
   });
 
   it.each(OPTIMIZERS)("%s first step lowers the energy", (_, make) => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     const s = start();
     const before = model(s);
     const out = make().step(s as never, before.forces, before.stress);
     expect(model(out.structure as never).energy).toBeLessThan(before.energy);
-    vi.restoreAllMocks();
   });
 
   it.each(OPTIMIZERS)("%s carries atoms with the cell (no forces → fractional coords unchanged)", (_, make) => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     const s = start();
     const stress = new Float64Array([0.02, 0.005, 0, 0.005, -0.01, 0.003, 0, 0.003, 0.015]);
     const out = make().step(s as never, new Float64Array(9), stress);
@@ -130,6 +125,5 @@ describe("cell relaxation on a skewed cell", () => {
     moved.sites.forEach((site, a) => {
       for (let d = 0; d < 3; d++) expect(site.frac[d]).toBeCloseTo(F_START[a][d], 12);
     });
-    vi.restoreAllMocks();
   });
 });

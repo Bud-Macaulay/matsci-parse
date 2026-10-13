@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { createLattice } from "@/core/lattice/lattice";
 import { cartesian } from "@/core/site/cartesian";
 import { createFIRE } from "@/core/structure/optimize/fire";
@@ -78,34 +78,22 @@ describe("FIRE", () => {
     expect(Math.abs(b[8] - 4)).toBeLessThanOrEqual(0.08 + 1e-12);
   });
 
-  it("scales steps by mass: light atom moves further per step", () => {
+  it("ignores species: unit masses, first step is F·dt²", () => {
     const lattice = createLattice([10, 0, 0, 0, 10, 0, 0, 0, 10]);
     const s = {
       lattice,
       sites: [
-        {
-          species: { symbol: "H" },
-          frac: new Float64Array([0.1, 0.1, 0.1]),
-          properties: { mass: 1 },
-        },
-        {
-          species: { symbol: "Pb" },
-          frac: new Float64Array([0.5, 0.5, 0.5]),
-          properties: { mass: 100 },
-        },
+        { species: { symbol: "H" }, frac: new Float64Array([0.1, 0.1, 0.1]) },
+        { species: { symbol: "Pb" }, frac: new Float64Array([0.5, 0.5, 0.5]) },
       ],
     };
     const opt = createFIRE({ fmax: 1e-12 });
-    // uniform +x force on both; first step is pure v += F·dt/m, x += v·dt
     const out = opt.step(s as never, new Float64Array([1, 0, 0, 1, 0, 0]));
     const c0 = cartesian(out.structure.lattice, out.structure.sites[0]);
     const c1 = cartesian(out.structure.lattice, out.structure.sites[1]);
-    const d0 = c0[0] - 1; // started at x=1
-    const d1 = c1[0] - 5; // started at x=5
-    // velocity mixing compresses ratios toward 1, but ordering holds and
-    // the ratio stays inside (1, massRatio)
-    expect(d0 / d1).toBeGreaterThan(1);
-    expect(d0 / d1).toBeLessThan(100);
+    // dt 0.1: dx = F·dt² = 0.01 for both, whatever the element
+    expect(c0[0] - 1).toBeCloseTo(0.01, 10);
+    expect(c1[0] - 5).toBeCloseTo(0.01, 10);
   });
 
   it("throws on bad forces/stress shapes instead of stalling", () => {
@@ -121,26 +109,6 @@ describe("FIRE", () => {
     ).toThrow();
   });
 
-  it("infers mass from the periodic table by species symbol", () => {
-    const lattice = createLattice([10, 0, 0, 0, 10, 0, 0, 0, 10]);
-    const s = {
-      lattice,
-      sites: [
-        { species: { symbol: "H" }, frac: new Float64Array([0.1, 0.1, 0.1]) },
-        { species: { symbol: "Si" }, frac: new Float64Array([0.5, 0.5, 0.5]) },
-      ],
-    };
-    const opt = createFIRE({ fmax: 1e-12 });
-    const out = opt.step(s as never, new Float64Array([1, 0, 0, 1, 0, 0]));
-    const c0 = cartesian(out.structure.lattice, out.structure.sites[0]);
-    const c1 = cartesian(out.structure.lattice, out.structure.sites[1]);
-    // H (1.00794) vs Si (28.0855): lighter atom moves further, ratio
-    // inside (1, massRatio) after velocity mixing
-    const ratio = (c0[0] - 1) / (c1[0] - 5);
-    expect(ratio).toBeGreaterThan(1);
-    expect(ratio).toBeLessThan(28.0855 / 1.00794);
-  });
-
   it("respects the trust radius under huge forces", () => {
     const lattice = createLattice([10, 0, 0, 0, 10, 0, 0, 0, 10]);
     const s = makeStructure(lattice, [[0.5, 0.5, 0.5]]);
@@ -150,29 +118,5 @@ describe("FIRE", () => {
     const after = cartesian(out.structure.lattice, out.structure.sites[0]);
     expect(after[0] - before[0]).toBeLessThanOrEqual(0.2 + 1e-12);
     expect(after[0] - before[0]).toBeGreaterThan(0);
-  });
-
-  it("warns once and falls back to 1.0 for unknown species", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      const lattice = createLattice([10, 0, 0, 0, 10, 0, 0, 0, 10]);
-      const s = {
-        lattice,
-        sites: [
-          { species: { symbol: "Xx" }, frac: new Float64Array([0.1, 0.1, 0.1]) },
-        ],
-      };
-      const opt = createFIRE({ fmax: 1e-12 });
-      const before = cartesian(s.lattice, s.sites[0]);
-      const out = opt.step(s as never, new Float64Array([1, 0, 0]));
-      const after = cartesian(out.structure.lattice, out.structure.sites[0]);
-      // mass 1.0, dt 0.1: dx = F·dt²/m = 0.01
-      expect(after[0] - before[0]).toBeCloseTo(0.01, 10);
-      expect(warn).toHaveBeenCalledTimes(1);
-      opt.step(out.structure as never, new Float64Array([1, 0, 0]));
-      expect(warn).toHaveBeenCalledTimes(1);
-    } finally {
-      warn.mockRestore();
-    }
   });
 });

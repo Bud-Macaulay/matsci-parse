@@ -1,5 +1,3 @@
-import { getElement } from "@/core/data/periodictable/atomicData";
-import { elementSymbolOf } from "@/core/data/periodictable/isotopes";
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import { dot } from "@/core/matrix/operations/vector/dot";
 import { norm } from "@/core/matrix/operations/vector/norm";
@@ -52,7 +50,6 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
   let nSteps = 0;
   let vPos: Float64Array | null = null;
   const vCell = new Float64Array(9);
-  const warnedSpecies = new Set<string>();
   // Reference cell for the position coordinates while relaxing the cell.
   let refB: Matrix | null = null;
 
@@ -62,33 +59,7 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
     dt = opts.dt ?? 0.1;
     alpha = ALPHA_START;
     nSteps = 0;
-    warnedSpecies.clear();
     refB = null;
-  }
-
-  /** Per-site mass: explicit `properties.mass` wins, else the periodic table
-   * via the (isotope-stripped) species symbol. Unknown species warn once and
-   * fall back to 1.0 rather than aborting the relaxation. */
-  function massesFor(structure: Structure): Float64Array {
-    return Float64Array.from(
-      structure.sites.map((site) => {
-        const prop = (site.properties as { mass?: unknown } | undefined)?.mass;
-        if (typeof prop === "number" && Number.isFinite(prop) && prop > 0) {
-          return prop;
-        }
-        const info = getElement(elementSymbolOf(site.species.symbol));
-        if (info && Number.isFinite(info.mass) && info.mass > 0) {
-          return info.mass;
-        }
-        if (!warnedSpecies.has(site.species.symbol)) {
-          warnedSpecies.add(site.species.symbol);
-          console.warn(
-            `createFIRE: no mass for species '${site.species.symbol}', using 1.0`,
-          );
-        }
-        return 1.0;
-      }),
-    );
   }
 
   function step(
@@ -116,10 +87,8 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
       vCell.fill(0);
     }
 
-    // v += F·dt/m (per-atom masses; cell block is massless)
-    const masses = massesFor(structure);
-    for (let i = 0; i < 3 * n; i++)
-      vPos[i] += (F[i] * dt) / masses[(i / 3) | 0];
+    // v += F·dt (unit masses, as in ASE's FIRE: relaxation, not dynamics)
+    for (let i = 0; i < 3 * n; i++) vPos[i] += F[i] * dt;
     if (cellF) for (let i = 0; i < 9; i++) vCell[i] += cellF[i] * dt;
 
     // Power: adapt along the force direction.
