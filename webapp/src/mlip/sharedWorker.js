@@ -51,17 +51,22 @@ export function useSharedModel() {
   );
 }
 
+/** Flat Cartesian positions [x0, y0, z0, x1, ...] of a structure. */
+export function cartPositions(struct) {
+  const pos = new Float64Array(struct.sites.length * 3);
+  struct.sites.forEach((site, i) => {
+    pos.set(cartesian(struct.lattice, site), i * 3);
+  });
+  return pos;
+}
+
 /** Build typed arrays from a structure (no WASM calls). */
 export function buildSystemArrays(struct) {
   const nAtoms = struct.sites.length;
-  const pos = new Float64Array(nAtoms * 3);
+  const pos = cartPositions(struct);
   const atomicNums = new Int32Array(nAtoms);
   const massArr = new Float64Array(nAtoms);
   for (let i = 0; i < nAtoms; i++) {
-    const c = cartesian(struct.lattice, struct.sites[i]);
-    pos[i * 3] = c[0];
-    pos[i * 3 + 1] = c[1];
-    pos[i * 3 + 2] = c[2];
     const sym = struct.sites[i].species.symbol;
     const z = ELEMENT_BY_SYMBOL[sym] ?? 0;
     atomicNums[i] = z;

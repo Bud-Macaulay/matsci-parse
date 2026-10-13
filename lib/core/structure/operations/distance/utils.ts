@@ -37,37 +37,26 @@ export function distanceSquared(mic: Vec3, G: Float64Array): number {
  * as the assignment search in symmetry/assign.ts). Returns the fractional
  * displacement vector, not a distance. */
 export function micDisplacement(df: Vec3, G: Float64Array): Float64Array {
-  const wx = df[0] - Math.round(df[0]);
-  const wy = df[1] - Math.round(df[1]);
-  const wz = df[2] - Math.round(df[2]);
-
-  const q = (x: number, y: number, z: number): number =>
-    x * (G[0] * x + G[1] * y + G[2] * z) +
-    y * (G[3] * x + G[4] * y + G[5] * z) +
-    z * (G[6] * x + G[7] * y + G[8] * z);
-
-  let bx = wx;
-  let by = wy;
-  let bz = wz;
-  let best = q(wx, wy, wz);
+  const wrapped = minimumImage(df);
+  const best = Float64Array.from(wrapped);
+  let bestD = distanceSquared(wrapped, G);
+  const trial = new Float64Array(3);
 
   for (let i = -1; i <= 1; i++) {
     for (let j = -1; j <= 1; j++) {
       for (let k = -1; k <= 1; k++) {
         if (i === 0 && j === 0 && k === 0) continue;
-        const x = wx + i;
-        const y = wy + j;
-        const z = wz + k;
-        const d = q(x, y, z);
-        if (d < best) {
-          best = d;
-          bx = x;
-          by = y;
-          bz = z;
+        trial[0] = wrapped[0] + i;
+        trial[1] = wrapped[1] + j;
+        trial[2] = wrapped[2] + k;
+        const d = distanceSquared(trial, G);
+        if (d < bestD) {
+          bestD = d;
+          best.set(trial);
         }
       }
     }
   }
 
-  return new Float64Array([bx, by, bz]);
+  return best;
 }

@@ -1,15 +1,16 @@
-import { createLattice } from "@/core/lattice/lattice";
-import { fractional } from "@/core/site/fractional";
+import { createMatrix, type Matrix } from "@/core/matrix/matrix";
+import { dot } from "@/core/matrix/operations/vector/dot";
+import { norm } from "@/core/matrix/operations/vector/norm";
 import type { Structure } from "../structure";
 import {
   adaptScale,
   assemble,
   atomScale,
   cellScale,
-  dot,
   ensurePositiveVolume,
   forceSummary,
   hasConverged,
+  rebuild,
   type Optimizer,
   type OptimizerOptions,
   type OptStep,
@@ -34,6 +35,8 @@ export function createLBFGS(opts: OptimizerOptions = {}): Optimizer {
   let prevG: Float64Array | null = null;
   let prevGNorm = 0;
   let scale = 1;
+  // Reference cell for the position coordinates while relaxing the cell.
+  let refB: Matrix | null = null;
 
   function reset() {
     sHist = [];
@@ -43,6 +46,7 @@ export function createLBFGS(opts: OptimizerOptions = {}): Optimizer {
     prevG = null;
     prevGNorm = 0;
     scale = 1;
+    refB = null;
   }
 
   function step(
@@ -51,11 +55,13 @@ export function createLBFGS(opts: OptimizerOptions = {}): Optimizer {
     stress?: Float64Array,
   ): OptStep {
     const n = structure.sites.length;
-    const { x, g, invB } = assemble(structure, forces, stress);
     const useCell = !!stress;
-
-    if (prevX && (prevX.length !== x.length || !prevG)) reset();
-    const gNorm = Math.sqrt(dot(g, g));
+    if (prevX && prevX.length !== 3 * n + (useCell ? 9 : 0)) reset();
+    const B = structure.lattice.basis.data;
+    const basis = structure.lattice.basis;
+    const ref = useCell ? (refB ??= createMatrix(3, 3, B)) : basis;
+    const { x, g, invB } = assemble(structure, forces, stress, ref);
+    const gNorm = norm(g);
     if (prevG) scale = adaptScale(scale, gNorm, prevGNorm);
     prevGNorm = gNorm;
     if (prevX && prevG) {
@@ -109,27 +115,16 @@ export function createLBFGS(opts: OptimizerOptions = {}): Optimizer {
     const newX = new Float64Array(3 * n);
     for (let i = 0; i < 3 * n; i++) newX[i] = x[i] - dPos[i] * aPos;
 
-    const oldB = structure.lattice.basis.data;
     const newB = new Float64Array(9);
-    for (let i = 0; i < 9; i++)
-      newB[i] = oldB[i] - (dCell ? dCell[i] * aCell : 0);
-    if (useCell) ensurePositiveVolume(newB, oldB);
-    const newLattice = createLattice(newB);
-
-    const sites = structure.sites.map((site, i) => ({
-      ...site,
-      frac: fractional(
-        newLattice,
-        new Float64Array([newX[i * 3], newX[i * 3 + 1], newX[i * 3 + 2]]),
-      ),
-    }));
+    for (let i = 0; i < 9; i++) newB[i] = B[i] - (dCell ? dCell[i] * aCell : 0);
+    if (useCell) ensurePositiveVolume(newB, B);
 
     prevX = x;
     prevG = g;
 
     const { maxForce, maxStress } = forceSummary(forces, stress);
     return {
-      structure: { lattice: newLattice, sites },
+      structure: rebuild(structure, newX, newB, ref),
       converged: hasConverged(maxForce, maxStress, fmax, smax),
       maxForce,
       maxStress,

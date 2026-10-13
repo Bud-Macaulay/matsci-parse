@@ -1,12 +1,10 @@
 import { metricTensor } from "@/core/lattice/metricTensor";
 import { cartesian } from "@/core/site/cartesian";
 import { micDisplacement } from "@/core/structure/operations/distance/utils";
+import { dot } from "@/core/matrix/operations/vector/dot";
+import { norm } from "@/core/matrix/operations/vector/norm";
 import type { Structure } from "../structure";
-import {
-  dot,
-  type Optimizer,
-  type OptimizerOptions,
-} from "./common";
+import type { Optimizer, OptimizerOptions } from "./common";
 
 export interface NEBOptions {
   /** Convergence: max NEB force component over movable images. Default 0.05. */
@@ -120,15 +118,7 @@ export function createNEB(
 
       const F = forcesList[i];
       const fPar = dot(F, tau);
-      let dPlus = 0;
-      let dMinus = 0;
-      for (let j = 0; j < 3 * n; j++) {
-        const dp = R[i + 1][j] - R[i][j];
-        const dm = R[i][j] - R[i - 1][j];
-        dPlus += dp * dp;
-        dMinus += dm * dm;
-      }
-      const spring = k * (Math.sqrt(dPlus) - Math.sqrt(dMinus));
+      const spring = k * (norm(tPlus) - norm(tMinus));
       const Fneb = new Float64Array(3 * n);
       for (let j = 0; j < 3 * n; j++) {
         Fneb[j] = F[j] - fPar * tau[j] + spring * tau[j];
@@ -166,18 +156,18 @@ function improvedTangent(
     const [a, b] = ePlus > eMinus ? [dMax, dMin] : [dMin, dMax];
     for (let j = 0; j < n; j++) tau[j] = a * tPlus[j] + b * tMinus[j];
   }
-  let norm = Math.sqrt(dot(tau, tau));
-  if (!(norm > 1e-12)) {
+  let len = norm(tau);
+  if (!(len > 1e-12)) {
     // Coincident images: fall back without normalizing garbage.
     tau.set(tPlus);
-    norm = Math.sqrt(dot(tau, tau));
-    if (!(norm > 1e-12)) {
+    len = norm(tau);
+    if (!(len > 1e-12)) {
       tau.set(tMinus);
-      norm = Math.sqrt(dot(tau, tau));
-      if (!(norm > 1e-12)) return tau; // all zero: plain relaxation
+      len = norm(tau);
+      if (!(len > 1e-12)) return tau; // all zero: plain relaxation
     }
   }
-  for (let j = 0; j < n; j++) tau[j] /= norm;
+  for (let j = 0; j < n; j++) tau[j] /= len;
   return tau;
 }
 

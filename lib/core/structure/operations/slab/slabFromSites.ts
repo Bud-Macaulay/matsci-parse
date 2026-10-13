@@ -2,6 +2,7 @@ import { getDisplacement } from "../distance/getDisplacement";
 import { supercell } from "../supercell";
 import { calculateScaleFactor } from "./calculateScaleFactor";
 import { addVacuum } from "./addVacuum";
+import { cross } from "@/core/matrix/operations/vector/cross";
 import { cartesian } from "@/core/site/cartesian";
 import { fractional } from "@/core/site/fractional";
 import { gcd } from "@/core/math/numeric";
@@ -35,11 +36,7 @@ export function millerIndexFromSites(
 ): [number, number, number] {
   const f1 = getDisplacement(structure, i, j);
   const f2 = getDisplacement(structure, i, k);
-  const raw = [
-    f1[1] * f2[2] - f1[2] * f2[1],
-    f1[2] * f2[0] - f1[0] * f2[2],
-    f1[0] * f2[1] - f1[1] * f2[0],
-  ];
+  const raw = Array.from(cross(f1, f2));
   const maxAbs = Math.max(...raw.map(Math.abs));
   if (maxAbs < 1e-10) {
     throw new Error("Cannot construct plane from collinear sites");

@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect } from "react";
 import {
-  cartesian,
   createFIRE,
   createLBFGS,
   createCG,
@@ -12,6 +11,7 @@ import AtomTable from "../MainPanel/AtomTable";
 import {
   getSharedWorker,
   buildSystemArrays,
+  cartPositions,
   useSharedModel,
 } from "../mlip/sharedWorker";
 
@@ -29,17 +29,6 @@ function cloneStructure(s) {
       frac: Float64Array.from(site.frac),
     })),
   };
-}
-
-function cartPositions(struct) {
-  const pos = new Float64Array(struct.sites.length * 3);
-  for (let i = 0; i < struct.sites.length; i++) {
-    const c = cartesian(struct.lattice, struct.sites[i]);
-    pos[i * 3] = c[0];
-    pos[i * 3 + 1] = c[1];
-    pos[i * 3 + 2] = c[2];
-  }
-  return pos;
 }
 
 /** Calculator seam: anything returning { energies, forcesList } plugs in.

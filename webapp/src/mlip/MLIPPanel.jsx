@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
-  cartesian,
   createFIRE,
   createLBFGS,
   createCG,
@@ -12,6 +11,7 @@ import {
   peekSharedWorker,
   noteModelLoaded,
   buildSystemArrays,
+  cartPositions,
 } from "./sharedWorker";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/pet-mad-xs.gguf`;
@@ -138,17 +138,6 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
       let energy = null;
       let maxForce = null;
       let converged = false;
-
-      const cartPositions = (struct) => {
-        const pos = new Float64Array(struct.sites.length * 3);
-        for (let i = 0; i < struct.sites.length; i++) {
-          const c = cartesian(struct.lattice, struct.sites[i]);
-          pos[i * 3] = c[0];
-          pos[i * 3 + 1] = c[1];
-          pos[i * 3 + 2] = c[2];
-        }
-        return pos;
-      };
 
       while (steps < maxSteps && !cancelRef.current) {
         let forces;

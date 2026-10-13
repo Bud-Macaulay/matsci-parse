@@ -1,16 +1,17 @@
-import { createLattice } from "@/core/lattice/lattice";
 import { getElement } from "@/core/data/periodictable/atomicData";
 import { elementSymbolOf } from "@/core/data/periodictable/isotopes";
-import { cartesian } from "@/core/site/cartesian";
-import { fractional } from "@/core/site/fractional";
+import { createMatrix, type Matrix } from "@/core/matrix/matrix";
+import { dot } from "@/core/matrix/operations/vector/dot";
+import { norm } from "@/core/matrix/operations/vector/norm";
 import type { Structure } from "../structure";
 import {
+  assemble,
   atomScale,
-  cellGeneralizedForces,
   cellScale,
   ensurePositiveVolume,
   forceSummary,
   hasConverged,
+  rebuild,
   type Optimizer,
   type OptimizerOptions,
   type OptStep,
@@ -34,9 +35,10 @@ export interface FIREOptions extends OptimizerOptions {
  * no classes. Loop: `forces = calc(s); ({ structure: s, converged } =
  * opt.step(s, forces, stress?))`.
  *
- * Cell block: for a deformation B' = (I+ε)B, dE = V·σ:ε, so the generalized
- * force on lattice components is F_B = -V·σ·B⁻ᵀ. Stress sign
- * convention: positive = tensile.
+ * Cell block: generalized force on the lattice components is
+ * F_B = -V·B⁻ᵀ·σ (rows are lattice vectors; see cellGeneralizedForces).
+ * Positions live in a fixed reference cell, so cell moves carry the atoms
+ * along (see assemble). Stress sign convention: positive = tensile.
  */
 export function createFIRE(opts: FIREOptions = {}): Optimizer {
   const dtMax = opts.dtMax ?? 1.0;
@@ -51,6 +53,8 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
   let vPos: Float64Array | null = null;
   const vCell = new Float64Array(9);
   const warnedSpecies = new Set<string>();
+  // Reference cell for the position coordinates while relaxing the cell.
+  let refB: Matrix | null = null;
 
   function reset() {
     vPos = null;
@@ -59,6 +63,7 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
     alpha = ALPHA_START;
     nSteps = 0;
     warnedSpecies.clear();
+    refB = null;
   }
 
   /** Per-site mass: explicit `properties.mass` wins, else the periodic table
@@ -92,33 +97,18 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
     stress?: Float64Array,
   ): OptStep {
     const n = structure.sites.length;
-    if (forces.length !== 3 * n) {
-      throw new Error(`Expected forces length ${3 * n}, got ${forces.length}`);
-    }
-    if (stress && stress.length !== 9) {
-      throw new Error(`Expected stress length 9, got ${stress.length}`);
-    }
+    const B = structure.lattice.basis.data;
+    const basis = structure.lattice.basis;
+    const ref = stress ? (refB ??= createMatrix(3, 3, B)) : basis;
+    const { x, g, invB } = assemble(structure, forces, stress, ref);
 
-    // Current Cartesian positions.
-    const x = new Float64Array(3 * n);
-    for (let i = 0; i < n; i++) {
-      const c = cartesian(structure.lattice, structure.sites[i]);
-      x[i * 3] = c[0];
-      x[i * 3 + 1] = c[1];
-      x[i * 3 + 2] = c[2];
-    }
-
-    // Read-only view: F is never mutated.
-    const F = forces;
-
-    // Cell generalized forces (9 lattice components), or null.
+    // Generalized forces in optimizer coordinates (atoms, then cell).
+    const F = new Float64Array(3 * n);
+    for (let i = 0; i < 3 * n; i++) F[i] = -g[i];
     let cellF: Float64Array | null = null;
-    let invB: Float64Array | null = null;
     if (stress) {
-      ({ cellF, inv: invB } = cellGeneralizedForces(
-        structure.lattice.basis,
-        stress,
-      ));
+      cellF = new Float64Array(9);
+      for (let i = 0; i < 9; i++) cellF[i] = -g[3 * n + i];
     }
 
     if (!vPos || vPos.length !== 3 * n) {
@@ -133,9 +123,8 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
     if (cellF) for (let i = 0; i < 9; i++) vCell[i] += cellF[i] * dt;
 
     // Power: adapt along the force direction.
-    let p = 0;
-    for (let i = 0; i < 3 * n; i++) p += F[i] * vPos[i];
-    if (cellF) for (let i = 0; i < 9; i++) p += cellF[i] * vCell[i];
+    let p = dot(F, vPos);
+    if (cellF) p += dot(cellF, vCell);
 
     if (p > 0) {
       nSteps++;
@@ -143,20 +132,9 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
         dt = Math.min(dt * F_INC, dtMax);
         alpha *= F_ALPHA;
       }
-      let normF = 0;
-      let normV = 0;
-      for (let i = 0; i < 3 * n; i++) {
-        normF += F[i] * F[i];
-        normV += vPos[i] * vPos[i];
-      }
-      if (cellF) {
-        for (let i = 0; i < 9; i++) {
-          normF += cellF[i] * cellF[i];
-          normV += vCell[i] * vCell[i];
-        }
-      }
-      normF = Math.sqrt(normF);
-      normV = Math.sqrt(normV);
+      // Norms over the combined (atoms, cell) vector.
+      const normF = Math.hypot(norm(F), cellF ? norm(cellF) : 0);
+      const normV = Math.hypot(norm(vPos), cellF ? norm(vCell) : 0);
       if (normF > 0 && normV > 0) {
         const mix = (alpha * normV) / normF;
         for (let i = 0; i < 3 * n; i++) {
@@ -187,25 +165,15 @@ export function createFIRE(opts: FIREOptions = {}): Optimizer {
     let sdtCell = dt;
     if (cellF && invB) sdtCell = dt * cellScale(vCell, dt, invB, maxCellStrain);
 
-    const oldB = structure.lattice.basis.data;
     const newB = new Float64Array(9);
     for (let i = 0; i < 9; i++)
-      newB[i] = oldB[i] + (cellF ? vCell[i] * sdtCell : 0);
-    if (cellF && !ensurePositiveVolume(newB, oldB)) vCell.fill(0);
-    const newLattice = createLattice(newB);
+      newB[i] = B[i] + (cellF ? vCell[i] * sdtCell : 0);
+    if (cellF && !ensurePositiveVolume(newB, B)) vCell.fill(0);
 
-    const sites = structure.sites.map((site, i) => ({
-      ...site,
-      frac: fractional(
-        newLattice,
-        new Float64Array([newX[i * 3], newX[i * 3 + 1], newX[i * 3 + 2]]),
-      ),
-    }));
-
-    const { maxForce, maxStress } = forceSummary(F, stress);
+    const { maxForce, maxStress } = forceSummary(forces, stress);
 
     return {
-      structure: { lattice: newLattice, sites },
+      structure: rebuild(structure, newX, newB, ref),
       converged: hasConverged(maxForce, maxStress, fmax, smax),
       maxForce,
       maxStress,
