@@ -72,23 +72,25 @@ export function createFIRE(opts: FIREOptions = {}) {
    * via the (isotope-stripped) species symbol. Unknown species warn once and
    * fall back to 1.0 rather than aborting the relaxation. */
   function massesFor(structure: Structure): Float64Array {
-    return Float64Array.from(structure.sites.map((site) => {
-      const prop = (site.properties as { mass?: unknown } | undefined)?.mass;
-      if (typeof prop === "number" && Number.isFinite(prop) && prop > 0) {
-        return prop;
-      }
-      const info = getElement(elementSymbolOf(site.species.symbol));
-      if (info && Number.isFinite(info.mass) && info.mass > 0) {
-        return info.mass;
-      }
-      if (!warnedSpecies.has(site.species.symbol)) {
-        warnedSpecies.add(site.species.symbol);
-        console.warn(
-          `createFIRE: no mass for species '${site.species.symbol}', using 1.0`,
-        );
-      }
-      return 1.0;
-    }));
+    return Float64Array.from(
+      structure.sites.map((site) => {
+        const prop = (site.properties as { mass?: unknown } | undefined)?.mass;
+        if (typeof prop === "number" && Number.isFinite(prop) && prop > 0) {
+          return prop;
+        }
+        const info = getElement(elementSymbolOf(site.species.symbol));
+        if (info && Number.isFinite(info.mass) && info.mass > 0) {
+          return info.mass;
+        }
+        if (!warnedSpecies.has(site.species.symbol)) {
+          warnedSpecies.add(site.species.symbol);
+          console.warn(
+            `createFIRE: no mass for species '${site.species.symbol}', using 1.0`,
+          );
+        }
+        return 1.0;
+      }),
+    );
   }
 
   function step(
@@ -121,7 +123,8 @@ export function createFIRE(opts: FIREOptions = {}) {
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
           let acc = 0;
-          for (let k = 0; k < 3; k++) acc += stress[i * 3 + k] * invB[j * 3 + k];
+          for (let k = 0; k < 3; k++)
+            acc += stress[i * 3 + k] * invB[j * 3 + k];
           cellF[i * 3 + j] = s * acc;
         }
       }
@@ -134,7 +137,8 @@ export function createFIRE(opts: FIREOptions = {}) {
 
     // v += F·dt/m (per-atom masses; cell block is massless)
     const masses = massesFor(structure);
-    for (let i = 0; i < 3 * n; i++) vPos[i] += (F[i] * dt) / masses[(i / 3) | 0];
+    for (let i = 0; i < 3 * n; i++)
+      vPos[i] += (F[i] * dt) / masses[(i / 3) | 0];
     if (cellF) for (let i = 0; i < 9; i++) vCell[i] += cellF[i] * dt;
 
     // Power: adapt along the force direction.
@@ -198,7 +202,8 @@ export function createFIRE(opts: FIREOptions = {}) {
 
     const oldB = structure.lattice.basis.data;
     const newB = new Float64Array(9);
-    for (let i = 0; i < 9; i++) newB[i] = oldB[i] + (cellF ? vCell[i] * sdt : 0);
+    for (let i = 0; i < 9; i++)
+      newB[i] = oldB[i] + (cellF ? vCell[i] * sdt : 0);
     const newLattice = createLattice(newB);
 
     const sites = structure.sites.map((site, i) => ({

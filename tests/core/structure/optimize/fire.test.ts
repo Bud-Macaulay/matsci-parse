@@ -60,6 +60,24 @@ describe("FIRE", () => {
     expect(b[8]).toBeCloseTo(5, 2);
   });
 
+  it("caps cell strain under huge stress", () => {
+    const lattice = createLattice([4, 0, 0, 0, 4, 0, 0, 0, 4]);
+    const s = makeStructure(lattice, [[0.0, 0.0, 0.0]]);
+    const opt = createFIRE({ fmax: 1e-9, smax: 1e-9, maxCellStrain: 0.02 });
+    // 10 eV/Å³ tensile: uncapped this moves the cell 1.6Å (40%) in one step
+    const out = opt.step(
+      s,
+      new Float64Array(3),
+      new Float64Array([10, 0, 0, 0, 10, 0, 0, 0, 10]),
+    );
+    const b = (out.structure.lattice as { basis: { data: Float64Array } })
+      .basis.data;
+    // strain cap 0.02 on a=4 → max |dB| ≈ 0.08 per component
+    expect(Math.abs(b[0] - 4)).toBeLessThanOrEqual(0.08 + 1e-12);
+    expect(Math.abs(b[4] - 4)).toBeLessThanOrEqual(0.08 + 1e-12);
+    expect(Math.abs(b[8] - 4)).toBeLessThanOrEqual(0.08 + 1e-12);
+  });
+
   it("scales steps by mass: light atom moves further per step", () => {
     const lattice = createLattice([10, 0, 0, 0, 10, 0, 0, 0, 10]);
     const s = {
@@ -88,6 +106,19 @@ describe("FIRE", () => {
     // the ratio stays inside (1, massRatio)
     expect(d0 / d1).toBeGreaterThan(1);
     expect(d0 / d1).toBeLessThan(100);
+  });
+
+  it("throws on bad forces/stress shapes instead of stalling", () => {
+    const lattice = createLattice([5, 0, 0, 0, 5, 0, 0, 0, 5]);
+    const s = makeStructure(lattice, [
+      [0.1, 0.1, 0.1],
+      [0.2, 0.2, 0.2],
+    ]);
+    const opt = createFIRE({});
+    expect(() => opt.step(s, new Float64Array([1, 2, 3]))).toThrow();
+    expect(() =>
+      opt.step(s, new Float64Array(6), new Float64Array([1, 1, 1, 0, 0, 0])),
+    ).toThrow();
   });
 
   it("infers mass from the periodic table by species symbol", () => {
