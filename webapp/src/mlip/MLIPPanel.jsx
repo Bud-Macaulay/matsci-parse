@@ -1,5 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { cartesian, createFIRE, createLBFGS, createCG, volume } from "matsci-parse";
+import {
+  cartesian,
+  createFIRE,
+  createLBFGS,
+  createCG,
+  volume,
+} from "matsci-parse";
 
 import { ELEMENT_BY_SYMBOL, massForZ } from "./elements";
 import { createMlipWorker } from "./mlipWorkerClient";
@@ -7,9 +13,9 @@ import { createMlipWorker } from "./mlipWorkerClient";
 const MODEL_URL = `${import.meta.env.BASE_URL}models/pet-mad-xs.gguf`;
 
 const LOCAL_OPTIMIZERS = {
-  fire: { label: "FIRE", create: createFIRE },
   lbfgs: { label: "L-BFGS", create: createLBFGS },
   cg: { label: "CG", create: createCG },
+  fire: { label: "FIRE", create: createFIRE },
 };
 
 export default function MLIPPanel({ structure, setStructure, pushUndo }) {
@@ -25,7 +31,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [relaxCell, setRelaxCell] = useState(false);
   const [stressThreshold, setStressThreshold] = useState(0.01);
   const [cellStrain, setCellStrain] = useState(0.02);
-  const [localOpt, setLocalOpt] = useState("fire");
+  const [localOpt, setLocalOpt] = useState("lbfgs");
   const workerRef = useRef(null);
   const structureRef = useRef(structure);
   const cancelRef = useRef(false);
@@ -151,7 +157,12 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         periodic: true,
       });
 
-      const fire = LOCAL_OPTIMIZERS[localOpt].create({ fmax: forceThreshold, maxStep, smax: stressThreshold, maxCellStrain: cellStrain });
+      const fire = LOCAL_OPTIMIZERS[localOpt].create({
+        fmax: forceThreshold,
+        maxStep,
+        smax: stressThreshold,
+        maxCellStrain: cellStrain,
+      });
       const optLabel = LOCAL_OPTIMIZERS[localOpt].label;
       let current = structure;
       let steps = 0;
@@ -230,7 +241,20 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
       setRelaxing(false);
       setRelaxProgress(null);
     }
-  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold, maxStep, localOpt, relaxCell, stressThreshold, cellStrain]);
+  }, [
+    structure,
+    pushUndo,
+    setStructure,
+    getWorker,
+    buildSystemArrays,
+    maxSteps,
+    forceThreshold,
+    maxStep,
+    localOpt,
+    relaxCell,
+    stressThreshold,
+    cellStrain,
+  ]);
 
   return (
     <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 bg-white">
@@ -350,7 +374,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
       {/* Relaxation parameters */}
       {status === "ready" && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-          <label htmlFor="mlip-max-steps" className="shrink-0">Max steps:</label>
+          <label htmlFor="mlip-max-steps" className="shrink-0">
+            Max steps:
+          </label>
           <input
             id="mlip-max-steps"
             type="number"
@@ -365,7 +391,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
             className="w-20 px-2 py-0.5 rounded border border-gray-300 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
           />
           <span className="text-gray-400">|</span>
-          <label htmlFor="mlip-force-thresh" className="shrink-0">Convergence:</label>
+          <label htmlFor="mlip-force-thresh" className="shrink-0">
+            Convergence:
+          </label>
           <input
             id="mlip-force-thresh"
             type="number"
@@ -382,7 +410,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           />
           <span className="text-gray-400">eV/&#197;</span>
           <span className="text-gray-400">|</span>
-          <label htmlFor="mlip-max-step" className="shrink-0">Max step:</label>
+          <label htmlFor="mlip-max-step" className="shrink-0">
+            Max step:
+          </label>
           <input
             id="mlip-max-step"
             type="number"
@@ -399,7 +429,10 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           />
           <span className="text-gray-400">&#197;</span>
           <span className="text-gray-400">|</span>
-          <label htmlFor="mlip-relax-cell" className="shrink-0 flex items-center gap-1">
+          <label
+            htmlFor="mlip-relax-cell"
+            className="shrink-0 flex items-center gap-1"
+          >
             <input
               id="mlip-relax-cell"
               type="checkbox"
@@ -409,13 +442,15 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
               title="Disabled: this model build does not return stress"
               className="accent-teal-600"
             />
-            Cell
+            Cell (not implemented yet)
           </label>
         </div>
       )}
       {status === "ready" && relaxCell && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-          <label htmlFor="mlip-stress-thresh" className="shrink-0">Stress tol:</label>
+          <label htmlFor="mlip-stress-thresh" className="shrink-0">
+            Stress tol:
+          </label>
           <input
             id="mlip-stress-thresh"
             type="number"
@@ -432,7 +467,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           />
           <span className="text-gray-400">eV/&#197;&#179;</span>
           <span className="text-gray-400">|</span>
-          <label htmlFor="mlip-cell-strain" className="shrink-0">Strain cap:</label>
+          <label htmlFor="mlip-cell-strain" className="shrink-0">
+            Strain cap:
+          </label>
           <input
             id="mlip-cell-strain"
             type="number"
@@ -455,7 +492,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-mono">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-2 h-2 border-2 border-emerald-400 border-t-emerald-700 rounded-full animate-spin" />
-            <span className="font-semibold text-emerald-800">Relaxing&#8230;</span>
+            <span className="font-semibold text-emerald-800">
+              Relaxing&#8230;
+            </span>
             <span className="text-emerald-600 ml-auto">
               Step {relaxProgress.step}/{maxSteps}
             </span>
@@ -512,10 +551,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
                   Stress
                 </span>
                 <span className="text-right tabular-nums text-xs leading-relaxed">
-                  [
-                  {predictResult.stress
-                    .map((v) => v.toFixed(3))
-                    .join(", ")}]{" "}
+                  [{predictResult.stress.map((v) => v.toFixed(3)).join(", ")}]{" "}
                   <span className="font-sans">eV/&#197;&#179;</span>
                 </span>
               </>
