@@ -1,25 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { cartesian, fractional, createFIRE, createLBFGS, createCG } from "matsci-parse";
+import { cartesian, createFIRE, createLBFGS, createCG, volume } from "matsci-parse";
 
 import { ELEMENT_BY_SYMBOL, massForZ } from "./elements";
 import { createMlipWorker } from "./mlipWorkerClient";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/pet-mad-xs.gguf`;
 
-function relaxedStructure(structure, cartPos) {
-  const lattice = structure.lattice;
-  const newSites = structure.sites.map((site, i) => {
-    const cp = [cartPos[i * 3], cartPos[i * 3 + 1], cartPos[i * 3 + 2]];
-    const f = fractional(lattice, cp);
-    return { ...site, frac: [f[0], f[1], f[2]] };
-  });
-  return { ...structure, sites: newSites };
-}
-
 const LOCAL_OPTIMIZERS = {
-  fire: { label: "FIRE", create: (fmax) => createFIRE({ fmax }) },
-  lbfgs: { label: "L-BFGS", create: (fmax) => createLBFGS({ fmax }) },
-  cg: { label: "CG", create: (fmax) => createCG({ fmax }) },
+  fire: { label: "FIRE", create: createFIRE },
+  lbfgs: { label: "L-BFGS", create: createLBFGS },
+  cg: { label: "CG", create: createCG },
 };
 
 export default function MLIPPanel({ structure, setStructure, pushUndo }) {
@@ -31,10 +21,14 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [relaxProgress, setRelaxProgress] = useState(null);
   const [maxSteps, setMaxSteps] = useState(100);
   const [forceThreshold, setForceThreshold] = useState(0.05);
+  const [maxStep, setMaxStep] = useState(0.2);
+  const [relaxCell, setRelaxCell] = useState(false);
+  const [stressThreshold, setStressThreshold] = useState(0.01);
+  const [cellStrain, setCellStrain] = useState(0.02);
   const [localOpt, setLocalOpt] = useState("fire");
   const workerRef = useRef(null);
   const structureRef = useRef(structure);
-  const fireCancelRef = useRef(false);
+  const cancelRef = useRef(false);
 
   // Keep structure ref in sync
   useEffect(() => {
@@ -133,64 +127,8 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
     return { positions: pos, atomicNumbers: atomicNums, cell, masses: massArr };
   }, []);
 
-  const handleRelax = useCallback(async () => {
-    if (!structure) return;
-    setRelaxing(true);
-    setRelaxProgress(null);
-    setPredictResult(null);
-    setError("");
-
-    try {
-      const client = await getWorker();
-      const sys = buildSystemArrays(structure);
-      await client.setSystem({
-        ...sys,
-        periodic: true,
-      });
-
-      const t0 = performance.now();
-      const result = await client.startRelax(
-        { maxSteps, forceThreshold },
-        (stepMsg) => {
-          setRelaxProgress({
-            step: stepMsg.step,
-            energy: stepMsg.energy,
-            maxForce: stepMsg.maxForce,
-          });
-        },
-      );
-      const dt = performance.now() - t0;
-
-      // Apply the relaxed structure
-      const newStruct = relaxedStructure(structure, result.positions);
-      pushUndo({
-        action: "mlip-relax",
-        label: `Relaxed (${result.steps} steps, ${result.energy.toFixed(2)} eV)`,
-      });
-      setStructure(newStruct);
-      setRelaxProgress(null);
-
-      // Get forces on the relaxed structure for display
-      const relaxedSys = buildSystemArrays(newStruct);
-      await client.setSystem({ ...relaxedSys, periodic: true });
-      const finalResult = await client.predict();
-      setPredictResult({
-        energy: finalResult.energy,
-        forces: finalResult.forces ? Array.from(finalResult.forces) : null,
-        stress: finalResult.stress ? Array.from(finalResult.stress) : null,
-        timing: dt,
-        numAtoms: newStruct.sites.length,
-      });
-    } catch (err) {
-      setError(`Relaxation failed: ${err?.message ?? err}`);
-    } finally {
-      setRelaxing(false);
-      setRelaxProgress(null);
-    }
-  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold]);
-
   const handleCancelRelax = useCallback(() => {
-    fireCancelRef.current = true;
+    cancelRef.current = true;
     if (workerRef.current) workerRef.current.stop();
   }, []);
 
@@ -203,7 +141,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
     setRelaxProgress(null);
     setPredictResult(null);
     setError("");
-    fireCancelRef.current = false;
+    cancelRef.current = false;
 
     try {
       const client = await getWorker();
@@ -213,7 +151,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         periodic: true,
       });
 
-      const fire = LOCAL_OPTIMIZERS[localOpt].create(forceThreshold);
+      const fire = LOCAL_OPTIMIZERS[localOpt].create({ fmax: forceThreshold, maxStep, smax: stressThreshold, maxCellStrain: cellStrain });
       const optLabel = LOCAL_OPTIMIZERS[localOpt].label;
       let current = structure;
       let steps = 0;
@@ -232,31 +170,52 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         return pos;
       };
 
-      while (steps < maxSteps && !fireCancelRef.current) {
-        // Predict at the CURRENT positions — the worker holds the initial
-        // geometry from setSystem, so it must be told where we are.
-        const pred = await client.predict(cartPositions(current));
-        energy = pred.energy;
-        const forces = pred.forces;
+      while (steps < maxSteps && !cancelRef.current) {
+        let forces;
+        let stress;
+        if (relaxCell) {
+          // Cell moves too: push positions+cell, then predict in place.
+          // The worker has no per-step cell arg, so this costs an extra
+          // round trip per step — fine for a playground.
+          const sys = buildSystemArrays(current);
+          await client.setSystem({ ...sys, periodic: true });
+          const pred = await client.predict();
+          energy = pred.energy;
+          forces = pred.forces;
+          stress = pred.stress ?? undefined;
+        } else {
+          // Predict at the CURRENT positions — the worker holds the initial
+          // geometry from setSystem, so it must be told where we are.
+          const pred = await client.predict(cartPositions(current));
+          energy = pred.energy;
+          forces = pred.forces;
+          stress = undefined;
+        }
         maxForce = 0;
         for (let i = 0; i < forces.length; i++) {
           const a = Math.abs(forces[i]);
           if (a > maxForce) maxForce = a;
         }
-        const out = fire.step(current, forces);
+        const out = fire.step(current, forces, stress);
         current = out.structure;
         steps += 1;
         converged = out.converged;
         setStructure(current);
-        setRelaxProgress({ step: steps, energy, maxForce });
+        setRelaxProgress({
+          step: steps,
+          energy,
+          maxForce,
+          maxStress: out.maxStress,
+          volume: volume(current),
+        });
         if (converged) break;
       }
 
-      if (fireCancelRef.current) return;
+      if (cancelRef.current) return;
 
       pushUndo({
         action: "fire-relax",
-        label: `${optLabel} relaxed (${steps} steps, ${energy?.toFixed(2) ?? "?"} eV)`,
+        label: `${optLabel}${relaxCell ? "+cell" : ""} relaxed (${steps} steps, ${energy?.toFixed(2) ?? "?"} eV)`,
       });
       setPredictResult({
         energy,
@@ -271,7 +230,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
       setRelaxing(false);
       setRelaxProgress(null);
     }
-  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold, localOpt]);
+  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold, maxStep, localOpt, relaxCell, stressThreshold, cellStrain]);
 
   return (
     <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 bg-white">
@@ -357,20 +316,6 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
       <div className="h-px bg-gray-200" />
 
       {/* Action buttons */}
-      <button
-        onClick={relaxing ? handleCancelRelax : handleRelax}
-        disabled={status !== "ready" || relaxing || !structure}
-        className="w-full px-3 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {relaxing ? (
-          <span className="flex items-center justify-center gap-2">
-            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            Cancel
-          </span>
-        ) : (
-          "Relax"
-        )}
-      </button>
       <div className="flex gap-2">
         <select
           value={localOpt}
@@ -386,18 +331,25 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           ))}
         </select>
         <button
-          onClick={handleFireRelax}
-          disabled={status !== "ready" || relaxing || !structure}
+          onClick={relaxing ? handleCancelRelax : handleFireRelax}
+          disabled={status !== "ready" || !structure}
           title="Relax with the local optimizer (live trajectory)"
           className="flex-1 px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Relax ({LOCAL_OPTIMIZERS[localOpt].label})
+          {relaxing ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Cancel
+            </span>
+          ) : (
+            `Relax (${LOCAL_OPTIMIZERS[localOpt].label})`
+          )}
         </button>
       </div>
 
       {/* Relaxation parameters */}
       {status === "ready" && (
-        <div className="flex items-center gap-2 text-xs text-gray-600">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
           <label htmlFor="mlip-max-steps" className="shrink-0">Max steps:</label>
           <input
             id="mlip-max-steps"
@@ -429,6 +381,72 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
             className="w-20 px-2 py-0.5 rounded border border-gray-300 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
           />
           <span className="text-gray-400">eV/&#197;</span>
+          <span className="text-gray-400">|</span>
+          <label htmlFor="mlip-max-step" className="shrink-0">Max step:</label>
+          <input
+            id="mlip-max-step"
+            type="number"
+            min={0.01}
+            max={2}
+            step={0.05}
+            value={maxStep}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (v > 0) setMaxStep(v);
+            }}
+            disabled={relaxing}
+            className="w-20 px-2 py-0.5 rounded border border-gray-300 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
+          />
+          <span className="text-gray-400">&#197;</span>
+          <span className="text-gray-400">|</span>
+          <label htmlFor="mlip-relax-cell" className="shrink-0 flex items-center gap-1">
+            <input
+              id="mlip-relax-cell"
+              type="checkbox"
+              checked={relaxCell}
+              onChange={(e) => setRelaxCell(e.target.checked)}
+              disabled={true}
+              title="Disabled: this model build does not return stress"
+              className="accent-teal-600"
+            />
+            Cell
+          </label>
+        </div>
+      )}
+      {status === "ready" && relaxCell && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+          <label htmlFor="mlip-stress-thresh" className="shrink-0">Stress tol:</label>
+          <input
+            id="mlip-stress-thresh"
+            type="number"
+            min={0.0001}
+            max={10}
+            step={0.005}
+            value={stressThreshold}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (v > 0) setStressThreshold(v);
+            }}
+            disabled={relaxing}
+            className="w-20 px-2 py-0.5 rounded border border-gray-300 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
+          />
+          <span className="text-gray-400">eV/&#197;&#179;</span>
+          <span className="text-gray-400">|</span>
+          <label htmlFor="mlip-cell-strain" className="shrink-0">Strain cap:</label>
+          <input
+            id="mlip-cell-strain"
+            type="number"
+            min={0.001}
+            max={0.5}
+            step={0.005}
+            value={cellStrain}
+            onChange={(e) => {
+              const v = parseFloat(e.target.value);
+              if (v > 0) setCellStrain(v);
+            }}
+            disabled={relaxing}
+            className="w-20 px-2 py-0.5 rounded border border-gray-300 text-xs font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
+          />
         </div>
       )}
 
@@ -451,6 +469,22 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
             <span className="text-right">
               {relaxProgress.maxForce?.toFixed(4) ?? "\u2014"} eV/&#197;
             </span>
+            {relaxProgress.maxStress != null && (
+              <>
+                <span>Max |σ|</span>
+                <span className="text-right">
+                  {relaxProgress.maxStress.toExponential(2)} eV/&#197;&#179;
+                </span>
+              </>
+            )}
+            {relaxProgress.volume != null && (
+              <>
+                <span>Volume</span>
+                <span className="text-right">
+                  {relaxProgress.volume.toFixed(3)} &#197;&#179;
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -55,8 +55,9 @@ export function createLBFGS(opts: OptimizerOptions = {}): Optimizer {
     const useCell = !!stress;
 
     if (prevX && (prevX.length !== x.length || !prevG)) reset();
-    if (prevG) scale = adaptScale(scale, Math.sqrt(dot(g, g)), prevGNorm);
-    prevGNorm = Math.sqrt(dot(g, g));
+    const gNorm = Math.sqrt(dot(g, g));
+    if (prevG) scale = adaptScale(scale, gNorm, prevGNorm);
+    prevGNorm = gNorm;
     if (prevX && prevG) {
       const s = new Float64Array(x.length);
       const y = new Float64Array(x.length);

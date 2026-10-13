@@ -45,11 +45,12 @@ export function createCG(opts: OptimizerOptions = {}): Optimizer {
     const useCell = !!stress;
 
     if (prevG && (!prevD || prevD.length !== g.length)) reset();
-    if (prevG) scale = adaptScale(scale, Math.sqrt(dot(g, g)), prevGNorm);
-    prevGNorm = Math.sqrt(dot(g, g));
+    const gNorm = Math.sqrt(dot(g, g));
+    if (prevG) scale = adaptScale(scale, gNorm, prevGNorm);
+    prevGNorm = gNorm;
     let d = new Float64Array(g.length);
     if (prevG && prevD) {
-      const gg = dot(g, g);
+      const gg = gNorm * gNorm;
       const denom = dot(prevG, prevG);
       let beta = denom > 0 ? (gg - dot(g, prevG)) / denom : 0;
       if (beta < 0 || Math.abs(dot(g, prevG)) > 0.2 * gg) beta = 0;
