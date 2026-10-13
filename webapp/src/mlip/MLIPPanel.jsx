@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   cartesian,
   createFIRE,
@@ -7,8 +7,12 @@ import {
   volume,
 } from "matsci-parse";
 
-import { ELEMENT_BY_SYMBOL, massForZ } from "./elements";
-import { createMlipWorker } from "./mlipWorkerClient";
+import {
+  getSharedWorker,
+  peekSharedWorker,
+  noteModelLoaded,
+  buildSystemArrays,
+} from "./sharedWorker";
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/pet-mad-xs.gguf`;
 
@@ -32,41 +36,18 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [stressThreshold, setStressThreshold] = useState(0.01);
   const [cellStrain, setCellStrain] = useState(0.02);
   const [localOpt, setLocalOpt] = useState("lbfgs");
-  const workerRef = useRef(null);
-  const structureRef = useRef(structure);
   const cancelRef = useRef(false);
-
-  // Keep structure ref in sync
-  useEffect(() => {
-    structureRef.current = structure;
-  }, [structure]);
-
-  // Cleanup worker on unmount
-  useEffect(() => {
-    return () => {
-      if (workerRef.current) {
-        workerRef.current.destroy();
-        workerRef.current = null;
-      }
-    };
-  }, []);
-
-  const getWorker = useCallback(async () => {
-    if (workerRef.current?.isReady) return workerRef.current;
-    const client = createMlipWorker();
-    await client.init();
-    workerRef.current = client;
-    return client;
-  }, []);
 
   const loadModelFromBuffer = useCallback(
     async (buffer, source) => {
       setStatus("loading");
       setError("");
       try {
-        const client = await getWorker();
+        const client = await getSharedWorker();
         const info = await client.loadModel(buffer);
-        setModelInfo({ source, type: info.modelType, cutoff: info.cutoff });
+        const model = { source, type: info.modelType, cutoff: info.cutoff };
+        setModelInfo(model);
+        noteModelLoaded(model);
         setStatus("ready");
         setPredictResult(null);
       } catch (err) {
@@ -74,7 +55,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         setStatus("error");
       }
     },
-    [getWorker],
+    [],
   );
 
   const loadBundledModel = useCallback(async () => {
@@ -113,29 +94,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
     [loadModelFromBuffer],
   );
 
-  /** Build typed arrays from the current structure (no WASM calls). */
-  const buildSystemArrays = useCallback((struct) => {
-    const nAtoms = struct.sites.length;
-    const pos = new Float64Array(nAtoms * 3);
-    const atomicNums = new Int32Array(nAtoms);
-    const massArr = new Float64Array(nAtoms);
-    for (let i = 0; i < nAtoms; i++) {
-      const c = cartesian(struct.lattice, struct.sites[i]);
-      pos[i * 3] = c[0];
-      pos[i * 3 + 1] = c[1];
-      pos[i * 3 + 2] = c[2];
-      const sym = struct.sites[i].species.symbol;
-      const z = ELEMENT_BY_SYMBOL[sym] ?? 0;
-      atomicNums[i] = z;
-      massArr[i] = massForZ(z);
-    }
-    const cell = new Float64Array(struct.lattice.basis.data);
-    return { positions: pos, atomicNumbers: atomicNums, cell, masses: massArr };
-  }, []);
-
   const handleCancelRelax = useCallback(() => {
     cancelRef.current = true;
-    if (workerRef.current) workerRef.current.stop();
+    peekSharedWorker()?.stop();
   }, []);
 
   /** Relax with a local optimizer (lib/core/structure/optimize),
@@ -150,7 +111,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
     cancelRef.current = false;
 
     try {
-      const client = await getWorker();
+      const client = await getSharedWorker();
       const sys = buildSystemArrays(structure);
       await client.setSystem({
         ...sys,
@@ -245,8 +206,6 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
     structure,
     pushUndo,
     setStructure,
-    getWorker,
-    buildSystemArrays,
     maxSteps,
     forceThreshold,
     maxStep,
@@ -272,12 +231,9 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           </div>
           <button
             onClick={() => {
-              if (workerRef.current) {
-                workerRef.current.destroy();
-                workerRef.current = null;
-              }
               setStatus("idle");
               setModelInfo(null);
+              noteModelLoaded(null);
               setPredictResult(null);
             }}
             className="text-xs text-gray-400 underline hover:text-gray-700 shrink-0"
@@ -370,7 +326,6 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           )}
         </button>
       </div>
-
       {/* Relaxation parameters */}
       {status === "ready" && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">

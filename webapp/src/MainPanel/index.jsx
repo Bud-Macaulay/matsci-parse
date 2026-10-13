@@ -19,11 +19,16 @@ import AddAtomPanel from "./AddAtomPanel";
 import DistanceMatrixPanel from "./DistanceMatrixPanel";
 import SlabModal from "./SlabModal";
 import QEInputModal from "../common/QEInputModal";
+import Modal from "../common/Modal";
+import MLIPPanel from "../mlip/MLIPPanel";
+import NEBModal from "../neb/NEBModal";
 import BrillouinZoneModal from "./BrillouinZoneModal";
 import XrdModal from "./XrdModal";
 
 export default function MainPanel({ tab, updateTab }) {
   const [speciesModal, setSpeciesModal] = useState({ open: false, mode: null });
+  const [nebOpen, setNebOpen] = useState(false);
+  const [mlipOpen, setMlipOpen] = useState(false);
 
   const pushUndo = useCallback(
     (meta = {}) => {
@@ -193,6 +198,47 @@ export default function MainPanel({ tab, updateTab }) {
               pushUndo={pushUndo}
             />
           </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMlipOpen(true)}
+              disabled={!structure}
+              title="Machine-learning interatomic potential calculator"
+              className="buttonSimple blue"
+            >
+              MLIP Calculator
+            </button>
+            <button
+              onClick={() => setNebOpen(true)}
+              disabled={!structure}
+              title="Nudged elastic band between two endpoints"
+              className="buttonSimple blue"
+            >
+              NEB…
+            </button>
+          </div>
+          {mlipOpen && (
+            <Modal
+              open={mlipOpen}
+              onClose={() => setMlipOpen(false)}
+              title="MLIP Calculator"
+              maxWidth="max-w-md"
+            >
+              <MLIPPanel
+                structure={structure}
+                setStructure={setStructure}
+                pushUndo={pushUndo}
+              />
+            </Modal>
+          )}
+          {nebOpen && (
+            <NEBModal
+              open={nebOpen}
+              onClose={() => setNebOpen(false)}
+              structure={structure}
+              pushUndo={pushUndo}
+              setStructure={setStructure}
+            />
+          )}
           <QEInputModal structure={structure} />
           <BrillouinZoneModal structure={structure} />
           <XrdModal structure={structure} />
