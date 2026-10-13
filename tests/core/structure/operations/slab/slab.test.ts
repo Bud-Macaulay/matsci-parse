@@ -13,7 +13,16 @@ import { reorientToNormal } from "@/core/structure/operations/slab/reorientToNor
 import { addVacuum } from "@/core/structure/operations/slab/addVacuum";
 import { calculateScaleFactor } from "@/core/structure/operations/slab/calculateScaleFactor";
 import { slabFromMillerIndex } from "@/core/structure/operations/slab/slabFromMillerIndex";
-import { slabFromSites } from "@/core/structure/operations/slab/slabFromSites";
+import {
+  slabFromSites,
+  millerIndexFromSites,
+} from "@/core/structure/operations/slab/slabFromSites";
+import {
+  planeFromSites,
+  planeEquation,
+  distanceFromPlane,
+} from "@/core/structure/operations/geometry/plane";
+import { cross } from "@/core/matrix/operations/vector/cross";
 import { getDistance } from "@/core/structure/operations/distance/getDistance";
 import type { Structure } from "@/core/structure/structure";
 
@@ -79,7 +88,7 @@ describe("reorientToNormal", () => {
     expect(b[8]).toBeCloseTo(0, 8);
   });
 
-  it("preserves Cartesian positions", () => {
+  it("aligns c with the normal and preserves pairwise distances (rigid rotation)", () => {
     const s = cubicSi();
     const normals = [
       new Float64Array([1, 0, 0]),
@@ -90,14 +99,61 @@ describe("reorientToNormal", () => {
     ];
     for (const n of normals) {
       const r = reorientToNormal(s, n);
+      // c parallel to n
+      const b = r.lattice.basis.data;
+      const c = [b[6], b[7], b[8]];
+      const nn = norm(n);
+      const cn = norm(new Float64Array(c));
+      const cos = (c[0] * n[0] + c[1] * n[1] + c[2] * n[2]) / cn / nn;
+      expect(Math.abs(cos)).toBeCloseTo(1, 6);
+      // same c length (rotation, not rescaling)
+      expect(cn).toBeCloseTo(5.43, 8);
+      // rigid: pairwise Cartesian distances unchanged
       for (let i = 0; i < s.sites.length; i++) {
-        const cOrig = toCart(s.lattice, s.sites[i].frac);
-        const cNew = toCart(r.lattice, r.sites[i].frac);
-        for (let j = 0; j < 3; j++) {
-          expect(cNew[j]).toBeCloseTo(cOrig[j], 8);
+        for (let j = i + 1; j < s.sites.length; j++) {
+          const dOrig = norm(
+            new Float64Array([
+              toCart(s.lattice, s.sites[i].frac)[0] -
+                toCart(s.lattice, s.sites[j].frac)[0],
+              toCart(s.lattice, s.sites[i].frac)[1] -
+                toCart(s.lattice, s.sites[j].frac)[1],
+              toCart(s.lattice, s.sites[i].frac)[2] -
+                toCart(s.lattice, s.sites[j].frac)[2],
+            ]),
+          );
+          const dNew = norm(
+            new Float64Array([
+              toCart(r.lattice, r.sites[i].frac)[0] -
+                toCart(r.lattice, r.sites[j].frac)[0],
+              toCart(r.lattice, r.sites[i].frac)[1] -
+                toCart(r.lattice, r.sites[j].frac)[1],
+              toCart(r.lattice, r.sites[i].frac)[2] -
+                toCart(r.lattice, r.sites[j].frac)[2],
+            ]),
+          );
+          expect(dNew).toBeCloseTo(dOrig, 8);
         }
       }
     }
+  });
+
+  it("aligns c with the normal on a skewed cell", () => {
+    const s: Structure = {
+      lattice: createLattice([3, 0, 0, 1, 3, 0, 0.5, 0.5, 4]),
+      sites: [
+        { species: { symbol: "Si" }, frac: new Float64Array([0.1, 0.2, 0.3]) },
+        { species: { symbol: "Si" }, frac: new Float64Array([0.6, 0.15, 0.7]) },
+      ],
+    };
+    const n = new Float64Array([0.2, 0.3, 1]);
+    const r = reorientToNormal(s, n);
+    const b = r.lattice.basis.data;
+    const c = [b[6], b[7], b[8]];
+    const cos =
+      (c[0] * n[0] + c[1] * n[1] + c[2] * n[2]) /
+      norm(new Float64Array(c)) /
+      norm(n);
+    expect(Math.abs(cos)).toBeCloseTo(1, 6);
   });
 });
 
@@ -352,5 +408,71 @@ describe("slabFromSites", () => {
     for (const site of slab.sites) {
       expect(site.species.symbol).toBe("Si");
     }
+  });
+
+  // Old behaviour rotated c onto the plane normal, which leaves a and b out
+  // of the plane: the surface was not the chosen plane.
+  function expectSurfaceOnPlane(s: Structure, i: number, j: number, k: number) {
+    const plane = planeFromSites(s, i, j, k);
+    const eq = planeEquation(plane);
+    const slab = slabFromSites(s, i, j, k, { layers: 2, vacuum: 10 });
+    const b = slab.lattice.basis.data;
+
+    // Surface (a × b) is parallel to the plane normal.
+    const ab = cross(
+      new Float64Array([b[0], b[1], b[2]]),
+      new Float64Array([b[3], b[4], b[5]]),
+    );
+    expect(Math.abs(dot(ab, plane.normal)) / norm(ab)).toBeCloseTo(1, 8);
+
+    // Bottom termination is the chosen plane, and the whole slab sits on one
+    // side of it (same Cartesian frame as the bulk).
+    const bottom = slab.sites.filter((site) => site.frac[2] < 1e-8);
+    expect(bottom.length).toBeGreaterThan(0);
+    const dists = slab.sites.map((site) =>
+      distanceFromPlane(toCart(slab.lattice, site.frac), eq),
+    );
+    for (const site of bottom) {
+      const dist = distanceFromPlane(toCart(slab.lattice, site.frac), eq);
+      expect(Math.abs(dist)).toBeLessThan(1e-8);
+    }
+    const sign = Math.sign(dists.reduce((acc, d) => (Math.abs(d) > Math.abs(acc) ? d : acc), 0));
+    for (const d of dists) expect(d * sign).toBeGreaterThan(-1e-8);
+  }
+
+  it("terminates on the chosen (111)-type plane", () => {
+    expectSurfaceOnPlane(cubicSi(), 0, 1, 2);
+  });
+
+  it("terminates on the chosen plane in a skewed cell", () => {
+    const s: Structure = {
+      lattice: createLattice([3, 0, 0, 1, 3, 0, 0.5, 0.5, 4]),
+      sites: [
+        { species: { symbol: "Si" }, frac: new Float64Array([0, 0, 0]) },
+        { species: { symbol: "O" }, frac: new Float64Array([0.5, 0, 0]) },
+        { species: { symbol: "O" }, frac: new Float64Array([0.5, 0.5, 0.5]) },
+        { species: { symbol: "Si" }, frac: new Float64Array([0.25, 0.25, 0.75]) },
+      ],
+    };
+    // Minimum image puts site 2 at (0.5, 0.5, -0.5) relative to site 0.
+    expect(millerIndexFromSites(s, 0, 1, 2)).toEqual([0, -1, -1]);
+    expectSurfaceOnPlane(s, 0, 1, 2);
+  });
+
+  it("finds Miller indices of the plane through the sites", () => {
+    const hkl = millerIndexFromSites(cubicSi(), 0, 1, 2);
+    expect(hkl.map(Math.abs)).toEqual([1, 1, 1]);
+  });
+
+  it("throws for a plane that is not a lattice plane", () => {
+    const s: Structure = {
+      lattice: createLattice([4, 0, 0, 0, 4, 0, 0, 0, 4]),
+      sites: [
+        { species: { symbol: "Si" }, frac: new Float64Array([0, 0, 0]) },
+        { species: { symbol: "Si" }, frac: new Float64Array([0.1234567, 0.2718281, 0.05]) },
+        { species: { symbol: "Si" }, frac: new Float64Array([0.3141592, 0.0577215, 0.4142135]) },
+      ],
+    };
+    expect(() => slabFromSites(s, 0, 1, 2)).toThrow(/lattice plane/);
   });
 });

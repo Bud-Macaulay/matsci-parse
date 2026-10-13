@@ -154,9 +154,11 @@ export async function transformAP(
   );
   const absPositions = mulRows(positions, lattice);
   const invFinal = gjInverse(matrixFromRowMajor(finalRows.flat()));
+  // f_new_col = (B⁻¹)ᵀ · p_col (row convention: p_row = f_row · B).
+  const invFinalT = transpose(invFinal);
   const newPositions = absPositions.map((p) => {
     const v = createVector(p);
-    const res = mul(invFinal, v).data;
+    const res = mul(invFinalT, v).data;
     return [res[0], res[1], res[2]];
   });
 

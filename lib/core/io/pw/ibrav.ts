@@ -42,11 +42,11 @@ export function ibravToLattice(
   let cosbc: number;
 
   if (ABC) {
-    // A,B,C in Angstrom → convert to Bohr
+    // A,B,C in Angstrom → convert to Bohr (1 Bohr = 0.529177 Å)
     const [Av, Bv, Cv, cosAB, cosAC, cosBC] = ABC;
-    a = Av * BOHR_PER_ANGSTROM;
-    b = Bv * BOHR_PER_ANGSTROM;
-    c = Cv * BOHR_PER_ANGSTROM;
+    a = Av / 0.529177;
+    b = Bv / 0.529177;
+    c = Cv / 0.529177;
     cosab = cosAB;
     cosac = cosAC;
     cosbc = cosBC;
