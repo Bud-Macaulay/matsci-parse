@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { cartesian, fractional, createFIRE } from "matsci-parse";
+import { cartesian, fractional, createFIRE, createLBFGS, createCG } from "matsci-parse";
 
 import { ELEMENT_BY_SYMBOL, massForZ } from "./elements";
 import { createMlipWorker } from "./mlipWorkerClient";
@@ -16,6 +16,12 @@ function relaxedStructure(structure, cartPos) {
   return { ...structure, sites: newSites };
 }
 
+const LOCAL_OPTIMIZERS = {
+  fire: { label: "FIRE", create: (fmax) => createFIRE({ fmax }) },
+  lbfgs: { label: "L-BFGS", create: (fmax) => createLBFGS({ fmax }) },
+  cg: { label: "CG", create: (fmax) => createCG({ fmax }) },
+};
+
 export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [status, setStatus] = useState("idle");
   const [modelInfo, setModelInfo] = useState(null);
@@ -25,6 +31,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
   const [relaxProgress, setRelaxProgress] = useState(null);
   const [maxSteps, setMaxSteps] = useState(100);
   const [forceThreshold, setForceThreshold] = useState(0.05);
+  const [localOpt, setLocalOpt] = useState("fire");
   const workerRef = useRef(null);
   const structureRef = useRef(structure);
   const fireCancelRef = useRef(false);
@@ -187,7 +194,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
     if (workerRef.current) workerRef.current.stop();
   }, []);
 
-  /** Relax with the local FIRE optimizer (lib/core/structure/optimize),
+  /** Relax with a local optimizer (lib/core/structure/optimize),
    * driven by MLIP forces. Updates the structure live so the trajectory
    * is visible in the visualizer. Positions-only. */
   const handleFireRelax = useCallback(async () => {
@@ -206,7 +213,8 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         periodic: true,
       });
 
-      const fire = createFIRE({ fmax: forceThreshold });
+      const fire = LOCAL_OPTIMIZERS[localOpt].create(forceThreshold);
+      const optLabel = LOCAL_OPTIMIZERS[localOpt].label;
       let current = structure;
       let steps = 0;
       let energy = null;
@@ -248,7 +256,7 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
 
       pushUndo({
         action: "fire-relax",
-        label: `FIRE relaxed (${steps} steps, ${energy?.toFixed(2) ?? "?"} eV)`,
+        label: `${optLabel} relaxed (${steps} steps, ${energy?.toFixed(2) ?? "?"} eV)`,
       });
       setPredictResult({
         energy,
@@ -258,12 +266,12 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
         numAtoms: current.sites.length,
       });
     } catch (err) {
-      setError(`FIRE relaxation failed: ${err?.message ?? err}`);
+      setError(`Local relaxation failed: ${err?.message ?? err}`);
     } finally {
       setRelaxing(false);
       setRelaxProgress(null);
     }
-  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold]);
+  }, [structure, pushUndo, setStructure, getWorker, buildSystemArrays, maxSteps, forceThreshold, localOpt]);
 
   return (
     <div className="flex flex-col gap-2 p-3 rounded-lg border border-gray-200 bg-white">
@@ -363,14 +371,29 @@ export default function MLIPPanel({ structure, setStructure, pushUndo }) {
           "Relax"
         )}
       </button>
-      <button
-        onClick={handleFireRelax}
-        disabled={status !== "ready" || relaxing || !structure}
-        title="Relax with the local FIRE optimizer (live trajectory)"
-        className="w-full px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        Relax (FIRE)
-      </button>
+      <div className="flex gap-2">
+        <select
+          value={localOpt}
+          onChange={(e) => setLocalOpt(e.target.value)}
+          disabled={relaxing}
+          title="Local optimizer (live trajectory)"
+          className="px-2 py-2 rounded-md border border-gray-300 text-sm font-semibold text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+        >
+          {Object.entries(LOCAL_OPTIMIZERS).map(([key, { label }]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={handleFireRelax}
+          disabled={status !== "ready" || relaxing || !structure}
+          title="Relax with the local optimizer (live trajectory)"
+          className="flex-1 px-3 py-2 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Relax ({LOCAL_OPTIMIZERS[localOpt].label})
+        </button>
+      </div>
 
       {/* Relaxation parameters */}
       {status === "ready" && (
