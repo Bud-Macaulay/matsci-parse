@@ -4,6 +4,7 @@ import { volume } from "../lattice/volume";
 import { parameters } from "../lattice/parameters";
 
 import { cartesian } from "../site/cartesian";
+import { splitSite } from "../site/disorder";
 
 /** A single pymatgen species entry (an element with occupancy). */
 export interface PymatgenSpecies {
@@ -50,23 +51,24 @@ export interface PymatgenStructure {
 export function fromPymatgen(data: PymatgenStructure): Structure {
   const lattice = createLattice(new Float64Array(data.lattice.matrix.flat()));
 
-  const sites = data.sites.map((site) => {
-    const primary = site.species[0];
-
-    if (primary === undefined) {
+  const sites = data.sites.flatMap((site) => {
+    if (site.species.length === 0) {
       throw new Error("Site has no species");
     }
 
-    const label = site.label ?? primary.element;
+    const label = site.label ?? site.species[0].element;
 
-    return {
+    // Multi-species (disordered) sites expand to split co-located sites.
+    return splitSite(
+      site.abc,
+      site.species.map((s) => ({ symbol: s.element, fraction: s.occu })),
+    ).map((split) => ({
+      ...split,
       species: {
-        symbol: primary.element,
-        properties: { occu: primary.occu, label },
+        ...split.species,
+        properties: { ...split.species.properties, label },
       },
-
-      frac: new Float64Array(site.abc),
-    };
+    }));
   });
 
   const out: Structure & { charge?: number; properties?: unknown } = {
