@@ -1,0 +1,26 @@
+{
+  "name": "matsci-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "HTTP API that auto-exposes matsci-parse library functions as POST /api/<functionName> endpoints.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "start:structure-io": "API_GROUPS=structure,io API_FLAT_ROUTES=false tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "docs:extract": "tsx scripts/extract-fn-docs.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "matsci-parse": "workspace:*",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/swagger-ui-express": "^4.1.8",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
