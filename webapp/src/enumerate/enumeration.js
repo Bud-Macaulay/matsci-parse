@@ -3,7 +3,7 @@ import {
   createDisorderedSite,
   elementBySymbol,
   enumerateDerivativeStructures,
-  ewaldSum,
+  ewaldEnergies,
   getSymmetry,
   reducedFormula,
   toCIF,
@@ -62,7 +62,9 @@ export function parseOccupancy(text) {
 
 /** Occupancy as editable text ("Na:0.5 K:0.5"). */
 export function formatOccupancy(occupancy) {
-  return occupancy.map((o) => `${o.symbol}:${+o.fraction.toFixed(6)}`).join(" ");
+  return occupancy
+    .map((o) => `${o.symbol}:${+o.fraction.toFixed(6)}`)
+    .join(" ");
 }
 
 /**
@@ -165,24 +167,39 @@ export async function enumerateOrderings(parent, { maxSize, maxCombinations }) {
 }
 
 /**
- * Ewald energy of every row (eV, and eV/atom). Works in time slices so the
- * page stays responsive; `onProgress(done, total)` reports along the way.
+ * Ewald energy of every row (eV, and eV/atom). Orderings of one supercell
+ * share their geometry, so `ewaldEnergies` builds one charge-independent
+ * kernel per supercell and scores each ordering as q^T K q. Runs one
+ * supercell size at a time, yielding in between so the page stays
+ * responsive; `onProgress(done, total)` reports along the way.
  */
 export async function rankByEwald(rows, charges, onProgress) {
-  const out = [];
-  let last = performance.now();
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const q = row.structure.sites.map((s) => charges[s.species.symbol] ?? 0);
-    const { total } = ewaldSum(row.structure, q);
-    out.push({ ...row, energy: total, perAtom: total / row.nAtoms });
-    if (performance.now() - last > 30) {
-      onProgress?.(i + 1, rows.length);
-      await tick();
-      last = performance.now();
-    }
+  const bySize = new Map();
+  rows.forEach((row, i) => {
+    if (!bySize.has(row.size)) bySize.set(row.size, []);
+    bySize.get(row.size).push(i);
+  });
+  const out = new Array(rows.length);
+  let done = 0;
+  for (const idx of bySize.values()) {
+    const energies = ewaldEnergies(
+      idx.map((i) => rows[i].structure),
+      idx.map((i) =>
+        rows[i].structure.sites.map((s) => charges[s.species.symbol] ?? 0),
+      ),
+    );
+    idx.forEach((i, k) => {
+      const row = rows[i];
+      out[i] = {
+        ...row,
+        energy: energies[k],
+        perAtom: energies[k] / row.nAtoms,
+      };
+    });
+    done += idx.length;
+    onProgress?.(done, rows.length);
+    await tick();
   }
-  onProgress?.(rows.length, rows.length);
   return out;
 }
 
