@@ -1,18 +1,32 @@
 import { createLattice } from "@/core/lattice/lattice";
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
-import { splitSite } from "@/core/site/disorder";
-import type { Structure } from "@/core/structure/structure";
-import type { Site } from "@/core/site/site";
+import { createDisorderedSite } from "@/core/site/disorder";
+import type { DisorderedStructure } from "@/core/structure/disordered";
+
+type Occ = [string, number][];
+
+const site = (frac: number[], occ: Occ) =>
+  createDisorderedSite(
+    frac,
+    occ.map(([symbol, fraction]) => ({ symbol, fraction })),
+  );
+
+/** One disordered position at `frac` in an arbitrary lattice. */
+export function single(
+  basis: number[],
+  occ: Occ,
+  frac: number[] = [0, 0, 0],
+): DisorderedStructure {
+  return {
+    disordered: true,
+    lattice: createLattice(basis),
+    sites: [site(frac, occ)],
+  };
+}
 
 /** Primitive cubic cell with one disordered position. */
-export function primCubic(a: number, occ: [string, number][]): Structure {
-  return {
-    lattice: createLattice([a, 0, 0, 0, a, 0, 0, 0, a]),
-    sites: splitSite(
-      [0, 0, 0],
-      occ.map(([symbol, fraction]) => ({ symbol, fraction })),
-    ),
-  };
+export function primCubic(a: number, occ: Occ): DisorderedStructure {
+  return single([a, 0, 0, 0, a, 0, 0, 0, a], occ);
 }
 
 const NA_FRACS = [
@@ -31,19 +45,16 @@ const CL_FRACS = [
 /** Rocksalt conventional cell with independent disorder on each sublattice. */
 export function rocksalt(
   a: number,
-  naOcc: [string, number][] = [["Na", 1]],
-  clOcc: [string, number][] = [["Cl", 1]],
-): Structure {
-  const split = (fracs: number[][], occ: [string, number][]): Site[] =>
-    fracs.flatMap((f) =>
-      splitSite(
-        f,
-        occ.map(([symbol, fraction]) => ({ symbol, fraction })),
-      ),
-    );
+  naOcc: Occ = [["Na", 1]],
+  clOcc: Occ = [["Cl", 1]],
+): DisorderedStructure {
   return {
+    disordered: true,
     lattice: createLattice([a, 0, 0, 0, a, 0, 0, 0, a]),
-    sites: [...split(NA_FRACS, naOcc), ...split(CL_FRACS, clOcc)],
+    sites: [
+      ...NA_FRACS.map((f) => site(f, naOcc)),
+      ...CL_FRACS.map((f) => site(f, clOcc)),
+    ],
   };
 }
 
@@ -52,7 +63,7 @@ export const diag = (x: number, y: number, z: number): Matrix =>
 
 export interface EnumCase {
   name: string;
-  parent: Structure;
+  parent: DisorderedStructure;
   H: Matrix;
   expectedCount: number;
   /** Exact sorted site-keys per structure (small cases only). */
@@ -61,10 +72,24 @@ export interface EnumCase {
   counts?: Record<string, number>;
 }
 
-const HALF: [string, number][] = [
+const HALF: Occ = [
   ["Ag", 0.5],
   ["Pd", 0.5],
 ];
+
+const HEX = [
+  3,
+  0,
+  0,
+  -3 * Math.cos(Math.PI / 3),
+  3 * Math.sin(Math.PI / 3),
+  0,
+  0,
+  0,
+  5,
+];
+const FCC = [0, 1.5, 1.5, 1.5, 0, 1.5, 1.5, 1.5, 0];
+const TRICLINIC = [3, 0, 0, 0.4, 3.2, 0, 0.3, 0.5, 3.7];
 
 export const enumCases: EnumCase[] = [
   {
@@ -187,5 +212,52 @@ export const enumCases: EnumCase[] = [
     H: diag(3, 1, 1),
     expectedCount: 34,
     counts: { Na: 12, Cl: 6, Br: 6 },
+  },
+  // Cases below were cross-checked against a brute-force reference (every
+  // labeling deduplicated with pymatgen's StructureMatcher).
+  {
+    name: "J: hexagonal non-diagonal H",
+    parent: single(HEX, HALF),
+    H: createMatrix(3, 3, [2, 1, 0, 0, 1, 0, 0, 0, 2]),
+    expectedCount: 3,
+    counts: { Ag: 2, Pd: 2 },
+  },
+  {
+    name: "K: primitive fcc 2x2x2, 1/4 - 3/4",
+    parent: single(FCC, [
+      ["Ag", 0.25],
+      ["Pd", 0.75],
+    ]),
+    H: diag(2, 2, 2),
+    expectedCount: 2,
+    counts: { Ag: 2, Pd: 6 },
+  },
+  {
+    name: "L: primitive fcc non-diagonal H",
+    parent: single(FCC, HALF),
+    H: createMatrix(3, 3, [1, 1, 0, -1, 1, 0, 0, 0, 2]),
+    expectedCount: 2,
+    counts: { Ag: 2, Pd: 2 },
+  },
+  {
+    name: "M: rocksalt 2x1x1 Cl/Br 1/4 - 3/4",
+    parent: rocksalt(
+      5.64,
+      [["Na", 1]],
+      [
+        ["Cl", 0.25],
+        ["Br", 0.75],
+      ],
+    ),
+    H: diag(2, 1, 1),
+    expectedCount: 4,
+    counts: { Na: 8, Cl: 2, Br: 6 },
+  },
+  {
+    name: "N: triclinic 4x1x1",
+    parent: single(TRICLINIC, HALF, [0.1, 0.2, 0.3]),
+    H: diag(4, 1, 1),
+    expectedCount: 2,
+    counts: { Ag: 2, Pd: 2 },
   },
 ];

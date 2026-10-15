@@ -1,102 +1,90 @@
-import type { Site } from "./site";
-import { occupancyOf } from "./occupancy";
+import type { SiteProperties, Vec3 } from "./site";
 
-// NOTE — first-class disordered sites: disorder is represented as split
-// co-located sites (one species + `occu` fraction each), not as a
-// first-class multi-species site. Revisit if split sites cause trouble in
-// ordered paths (neighbors/slabs see zero-distance pairs) or if an
-// importer needs exact round-trip fidelity (see toPymatgen).
+/** Slack on occupancy bounds, absorbing float noise from readers. */
+const OCCUPANCY_TOL = 1e-6;
 
-/** One component of a disordered position. */
+/** One species' share of a disordered position. */
 export interface SiteOccupancy {
   symbol: string;
   fraction: number;
-}
-
-/** A disordered position: species sharing one fractional coordinate. */
-export interface DisorderedPosition {
-  frac: Float64Array;
-  occupancy: SiteOccupancy[];
-  /** Indices of the contributing split sites in the source array. */
-  indices: number[];
+  /** Species properties (as on `Species.properties`), if any. */
+  properties?: Record<string, any>;
 }
 
 /**
- * Expand a disordered position into split co-located sites, one per
- * species, with the fraction stashed on `species.properties.occu`
- * (the same pattern readers use; see {@link occupancyOf}).
+ * A crystallographic position shared by one or more species, each with a
+ * fractional occupancy. Fractions summing below 1 leave a vacancy.
+ *
+ * Deliberately has no `species` field, so it is not assignable to `Site`:
+ * ordered-only code cannot be handed a disordered site by accident.
  */
-export function splitSite(
+export interface DisorderedSite<P extends SiteProperties = SiteProperties> {
+  frac: Vec3;
+  occupancy: SiteOccupancy[];
+  properties?: P;
+}
+
+/**
+ * Create a validated disordered site.
+ *
+ * @param frac - Fractional coordinates.
+ * @param occupancy - Species fractions, as a list or a `{ symbol: fraction }` record.
+ * @param properties - Optional site properties.
+ * @returns A new DisorderedSite.
+ * @throws If a fraction is outside [0, 1], a symbol repeats, the site is
+ *   empty, or the fractions sum above 1.
+ */
+export function createDisorderedSite<P extends SiteProperties>(
   frac: ArrayLike<number>,
   occupancy: SiteOccupancy[] | Record<string, number>,
-): Site[] {
-  const entries = Array.isArray(occupancy)
-    ? occupancy
+  properties?: P,
+): DisorderedSite<P> {
+  const entries: SiteOccupancy[] = Array.isArray(occupancy)
+    ? occupancy.map((o) => ({ ...o }))
     : Object.entries(occupancy).map(([symbol, fraction]) => ({
         symbol,
         fraction,
       }));
-  const coords = new Float64Array([frac[0], frac[1], frac[2]]);
-  return entries.map(({ symbol, fraction }) => {
-    if (!(fraction >= 0 && fraction <= 1 && Number.isFinite(fraction))) {
-      throw new Error(`splitSite: invalid fraction ${fraction} for ${symbol}`);
+  if (entries.length === 0) {
+    throw new Error("createDisorderedSite: no species");
+  }
+  const seen = new Set<string>();
+  let total = 0;
+  for (const { symbol, fraction } of entries) {
+    if (
+      !Number.isFinite(fraction) ||
+      fraction < 0 ||
+      fraction > 1 + OCCUPANCY_TOL
+    ) {
+      throw new Error(
+        `createDisorderedSite: invalid fraction ${fraction} for ${symbol}`,
+      );
     }
-    return {
-      species: { symbol, properties: { occu: fraction } },
-      frac: coords.slice(),
-    };
-  });
+    if (seen.has(symbol)) {
+      throw new Error(`createDisorderedSite: duplicate species ${symbol}`);
+    }
+    seen.add(symbol);
+    total += fraction;
+  }
+  if (total > 1 + OCCUPANCY_TOL) {
+    throw new Error(`createDisorderedSite: occupancies sum to ${total}`);
+  }
+  return {
+    frac: new Float64Array([frac[0], frac[1], frac[2]]),
+    occupancy: entries,
+    properties,
+  };
 }
 
-/**
- * Group split co-located sites back into disordered positions.
- * Bitwise-identical coordinates group exactly; `tol` (fractional units)
- * additionally merges hand-built near-duplicates. Ordered sites yield
- * single-component positions with fraction 1.
- *
- * Vacancies (fractions summing below 1) are allowed; overfill throws.
- */
-export function groupDisorder(
-  sites: readonly Site[],
-  tol = 0,
-): DisorderedPosition[] {
-  const groups: { key: number[]; members: number[] }[] = [];
-  const keyOf = (f: ArrayLike<number>): string => `${f[0]},${f[1]},${f[2]}`;
-  const byKey = new Map<string, number[]>();
+/** Total occupancy of a disordered site (1 when fully occupied). */
+export function totalOccupancy(site: DisorderedSite): number {
+  return site.occupancy.reduce((acc, o) => acc + o.fraction, 0);
+}
 
-  sites.forEach((site, i) => {
-    const f = site.frac;
-    if (tol <= 0) {
-      const list = byKey.get(keyOf(f)) ?? [];
-      list.push(i);
-      byKey.set(keyOf(f), list);
-      return;
-    }
-    const g = groups.find(({ key }) =>
-      key.every((v, d) => Math.abs(v - (f[d] as number)) <= tol),
-    );
-    if (g) g.members.push(i);
-    else groups.push({ key: [f[0], f[1], f[2]], members: [i] });
-  });
-  if (tol <= 0) {
-    for (const [key, members] of byKey) {
-      groups.push({ key: key.split(",").map(Number), members });
-    }
-  }
-
-  return groups.map(({ key, members }) => {
-    const occupancy = members.map((i) => ({
-      symbol: sites[i].species.symbol,
-      fraction: occupancyOf(sites[i]),
-    }));
-    const total = occupancy.reduce((acc, o) => acc + o.fraction, 0);
-    if (total > 1 + 1e-9) {
-      throw new Error(`groupDisorder: occupancies sum to ${total} at [${key}]`);
-    }
-    return {
-      frac: new Float64Array(key),
-      occupancy,
-      indices: members,
-    };
-  });
+/** True when the site holds exactly one species at full occupancy. */
+export function isOrderedSite(site: DisorderedSite): boolean {
+  return (
+    site.occupancy.length === 1 &&
+    Math.abs(site.occupancy[0].fraction - 1) <= OCCUPANCY_TOL
+  );
 }

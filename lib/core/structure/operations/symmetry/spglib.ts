@@ -16,6 +16,7 @@ import type { MoyoDataset } from "@spglib/moyo-wasm";
 
 import { createLattice } from "@/core/lattice";
 import { Structure } from "../../structure";
+import { assertOrdered } from "../../disordered";
 
 let ready: Promise<unknown> | null = null;
 
@@ -83,6 +84,7 @@ export async function analyzeStructure(
   tolerance = 1e-4,
   setting = "Spglib",
 ): Promise<MoyoDataset> {
+  assertOrdered(structure, "analyzeStructure");
   await initMoyo();
   return analyze_cell(
     JSON.stringify(toMoyoInput(structure)),

@@ -1,19 +1,29 @@
 import { supercell } from "../supercell";
-import { groupDisorder } from "@/core/site/disorder";
+import { totalOccupancy } from "@/core/site/disorder";
 import { analyzeStructure } from "../symmetry/spglib";
 import { latticePointsInSupercell } from "@/core/matrix/operations/latticePointsInSupercell";
 import { inverse3x3 } from "@/core/matrix/operations/inverse/inverse3x3";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { mul } from "@/core/matrix/operations/mul";
+import { determinant } from "@/core/matrix/operations/determinant";
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import type { Structure } from "../../structure";
+import type { DisorderedStructure } from "../../disordered";
+
+/**
+ * Default cap on the assignment search space. Every candidate is
+ * materialized and canonicalized against the full symmetry group, so
+ * spaces much beyond this get slow and memory-hungry; raise it per call
+ * via `EnumOptions.maxCombinations` when needed.
+ */
+export const DEFAULT_MAX_COMBINATIONS = 10_000;
 
 export interface EnumOptions {
   /** Fractional tolerance when matching supercell sites to parent sites. Default 1e-6. */
   tol?: number;
   /** Symmetry precision for the parent analysis. Default 1e-4. */
   symprec?: number;
-  /** Cap on the assignment search space. Default 10_000_000. */
+  /** Cap on the assignment search space. Default {@link DEFAULT_MAX_COMBINATIONS}. */
   maxCombinations?: number;
 }
 
@@ -66,25 +76,24 @@ function snapKey(f: ArrayLike<number>): string {
  * parent in a fixed supercell (sandbox port of enumlib's core loop;
  * superlattice search is not included).
  *
- * Disorder comes from split co-located sites (see `groupDisorder`): each
- * parent orbit's species counts are fixed by its occupancy fractions times
+ * Each parent orbit's species counts are fixed by its occupancy fractions times
  * its site multiplicity in the supercell (vacancies and incommensurate
  * fractions throw). Decorations are deduped under supercell translations
  * plus parent rotations preserving the supercell, using the closed group
  * (canonical minimum labeling — generators alone miss composed operations).
  *
- * @param parent - Parent structure with disorder as split sites.
+ * @param parent - Disordered parent structure.
  * @param H - Integer supercell matrix (rows = new lattice vectors).
  * @param opts - Tolerances and search cap.
  * @returns Unique ordered supercell structures.
  */
 export async function orderDisorderedStructure(
-  parent: Structure,
+  parent: DisorderedStructure,
   H: Matrix,
   opts: EnumOptions = {},
 ): Promise<Structure[]> {
   const tol = opts.tol ?? 1e-6;
-  const maxCombinations = opts.maxCombinations ?? 10_000_000;
+  const maxCombinations = opts.maxCombinations ?? DEFAULT_MAX_COMBINATIONS;
 
   if (H.rows !== 3 || H.cols !== 3) {
     throw new Error("orderDisorderedStructure: H must be 3x3");
@@ -93,22 +102,26 @@ export async function orderDisorderedStructure(
   if (!h.every((v) => Math.abs(v - Math.round(v)) < 1e-8)) {
     throw new Error("orderDisorderedStructure: H must be integer");
   }
-  const det =
-    h[0] * (h[4] * h[8] - h[5] * h[7]) -
-    h[1] * (h[3] * h[8] - h[5] * h[6]) +
-    h[2] * (h[3] * h[7] - h[4] * h[6]);
-  if (Math.abs(det) < 0.5) {
+  const Hm = createMatrix(3, 3, h);
+  if (Math.abs(determinant(Hm)) < 0.5) {
     throw new Error("orderDisorderedStructure: H is singular");
   }
 
   // Disorder per parent position; color by occupancy signature so the
   // symmetry analysis preserves the disorder pattern.
-  const positions = groupDisorder(parent.sites);
+  const positions = parent.sites;
   for (const pos of positions) {
-    const total = pos.occupancy.reduce((acc, o) => acc + o.fraction, 0);
+    const total = totalOccupancy(pos);
     if (total < 1 - 1e-9) {
       throw new Error(
         `orderDisorderedStructure: vacancies not supported (sums to ${total})`,
+      );
+    }
+    // Sites may be hand-built literals that skipped createDisorderedSite.
+    const symbols = pos.occupancy.map((o) => o.symbol);
+    if (new Set(symbols).size !== symbols.length) {
+      throw new Error(
+        `orderDisorderedStructure: duplicate species at one site (${symbols.join(", ")})`,
       );
     }
   }
@@ -122,8 +135,6 @@ export async function orderDisorderedStructure(
   for (const sig of signatures) {
     if (!sigId.has(sig)) sigId.set(sig, sigId.size);
   }
-  // One site per disordered position: split co-located sites would be
-  // rejected as overlapping atoms.
   const colored: Structure = {
     lattice: parent.lattice,
     sites: positions.map((pos, pi) => ({
@@ -134,17 +145,21 @@ export async function orderDisorderedStructure(
   const ds = await analyzeStructure(colored, opts.symprec ?? 1e-4);
   const orbits: number[] = Array.from(ds.orbits);
 
-  // Expand the collapsed average cell (one site per disordered position),
-  // not the split parent, and label each supercell site with its orbit.
+  // Expand the colored average cell and label each supercell site with
+  // its orbit.
   // Parent frac of the pre-image is p = H^T F (rows of H are new vectors),
-  // matched minimum-image since p need not lie in [0, 1).
+  // i.e. row-wise P = F H, matched minimum-image since p need not lie in
+  // [0, 1).
   const sc = supercell(colored, H);
   const n = sc.sites.length;
-  const scOrbit = sc.sites.map((site) => {
-    const F = site.frac;
-    const p = [0, 1, 2].map(
-      (r) => h[r] * F[0] + h[3 + r] * F[1] + h[6 + r] * F[2],
-    );
+  const scFrac = createMatrix(
+    n,
+    3,
+    sc.sites.flatMap((site) => [...site.frac]),
+  );
+  const parentFrac = mul(scFrac, Hm).data;
+  const scOrbit = sc.sites.map((_, si) => {
+    const p = parentFrac.subarray(3 * si, 3 * si + 3);
     for (let i = 0; i < positions.length; i++) {
       const q = positions[i]?.frac;
       if (
@@ -224,7 +239,6 @@ export async function orderDisorderedStructure(
       ),
     );
   }
-  const Hm = createMatrix(3, 3, h);
   const invT = transpose(inverse3x3(Hm));
   const Ht = transpose(Hm);
   for (const op of ds.operations) {
@@ -232,19 +246,14 @@ export async function orderDisorderedStructure(
     // A parent rotation preserves the supercell iff H^-T R H^T is integral.
     const M = Array.from(mul(mul(invT, R), Ht).data);
     if (!M.every((v) => Math.abs(v - Math.round(v)) < 1e-6)) continue;
-    const Ri = M.map(Math.round);
-    const tsc = Array.from(
-      mul(invT, createMatrix(3, 1, Array.from(op.translation))).data,
-    );
+    const Ri = createMatrix(3, 3, M.map(Math.round));
+    const tsc = mul(invT, createMatrix(3, 1, Array.from(op.translation))).data;
+    // Row-wise F' = F Ri^T + tsc.
+    const moved = mul(scFrac, transpose(Ri)).data;
     generators.push(
-      sc.sites.map((s) => {
-        const F = s.frac;
-        return at([
-          Ri[0] * F[0] + Ri[1] * F[1] + Ri[2] * F[2] + tsc[0],
-          Ri[3] * F[0] + Ri[4] * F[1] + Ri[5] * F[2] + tsc[1],
-          Ri[6] * F[0] + Ri[7] * F[1] + Ri[8] * F[2] + tsc[2],
-        ]);
-      }),
+      sc.sites.map((_, si) =>
+        at([0, 1, 2].map((d) => moved[3 * si + d] + tsc[d])),
+      ),
     );
   }
   const group: number[][] = [];

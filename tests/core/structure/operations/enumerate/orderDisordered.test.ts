@@ -3,6 +3,7 @@ import { createMatrix } from "@/core/matrix/matrix";
 import { orderDisorderedStructure } from "@/core/structure/operations/enumerate/orderDisordered";
 import { enumCases, primCubic, diag } from "./fixtures";
 import type { Structure } from "@/core/structure/structure";
+import type { DisorderedStructure } from "@/core/structure/disordered";
 
 function keys(s: Structure): string[] {
   return s.sites
@@ -97,5 +98,21 @@ describe("orderDisorderedStructure", () => {
     await expect(
       orderDisorderedStructure(ok, diag(2, 2, 2), { maxCombinations: 5 }),
     ).rejects.toThrow(/exceeds cap/);
+    // Hand-built literal bypassing createDisorderedSite's validation.
+    const dup: DisorderedStructure = {
+      ...ok,
+      sites: [
+        {
+          frac: [0, 0, 0],
+          occupancy: [
+            { symbol: "Ag", fraction: 0.5 },
+            { symbol: "Ag", fraction: 0.5 },
+          ],
+        },
+      ],
+    };
+    await expect(orderDisorderedStructure(dup, diag(2, 1, 1))).rejects.toThrow(
+      /duplicate species/,
+    );
   });
 });

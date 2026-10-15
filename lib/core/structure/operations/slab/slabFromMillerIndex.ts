@@ -4,6 +4,7 @@ import { addVacuum } from "./addVacuum";
 import { parameters } from "@/core/lattice/parameters";
 import { fromParametersCAlongZ } from "@/core/lattice/create/fromParametersCAlongZ";
 import type { Structure } from "../../structure";
+import { assertOrdered } from "../../disordered";
 
 interface SlabOptions {
   /** Number of unit cell replications along c (surface normal). Default 1. */
@@ -48,6 +49,7 @@ export function slabFromMillerIndex(
   l: number,
   opts: SlabOptions = {},
 ): Structure {
+  assertOrdered(structure, "slabFromMillerIndex");
   const { layers = 1, vacuum = 0, shift = 0 } = opts;
 
   // Step 1: Calculate the scale factor

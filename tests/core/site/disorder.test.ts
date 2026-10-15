@@ -1,144 +1,91 @@
 import { describe, it, expect } from "vitest";
-import { splitSite, groupDisorder } from "@/core/site/disorder";
-import { occupancyOf } from "@/core/site/occupancy";
-import { fromPymatgen } from "@/core/io/pymatgen";
-import type { Site } from "@/core/site/site";
+import {
+  createDisorderedSite,
+  totalOccupancy,
+  isOrderedSite,
+} from "@/core/site/disorder";
 
-function ordered(symbol: string, frac: number[]): Site {
-  return { species: { symbol }, frac: new Float64Array(frac) };
-}
-
-describe("splitSite", () => {
-  it("expands one site per species with occu fractions", () => {
-    const sites = splitSite(
+describe("createDisorderedSite", () => {
+  it("builds a site from a species list", () => {
+    const site = createDisorderedSite(
       [0.25, 0.25, 0.25],
       [
         { symbol: "Ag", fraction: 0.5 },
         { symbol: "Pd", fraction: 0.5 },
       ],
+      { label: "M1" },
     );
-    expect(sites.length).toBe(2);
-    expect(sites.map((s) => s.species.symbol)).toEqual(["Ag", "Pd"]);
-    expect(sites.map(occupancyOf)).toEqual([0.5, 0.5]);
-    for (const s of sites) {
-      expect(Array.from(s.frac)).toEqual([0.25, 0.25, 0.25]);
-    }
+    expect(Array.from(site.frac)).toEqual([0.25, 0.25, 0.25]);
+    expect(site.occupancy).toEqual([
+      { symbol: "Ag", fraction: 0.5 },
+      { symbol: "Pd", fraction: 0.5 },
+    ]);
+    expect(site.properties).toEqual({ label: "M1" });
   });
 
   it("accepts a record", () => {
-    const sites = splitSite([0, 0, 0], { Ag: 0.75, Pd: 0.25 });
-    expect(sites.map((s) => s.species.symbol).sort()).toEqual(["Ag", "Pd"]);
+    const site = createDisorderedSite([0, 0, 0], { Ag: 0.75, Pd: 0.25 });
+    expect(site.occupancy).toEqual([
+      { symbol: "Ag", fraction: 0.75 },
+      { symbol: "Pd", fraction: 0.25 },
+    ]);
   });
 
-  it("rejects out-of-range fractions", () => {
-    expect(() =>
-      splitSite([0, 0, 0], [{ symbol: "Ag", fraction: 1.5 }]),
-    ).toThrow();
-    expect(() =>
-      splitSite([0, 0, 0], [{ symbol: "Ag", fraction: NaN }]),
-    ).toThrow();
+  it("copies its inputs", () => {
+    const frac = [0.1, 0.2, 0.3];
+    const occ = [{ symbol: "Ag", fraction: 1 }];
+    const site = createDisorderedSite(frac, occ);
+    frac[0] = 9;
+    occ[0].fraction = 0.1;
+    expect(site.frac[0]).toBe(0.1);
+    expect(site.occupancy[0].fraction).toBe(1);
   });
-});
 
-describe("groupDisorder", () => {
-  it("round-trips split sites", () => {
-    const sites = splitSite(
-      [0.1, 0.2, 0.3],
-      [
-        { symbol: "Ag", fraction: 0.5 },
-        { symbol: "Pd", fraction: 0.5 },
-      ],
+  it("allows vacancies and float noise above 1", () => {
+    expect(totalOccupancy(createDisorderedSite([0, 0, 0], { Li: 0.691 }))).toBe(
+      0.691,
     );
-    const [pos] = groupDisorder(sites);
-    expect(Array.from(pos.frac)).toEqual([0.1, 0.2, 0.3]);
-    expect(pos.occupancy).toEqual([
-      { symbol: "Ag", fraction: 0.5 },
-      { symbol: "Pd", fraction: 0.5 },
-    ]);
-    expect(pos.indices).toEqual([0, 1]);
+    expect(() =>
+      createDisorderedSite([0, 0, 0], { Ag: 0.5000001, Pd: 0.5 }),
+    ).not.toThrow();
   });
 
-  it("leaves ordered sites as singletons", () => {
-    const sites = [ordered("Si", [0, 0, 0]), ordered("Si", [0.5, 0.5, 0.5])];
-    const groups = groupDisorder(sites);
-    expect(groups.length).toBe(2);
-    expect(groups[0].occupancy).toEqual([{ symbol: "Si", fraction: 1 }]);
-  });
-
-  it("allows vacancies but throws on overfill", () => {
-    const vac = splitSite([0, 0, 0], [{ symbol: "Ag", fraction: 0.5 }]);
-    expect(groupDisorder(vac)[0].occupancy).toEqual([
-      { symbol: "Ag", fraction: 0.5 },
-    ]);
-    const over = [
-      ...splitSite([0, 0, 0], [{ symbol: "Ag", fraction: 0.7 }]),
-      ...splitSite([0, 0, 0], [{ symbol: "Pd", fraction: 0.5 }]),
-    ];
-    expect(() => groupDisorder(over)).toThrow(/sum/);
-  });
-
-  it("merges near-duplicates with tol", () => {
-    const split: Site[] = [
-      {
-        species: { symbol: "Ag", properties: { occu: 0.5 } },
-        frac: new Float64Array([0, 0, 0]),
-      },
-      {
-        species: { symbol: "Pd", properties: { occu: 0.5 } },
-        frac: new Float64Array([1e-9, 0, 0]),
-      },
-    ];
-    expect(groupDisorder(split).length).toBe(2);
-    expect(groupDisorder(split, 1e-6)[0].occupancy).toEqual([
-      { symbol: "Ag", fraction: 0.5 },
-      { symbol: "Pd", fraction: 0.5 },
-    ]);
+  it("rejects invalid occupancies", () => {
+    expect(() => createDisorderedSite([0, 0, 0], [])).toThrow(/no species/);
+    expect(() => createDisorderedSite([0, 0, 0], { Ag: 1.5 })).toThrow(
+      /invalid fraction/,
+    );
+    expect(() => createDisorderedSite([0, 0, 0], { Ag: -0.1 })).toThrow(
+      /invalid fraction/,
+    );
+    expect(() => createDisorderedSite([0, 0, 0], { Ag: NaN })).toThrow(
+      /invalid fraction/,
+    );
+    expect(() => createDisorderedSite([0, 0, 0], { Ag: 0.7, Pd: 0.5 })).toThrow(
+      /sum/,
+    );
+    expect(() =>
+      createDisorderedSite(
+        [0, 0, 0],
+        [
+          { symbol: "Ag", fraction: 0.5 },
+          { symbol: "Ag", fraction: 0.5 },
+        ],
+      ),
+    ).toThrow(/duplicate/);
   });
 });
 
-describe("fromPymatgen disorder", () => {
-  it("expands multi-species sites to split sites", () => {
-    const s = fromPymatgen({
-      "@module": "pymatgen.core.structure",
-      "@class": "Structure",
-      lattice: {
-        matrix: [
-          [4, 0, 0],
-          [0, 4, 0],
-          [0, 0, 4],
-        ],
-      },
-      sites: [
-        {
-          species: [
-            { element: "Ag", occu: 0.5 },
-            { element: "Pd", occu: 0.5 },
-          ],
-          abc: [0, 0, 0],
-        },
-      ],
-    });
-    expect(s.sites.length).toBe(2);
-    expect(groupDisorder(s.sites)[0].occupancy).toEqual([
-      { symbol: "Ag", fraction: 0.5 },
-      { symbol: "Pd", fraction: 0.5 },
-    ]);
-  });
-
-  it("keeps single-species behavior", () => {
-    const s = fromPymatgen({
-      "@module": "pymatgen.core.structure",
-      "@class": "Structure",
-      lattice: {
-        matrix: [
-          [4, 0, 0],
-          [0, 4, 0],
-          [0, 0, 4],
-        ],
-      },
-      sites: [{ species: [{ element: "Si", occu: 1 }], abc: [0, 0, 0] }],
-    });
-    expect(s.sites.length).toBe(1);
-    expect(occupancyOf(s.sites[0])).toBe(1);
+describe("isOrderedSite", () => {
+  it("is true only for one species at full occupancy", () => {
+    expect(isOrderedSite(createDisorderedSite([0, 0, 0], { Si: 1 }))).toBe(
+      true,
+    );
+    expect(isOrderedSite(createDisorderedSite([0, 0, 0], { Li: 0.5 }))).toBe(
+      false,
+    );
+    expect(
+      isOrderedSite(createDisorderedSite([0, 0, 0], { Ag: 0.5, Pd: 0.5 })),
+    ).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ import { transpose } from "@/core/matrix/operations/transpose";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { minimumImage } from "@/core/structure/operations/distance/utils";
 import type { Structure } from "@/core/structure/structure";
+import { assertOrdered } from "@/core/structure/disordered";
 
 /** Point-charge Coulomb constant: e^2 / (4 pi eps0), in eV·Angstrom. */
 const COULOMB_EV_ANGSTROM =
@@ -58,6 +59,7 @@ export function ewaldSum(
   charges: ArrayLike<number>,
   opts: EwaldOptions = {},
 ): EwaldEnergies {
+  assertOrdered(structure, "ewaldSum");
   const n = structure.sites.length;
   if (charges.length !== n) {
     throw new Error(`ewaldSum: ${charges.length} charges for ${n} sites`);
