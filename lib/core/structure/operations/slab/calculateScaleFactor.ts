@@ -5,7 +5,7 @@ import { norm } from "@/core/matrix/operations/vector/norm";
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import type { Lattice } from "@/core/lattice/lattice";
 import { EPSILON } from "@/core/math/constants";
-import { gcd, lcm } from "@/core/math/numeric";
+import { clean, gcd, lcm } from "@/core/math/numeric";
 
 function reduceVector(v: number[]): number[] {
   let g = 0;
@@ -17,7 +17,7 @@ function reduceVector(v: number[]): number[] {
 }
 
 /**
- * Calculate the slab scale factor following pymatgen's `calculate_scaling_factor` algorithm.
+ * Calculate the slab scale factor for an (hkl) surface termination.
  *
  * Given Miller indices (h, k, l), builds a 3×3 integer matrix U such that:
  * - Rows 0 and 1 are real-space vectors perpendicular to the surface normal (in-plane).
@@ -35,7 +35,15 @@ export function calculateScaleFactor(
   millerIndex: [number, number, number],
   lattice: Lattice,
 ): Matrix {
-  const [h, k, l] = millerIndex;
+  // Reduce to primitive Miller index, e.g. (2, 2, 0) -> (1, 1, 0).
+  const g = gcd(
+    gcd(Math.abs(millerIndex[0]), Math.abs(millerIndex[1])),
+    Math.abs(millerIndex[2]),
+  );
+  const [h, k, l] =
+    g > 1
+      ? (millerIndex.map((m) => m / g) as [number, number, number])
+      : millerIndex;
 
   // Surface normal in Cartesian from reciprocal lattice
   const recip = reciprocalLatticeCrystallographic(lattice);
@@ -119,12 +127,12 @@ export function calculateScaleFactor(
   const flat = slabScaleFactor.flat();
   let mat = createMatrix(3, 3, flat);
 
-  // Ensure positive determinant (left-handed → negate first row)
+  // Ensure a right-handed cell (positive determinant) by negating the matrix.
   if (determinant(mat) < 0) {
     mat = createMatrix(
       3,
       3,
-      flat.map((x, i) => (i < 3 ? -x : x)),
+      flat.map((x) => clean(-x)),
     );
   }
 

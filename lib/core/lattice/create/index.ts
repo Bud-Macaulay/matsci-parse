@@ -1,5 +1,6 @@
 export * from "./cubic";
 export * from "./fromParameters";
+export * from "./fromParametersCAlongZ";
 export * from "./hexagonal";
 export * from "./monoclinic";
 export * from "./orthorhombic";
