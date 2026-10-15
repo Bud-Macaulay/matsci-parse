@@ -95,6 +95,8 @@ _symmetry_int_tables_number             1
 _symmetry_space_group_name_H-M          'P 1'
 `;
 
+// COD 1550399, with the refined Li occupancy 1.72(6) set to 1.0: fromCIF
+// rejects overfilled sites, and this fixture tests symmetry expansion.
 export const liCoO2Cif = `data_1550399
 loop_1
 _space_group_IT_number           166
@@ -156,7 +158,7 @@ _atom_site_fract_z
 _atom_site_adp_type
 _atom_site_U_iso_or_equiv
 _atom_site_type_symbol
-Li 1.72(6) 0 0 0.5 Uiso 0.050 Li
+Li 1.0 0 0 0.5 Uiso 0.050 Li
 Co 1.0 0 0 0 Uiso 0.030 Co
 O1 1.0 0 0 0.2570(7) Uiso 0.030 O`;
 
