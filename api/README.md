@@ -42,13 +42,6 @@ pnpm --filter matsci-api start        # http://localhost:3000, docs at /docs
 PORT=8080 pnpm --filter matsci-api start
 ```
 
-With Docker (from the repo root):
-
-```sh
-docker build -f api/Dockerfile -t matsci-api .
-docker run -p 3000:3000 matsci-api
-```
-
 `PORT` is the only setting.
 
 ## Wire format
