@@ -19,6 +19,7 @@ import PerturbPanel from "./PerturbPanel";
 import AddAtomPanel from "./AddAtomPanel";
 import DistanceMatrixPanel from "./DistanceMatrixPanel";
 import SlabModal from "./SlabModal";
+import EnumerateModal from "./EnumerateModal";
 import QEInputModal from "../common/QEInputModal";
 import Modal from "../common/Modal";
 import MLIPPanel from "../mlip/MLIPPanel";
@@ -203,6 +204,7 @@ export default function MainPanel({ tab, updateTab }) {
               setStructure={setStructure}
               pushUndo={pushUndo}
             />
+            <EnumerateModal structure={structure} />
           </div>
           <div className="flex gap-2">
             <button
