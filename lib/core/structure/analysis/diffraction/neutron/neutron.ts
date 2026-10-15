@@ -76,7 +76,9 @@ function expandSites(
  *
  * @param structure - Crystal structure with lattice basis rows in angstroms.
  * @param options - Wavelength, range, scaling, Debye-Waller factors.
- * @returns Two-theta positions, intensities, Miller families, d-spacings. */
+ * @returns Two-theta positions, intensities, Miller families, d-spacings.
+ * @api
+ */
 export function calculateNdPattern(
   structure: Structure | DisorderedStructure,
   options?: NdOptions,

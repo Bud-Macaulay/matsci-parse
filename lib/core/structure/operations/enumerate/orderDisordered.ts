@@ -86,6 +86,7 @@ function snapKey(f: ArrayLike<number>): string {
  * @param H - Integer supercell matrix (rows = new lattice vectors).
  * @param opts - Tolerances and search cap.
  * @returns Unique ordered supercell structures.
+ * @api
  */
 export async function orderDisorderedStructure(
   parent: DisorderedStructure,

@@ -26,6 +26,7 @@ function isMatrix(size: SupercellSize): size is Matrix {
  * @param structure - The input structure.
  * @param size - Supercell size: number (isotropic), [nx, ny, nz], or 3x3 integer matrix.
  * @returns A new Structure with the supercell applied.
+ * @api
  */
 export function supercell(structure: Structure, size: SupercellSize): Structure {
   let U: Matrix;

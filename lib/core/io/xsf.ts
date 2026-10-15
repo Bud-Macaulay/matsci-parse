@@ -15,7 +15,10 @@ function nextSectionLine(r: LineReader, section: string): void {
 
 // TODO: support atomic numbers instead of symbols in primvec.
 
-/** Parses an XSF (XCrySDen Structure Format) string into a Structure. */
+/**
+ * Parses an XSF (XCrySDen Structure Format) string into a Structure.
+ * @api
+ */
 export function fromXSF(text: string): Structure {
   const r = new LineReader(text);
 
@@ -80,7 +83,10 @@ function formatLattice(lattice: Structure["lattice"]): string[] {
   ];
 }
 
-/** Serializes a Structure to an XSF string. */
+/**
+ * Serializes a Structure to an XSF string.
+ * @api
+ */
 export function toXSF(structure: Structure): string {
   const lines: string[] = [];
 

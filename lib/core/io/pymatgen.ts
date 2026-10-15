@@ -62,6 +62,7 @@ export interface PymatgenStructure {
  * Returns an ordered Structure when every site holds one species at full
  * occupancy, otherwise a DisorderedStructure (shared or partially vacant
  * sites); narrow with `isDisordered`.
+ * @api
  */
 export function fromPymatgen(
   data: PymatgenStructure,
@@ -119,6 +120,7 @@ export function fromPymatgen(
 /**
  * Serializes a Structure to a pymatgen `Structure` JSON object. Disordered
  * sites are written as multi-species sites.
+ * @api
  */
 export function toPymatgen(
   structure: Structure | DisorderedStructure,

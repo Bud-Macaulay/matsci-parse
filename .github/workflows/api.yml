@@ -1,0 +1,36 @@
+name: API
+
+on:
+  push:
+    branches: [main]
+    paths: ["lib/**", "api/**", "pnpm-lock.yaml"]
+  pull_request:
+    paths: ["lib/**", "api/**", "pnpm-lock.yaml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+
+      - run: pnpm install --frozen-lockfile
+      - name: API is in sync with the library's @api functions
+        run: pnpm --filter matsci-api generate:check
+      - run: pnpm --filter matsci-api typecheck
+      - run: pnpm exec vitest run api/tests
+
+      - name: Generate OpenAPI spec and Python client
+        run: pnpm --filter matsci-api client:python
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matsci-api-client
+          path: |
+            api/openapi.json
+            api/clients/python

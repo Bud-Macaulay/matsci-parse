@@ -88,7 +88,9 @@ function expandSites(structure: Structure | DisorderedStructure, debyeWallerFact
  *
  * @param structure - Crystal structure with lattice basis rows in angstroms.
  * @param options - Wavelength, range, scaling, Debye-Waller factors.
- * @returns Two-theta positions, intensities, Miller families, d-spacings. */
+ * @returns Two-theta positions, intensities, Miller families, d-spacings.
+ * @api
+ */
 export function calculateXrdPattern(structure: Structure | DisorderedStructure, options?: XrdOptions): XrdPattern {
   const wavelength = resolveWavelength(options?.wavelength ?? "CuKa");
   const range = options?.twoThetaRange === undefined ? ([0, 90] as const) : options.twoThetaRange;

@@ -2,7 +2,6 @@ packages:
   - .
   - api
 allowBuilds:
-  '@scarf/scarf': false
   "@swc/core": false
   esbuild: false
 patchedDependencies:

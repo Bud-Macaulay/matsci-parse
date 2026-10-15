@@ -20,6 +20,7 @@ import type { Structure } from "../../structure";
  * @param millerIndex - The Miller indices [h, k, l].
  * @param ftol - Plane-clustering threshold in Angstroms. Default 0.1.
  * @returns Termination shifts in [0, 1) along the OUC c-direction, sorted.
+ * @api
  */
 export function possibleTerminations(
   structure: Structure,
