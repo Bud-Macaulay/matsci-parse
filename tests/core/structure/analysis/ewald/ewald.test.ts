@@ -180,6 +180,31 @@ describe("ewaldSum", () => {
     );
   });
 
+  it("is invariant to lattice-vector shifts of sites (unwrapped fracs)", () => {
+    // Regression: unreduced pair offsets used to fall outside the image box.
+    for (const accuracy of [12, 4]) {
+      const ref = ewaldSum(rocksalt.s, rocksalt.q, { accuracy });
+      for (const shift of [
+        [3, 0, 0],
+        [-2, 1, 0],
+        [0, -1, 5],
+      ]) {
+        const shifted: Structure = {
+          ...rocksalt.s,
+          sites: rocksalt.s.sites.map((site, i) => ({
+            ...site,
+            frac:
+              i % 2 === 0 ? site.frac.map((f, d) => f + shift[d]) : site.frac,
+          })),
+        };
+        const e = ewaldSum(shifted, rocksalt.q, { accuracy });
+        expect(e.real).toBeCloseTo(ref.real, 8);
+        expect(e.reciprocal).toBeCloseTo(ref.reciprocal, 8);
+        expect(e.total).toBeCloseTo(ref.total, 8);
+      }
+    }
+  });
+
   it("validates inputs", () => {
     expect(() => ewaldSum(b2Na.s, [1])).toThrow(/charges/);
     expect(() => ewaldSum(b2Na.s, [1, Number.NaN])).toThrow(/finite/);
