@@ -52,40 +52,39 @@ export function erfc(x: number): number {
  */
 const TABLE_XMAX = 8;
 const TABLE_N = 4096;
-let tableV: Float64Array | null = null;
-let tableD: Float64Array | null = null;
+const TABLE_H = TABLE_XMAX / TABLE_N;
+const TABLE_INV_H = TABLE_N / TABLE_XMAX;
+// Interleaved [f(x_i), h f'(x_i)] pairs: one array, and both values of a
+// node share a cache line. Built on first use (4097 exact erfc calls).
+let table: Float64Array | null = null;
 
-function buildTable(): void {
-  if (tableV && tableD) return;
-  const v = new Float64Array(TABLE_N + 1);
-  const d = new Float64Array(TABLE_N + 1);
+function buildTable(): Float64Array {
+  const tab = new Float64Array(2 * (TABLE_N + 1));
   for (let i = 0; i <= TABLE_N; i++) {
-    const x = (i / TABLE_N) * TABLE_XMAX;
-    v[i] = erfc(x);
-    d[i] = -(2 / SQRT_PI) * Math.exp(-x * x);
+    const x = i * TABLE_H;
+    tab[2 * i] = erfc(x);
+    tab[2 * i + 1] = TABLE_H * (-(2 / SQRT_PI) * Math.exp(-x * x));
   }
-  tableV = v;
-  tableD = d;
+  table = tab;
+  return tab;
 }
 
 /** Table-interpolated erfc: ~8x faster than {@link erfc} at ~1e-13 accuracy. */
 export function erfcFast(x: number): number {
   if (x < 0) return 2 - erfcFast(-x);
   if (x > TABLE_XMAX) return erfc(x);
-  buildTable();
-  const v = tableV as Float64Array;
-  const d = tableD as Float64Array;
-  const h = TABLE_XMAX / TABLE_N;
-  const pos = x / h;
+  const tab = table ?? buildTable();
+  const pos = x * TABLE_INV_H;
   let i = Math.floor(pos);
   if (i >= TABLE_N) i = TABLE_N - 1;
   const t = pos - i;
   const t2 = t * t;
   const t3 = t2 * t;
-  const f0 = v[i] as number;
-  const f1 = v[i + 1] as number;
-  const s0 = h * (d[i] as number);
-  const s1 = h * (d[i + 1] as number);
+  const k = 2 * i;
+  const f0 = tab[k] as number;
+  const s0 = tab[k + 1] as number;
+  const f1 = tab[k + 2] as number;
+  const s1 = tab[k + 3] as number;
   return (
     (2 * t3 - 3 * t2 + 1) * f0 +
     (t3 - 2 * t2 + t) * s0 +

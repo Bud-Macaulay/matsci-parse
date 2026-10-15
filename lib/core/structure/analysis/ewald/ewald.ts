@@ -24,9 +24,10 @@ export interface EwaldOptions {
   /** Significant figures each sum is converged to. Default 8. */
   accuracy?: number;
   /**
-   * erfc evaluator for the real-space sum. `"fast"` (~1e-13, ~8x quicker)
-   * satisfies any `accuracy`; `"exact"` (~1e-15) is the reference path.
-   * Default `"auto"` (currently `"fast"`).
+   * erfc evaluator for the real-space sum. `"fast"` is a table (~3e-13
+   * relative error on the energy, ~8x quicker), so it cannot honour
+   * `accuracy` above ~12; `"exact"` (~1e-15) is the reference path.
+   * Default `"auto"`: fast for `accuracy` <= 12, exact above.
    */
   erfc?: "auto" | ErfcMethod;
 }
@@ -78,7 +79,11 @@ export function ewaldSum(
     throw new Error("ewaldSum: accuracy must be positive");
   }
   const vol = volume(structure.lattice);
-  const erfcFn = selectErfc(opts.erfc === "exact" ? "exact" : "fast");
+  const erfcFn = selectErfc(
+    opts.erfc === "exact" || (opts.erfc !== "fast" && accuracy > 12)
+      ? "exact"
+      : "fast",
+  );
   const eta = opts.eta ?? Math.cbrt(n / Math.SQRT2 / vol ** 2) * Math.PI;
   if (!(eta > 0 && Number.isFinite(eta))) {
     throw new Error("ewaldSum: eta must be positive");
@@ -110,16 +115,34 @@ export function ewaldSum(
       }
     }
   }
-  // Cartesian translations T = n B (rows), computed once for all pairs.
-  const T = mul(
+  // Cartesian translations T = n B (rows), computed once for all pairs,
+  // then sorted by length so each pair can stop at the first T that cannot
+  // reach the cutoff: |d + T| >= |T| - |d| > rmax once |T| > rmax + |d|.
+  const T0 = mul(
     createMatrix(shifts.length / 3, 3, shifts),
     structure.lattice.basis,
   ).data;
+  const nT = T0.length / 3;
+  const tLen2 = new Float64Array(nT);
+  for (let t = 0; t < nT; t++) {
+    tLen2[t] = T0[3 * t] ** 2 + T0[3 * t + 1] ** 2 + T0[3 * t + 2] ** 2;
+  }
+  const order = Array.from({ length: nT }, (_, t) => t).sort(
+    (a, b) => tLen2[a] - tLen2[b],
+  );
+  const T = new Float64Array(3 * nT);
+  const tLen = new Float64Array(nT);
+  for (let t = 0; t < nT; t++) {
+    const o = order[t];
+    T[3 * t] = T0[3 * o];
+    T[3 * t + 1] = T0[3 * o + 1];
+    T[3 * t + 2] = T0[3 * o + 2];
+    tLen[t] = Math.sqrt(tLen2[o]);
+  }
   // Pair Cartesian offsets straight from fractional differences: each
   // offset is wrapped into [-0.5, 0.5] in locals (minimumImage() would
   // allocate per pair) and pushed through the basis inline, so there are no
-  // per-row products and no per-pair allocation. The summation order matches
-  // the old row-product formulation exactly (m = 0, 1, 2 accumulation).
+  // per-row products and no per-pair allocation.
   const B = structure.lattice.basis.data;
   const b0 = B[0];
   const b1 = B[1];
@@ -152,12 +175,13 @@ export function ewaldSum(
       const dy = fu * b1 + fv * b4 + fw * b7;
       const dz = fu * b2 + fv * b5 + fw * b8;
       // Sum erfc(sqrt(eta) r) / r over the images r = d + T within the
-      // cutoff (allocation-free hot loop).
+      // cutoff (allocation-free hot loop), up to the last T that can reach.
+      const tStop = rmax + Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-9;
       let s = 0;
-      for (let t = 0; t < T.length; t += 3) {
-        const x = dx + T[t];
-        const y = dy + T[t + 1];
-        const z = dz + T[t + 2];
+      for (let t = 0; t < nT && tLen[t] <= tStop; t++) {
+        const x = dx + T[3 * t];
+        const y = dy + T[3 * t + 1];
+        const z = dz + T[3 * t + 2];
         const r2 = x * x + y * y + z * z;
         // The zero translation of a self pair lands here (r2 = 0).
         if (r2 > rmax2 || r2 < 1e-16) continue;
@@ -176,71 +200,83 @@ export function ewaldSum(
   // Charged sites only; uncharged sites contribute nothing to S(G).
   const active = q.flatMap((qi, i) => (qi !== 0 ? [i] : []));
   if (active.length > 0) {
-    const recip = reciprocalLattice(structure.lattice);
-    // G vectors straight from Miller indices, without pointsInSphere: that
-    // shared helper allocates a ReciprocalPoint per candidate and sorts them
-    // all (measured +20-65% on this benchmark), but this sum needs neither
-    // objects nor order. Same search box (ceil((gmax + 0.15) * |a|)) and
-    // inclusion (g < gmax + 1e-8) as reciprocalPoints.ts, so the enumerated
-    // set is identical; keep the two in sync if either changes.
-    const rb = recip.basis.data;
+    const rb = reciprocalLattice(structure.lattice).basis.data;
+    // Miller-index box: G . a_i = 2 pi n_i, so |n_i| <= |G| |a_i| / 2pi.
+    // (pointsInSphere's ceil((gmax + 0.15) |a|) box is sized for the
+    // crystallographic convention without 2pi, ~2pi too wide per axis here:
+    // ~250x the candidates.) Inclusion |G| < gmax + 1e-8 as there.
     const [l0, l1, l2] = lengths(structure.lattice);
-    const n0 = Math.ceil((gmax + 0.15) * l0);
-    const n1 = Math.ceil((gmax + 0.15) * l1);
-    const n2 = Math.ceil((gmax + 0.15) * l2);
-    const gcut2 = (gmax + 1e-8) * (gmax + 1e-8);
-    const hkl: number[] = [];
-    for (let h = -n0; h <= n0; h++) {
-      for (let k = -n1; k <= n1; k++) {
-        for (let l = -n2; l <= n2; l++) {
-          if (h === 0 && k === 0 && l === 0) continue;
-          // Friedel symmetry: |S(-G)|^2 = |S(G)|^2, so each +/-G pair is
-          // counted once. Keeping the member whose first nonzero index is
-          // positive reproduces the old sort-and-dedupe survivor exactly
-          // (it sorted larger-h first), without strings or sorting.
-          if (h < 0 || (h === 0 && (k < 0 || (k === 0 && l < 0)))) continue;
-          const x = h * rb[0] + k * rb[3] + l * rb[6];
-          const y = h * rb[1] + k * rb[4] + l * rb[7];
-          const z = h * rb[2] + k * rb[5] + l * rb[8];
-          if (x * x + y * y + z * z < gcut2) hkl.push(h, k, l);
+    const gcut = gmax + 1e-8;
+    const n0 = Math.floor((gcut * l0) / (2 * Math.PI));
+    const n1 = Math.floor((gcut * l1) / (2 * Math.PI));
+    const n2 = Math.floor((gcut * l2) / (2 * Math.PI));
+    const gcut2 = gcut * gcut;
+    // Trig-free structure factors: G . r_s = 2 pi (h u_s + k v_s + l w_s)
+    // for fractional (u, v, w), so exp(i G . r_s) factors per axis. Tabulate
+    // exp(2 pi i m f) for |m| <= n per site and axis (each entry from its
+    // own cos/sin, no recurrence drift), laid out [m][site][re, im] so the
+    // inner site loop reads contiguously.
+    const nA = active.length;
+    const qa = new Float64Array(nA);
+    for (let s = 0; s < nA; s++) qa[s] = q[active[s]];
+    const axisPhases = (axis: number, nAx: number): Float64Array => {
+      const out = new Float64Array(2 * nA * (2 * nAx + 1));
+      for (let m = -nAx; m <= nAx; m++) {
+        const base = 2 * nA * (m + nAx);
+        for (let s = 0; s < nA; s++) {
+          const ph = 2 * Math.PI * m * structure.sites[active[s]].frac[axis];
+          out[base + 2 * s] = Math.cos(ph);
+          out[base + 2 * s + 1] = Math.sin(ph);
         }
       }
-    }
-    const nG = hkl.length / 3;
-    if (nG > 0) {
-      // Reciprocal vectors G = H B* (rows): one product for all G at once.
-      // Kept as raw .data (row-major, 3 per G); the loop below reads it with
-      // direct offsets rather than row() slices, which would allocate per G.
-      const G = mul(createMatrix(nG, 3, hkl), recip.basis).data;
-      // Cartesian positions of the charged sites in one product R = F B
-      // (rows). This replaces a per-site cartesian() call, which
-      // re-transposes the same 3x3 basis for every atom.
-      const nA = active.length;
-      const frac = new Float64Array(3 * nA);
-      for (let s = 0; s < nA; s++) {
-        frac.set(structure.sites[active[s]].frac, 3 * s);
-      }
-      const R = mul(createMatrix(nA, 3, frac), structure.lattice.basis).data;
-      const qa = active.map((i) => q[i]);
-      // Structure factor per G, fused: each phase G_g . r_s is consumed by
-      // cos/sin immediately, so the nG x nA phases matrix of G R^T is never
-      // materialized (that transient hit megabytes on large cells). g2 is a
-      // plain dot product here: norm() would sqrt just to square again.
-      for (let g = 0; g < nG; g++) {
-        const gx = G[3 * g];
-        const gy = G[3 * g + 1];
-        const gz = G[3 * g + 2];
-        const g2 = gx * gx + gy * gy + gz * gz;
-        const weight = 2 * (Math.exp(-g2 / (4 * eta)) / g2);
-        let re = 0;
-        let im = 0;
-        for (let s = 0; s < qa.length; s++) {
-          const phase =
-            gx * R[3 * s] + gy * R[3 * s + 1] + gz * R[3 * s + 2];
-          re += qa[s] * Math.cos(phase);
-          im += qa[s] * Math.sin(phase);
+      return out;
+    };
+    const E0 = axisPhases(0, n0);
+    const E1 = axisPhases(1, n1);
+    const E2 = axisPhases(2, n2);
+    // q_s exp(2 pi i (h u_s + k v_s)), shared by every l of one (h, k).
+    const A = new Float64Array(2 * nA);
+    // Friedel symmetry: |S(-G)|^2 = |S(G)|^2, so each +/-G pair is counted
+    // once, keeping the member whose first nonzero index is positive.
+    for (let h = 0; h <= n0; h++) {
+      for (let k = h === 0 ? 0 : -n1; k <= n1; k++) {
+        const px = h * rb[0] + k * rb[3];
+        const py = h * rb[1] + k * rb[4];
+        const pz = h * rb[2] + k * rb[5];
+        let haveA = false;
+        for (let l = h === 0 && k === 0 ? 1 : -n2; l <= n2; l++) {
+          const gx = px + l * rb[6];
+          const gy = py + l * rb[7];
+          const gz = pz + l * rb[8];
+          const g2 = gx * gx + gy * gy + gz * gz;
+          if (g2 >= gcut2) continue;
+          if (!haveA) {
+            const bh = 2 * nA * (h + n0);
+            const bk = 2 * nA * (k + n1);
+            for (let s = 0; s < nA; s++) {
+              const hr = E0[bh + 2 * s];
+              const hi = E0[bh + 2 * s + 1];
+              const kr = E1[bk + 2 * s];
+              const ki = E1[bk + 2 * s + 1];
+              A[2 * s] = qa[s] * (hr * kr - hi * ki);
+              A[2 * s + 1] = qa[s] * (hr * ki + hi * kr);
+            }
+            haveA = true;
+          }
+          const bl = 2 * nA * (l + n2);
+          let re = 0;
+          let im = 0;
+          for (let s = 0; s < nA; s++) {
+            const ar = A[2 * s];
+            const ai = A[2 * s + 1];
+            const lr = E2[bl + 2 * s];
+            const li = E2[bl + 2 * s + 1];
+            re += ar * lr - ai * li;
+            im += ar * li + ai * lr;
+          }
+          reciprocal +=
+            2 * (Math.exp(-g2 / (4 * eta)) / g2) * (re * re + im * im);
         }
-        reciprocal += weight * (re * re + im * im);
       }
     }
     reciprocal *= ((2 * Math.PI) / vol) * COULOMB_EV_ANGSTROM;

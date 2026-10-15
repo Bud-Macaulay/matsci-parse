@@ -207,7 +207,7 @@ export const types: Record<string, Desc> = {
       {
         "name": "erfc",
         "optional": true,
-        "doc": "erfc evaluator for the real-space sum. `\"fast\"` (~1e-13, ~8x quicker)\nsatisfies any `accuracy`; `\"exact\"` (~1e-15) is the reference path.\nDefault `\"auto\"` (currently `\"fast\"`).",
+        "doc": "erfc evaluator for the real-space sum. `\"fast\"` is a table (~3e-13\nrelative error on the energy, ~8x quicker), so it cannot honour\n`accuracy` above ~12; `\"exact\"` (~1e-15) is the reference path.\nDefault `\"auto\"`: fast for `accuracy` <= 12, exact above.",
         "type": {
           "k": "union",
           "of": [
