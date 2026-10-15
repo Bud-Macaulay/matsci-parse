@@ -15,3 +15,4 @@ export * from "./json";
 
 export * from "./ase";
 export * from "./pymatgen";
+export * from "./vasprun";
