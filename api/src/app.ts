@@ -1,289 +1,91 @@
-import express, { type Express } from "express";
-import swaggerUi from "swagger-ui-express";
-import {
-  discoverFunctions,
-  type DiscoveryResult,
-  type LibraryFunction,
-  type LibraryModule,
-} from "./discover.js";
-import { buildOpenApi } from "./openapi.js";
-import { FN_DOCS } from "./fn-docs.js";
-import { FN_GROUPS } from "./fn-groups.js";
-
-export interface AppOptions {
-  bodyLimit?: string;
-  maxBatch?: number;
-  allowlist?: string[];
-  denylist?: string[];
-  /** If set, only functions from these lib/core/* barrels are exposed. */
-  groups?: string[];
-  /** Expose the flat POST /api/<name> routes (default true). */
-  flatRoutes?: boolean;
-}
-
-export interface CallError {
-  code: string;
-  message: string;
-}
-
-function toMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-interface InvokeOutcome {
-  ok: boolean;
-  result?: unknown;
-  error?: CallError;
-}
-
 /**
- * Invoke one library function. Sync functions return directly, async ones
- * are awaited. Thrown errors and non-JSON-serializable results both become
- * per-call errors instead of crashing the request.
+ * matsci-parse REST API, generated from the library: each `@api`-tagged
+ * function (see src/generated.ts) becomes `POST /<module>/<function>` with a
+ * JSON body keyed by parameter name. Validation, the OpenAPI spec and the
+ * docs page all come from the library's own types and doc comments.
  */
-async function invoke(fn: LibraryFunction, args: unknown[]): Promise<InvokeOutcome> {
-  let result: unknown;
-  try {
-    result = await fn(...args);
-  } catch (err) {
-    return { ok: false, error: { code: "FUNCTION_ERROR", message: toMessage(err) } };
-  }
-  if (typeof result === "undefined") result = null;
-  try {
-    JSON.stringify(result);
-  } catch {
-    return {
-      ok: false,
-      error: {
-        code: "SERIALIZATION_ERROR",
-        message: "Function result is not JSON-serializable",
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
+import { bodyLimit } from "hono/body-limit";
+import { schemaFactory, valueCodec, type Endpoint } from "./codec";
+import { endpoints, functions, types } from "./generated";
+
+export const VERSION = "0.1.0";
+
+const ErrorSchema = z
+  .object({ error: z.string() })
+  .openapi("Error", { description: "Why the request could not be served." });
+
+const { schemaOf, objectOf } = schemaFactory(types);
+const { decode, encode } = valueCodec(types);
+
+function routeFor(e: Endpoint) {
+  const json = (schema: z.ZodType) => ({ "application/json": { schema } });
+  return createRoute({
+    method: "post",
+    path: `/${e.tag}/${e.name}`,
+    operationId: e.name,
+    tags: [e.tag],
+    summary: e.doc.split("\n")[0],
+    description: e.doc,
+    request: { body: { required: true, content: json(objectOf(e.params)) } },
+    responses: {
+      200: {
+        description: e.returnsDoc ?? "OK",
+        content: json(schemaOf(e.returns)),
       },
-    };
-  }
-  return { ok: true, result };
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export interface CreatedApp {
-  app: Express;
-  discovery: DiscoveryResult;
-}
-
-export function createApp(lib: LibraryModule, opts: AppOptions = {}): CreatedApp {
-  const maxBatch = opts.maxBatch ?? 50;
-  const discovery = discoverFunctions(lib, {
-    allowlist: opts.allowlist,
-    denylist: opts.denylist,
-  });
-  // Group filter (e.g. only structure + io): applied after discovery, so the
-  // startup log still reports what was skipped and why.
-  if (opts.groups) {
-    const allowed = new Set(opts.groups);
-    for (const name of [...discovery.functions.keys()]) {
-      if (!allowed.has(FN_GROUPS[name] ?? "")) {
-        discovery.functions.delete(name);
-        discovery.skippedFiltered.push(name);
-      }
-    }
-  }
-
-  const app = express();
-  app.disable("x-powered-by");
-  app.use(express.json({ limit: opts.bodyLimit ?? "1mb", strict: true }));
-
-  // Malformed JSON bodies -> 400 (must be registered right after the parser).
-  app.use(
-    (
-      err: unknown,
-      _req: express.Request,
-      res: express.Response,
-      next: express.NextFunction,
-    ) => {
-      if (
-        isJsonObject(err) &&
-        (err["type"] === "entity.parse.failed" || (err as { status?: number }).status === 400)
-      ) {
-        res
-          .status(400)
-          .json({ error: { code: "INVALID_JSON", message: "Request body is not valid JSON" } });
-        return;
-      }
-      next(err as Error);
+      400: { description: "Request does not match the schema", content: json(ErrorSchema) },
+      422: { description: "The library rejected the input", content: json(ErrorSchema) },
+      500: { description: "Server error", content: json(ErrorSchema) },
     },
-  );
-
-  app.get("/healthz", (_req, res) => {
-    res.json({ status: "ok", functions: discovery.functions.size });
   });
+}
 
-  app.get("/api", (_req, res) => {
-    const functions = [...discovery.functions.keys()].sort();
-    const groups: Record<string, string[]> = {};
-    for (const name of functions) {
-      const g = FN_GROUPS[name] ?? "other";
-      (groups[g] ??= []).push(name);
-    }
-    res.json({ functions, groups });
-  });
-
-  // Autogenerated docs: always reflect the actually-exposed functions.
-  // Descriptions come from the library's own TSDoc comments (see
-  // scripts/extract-fn-docs.ts); the UI assets are served locally by
-  // swagger-ui-express, so /docs works offline.
-  const names = [...discovery.functions.keys()].sort();
-  const groupOf: Record<string, string> = {};
-  for (const name of names) {
-    const g = FN_GROUPS[name];
-    if (g) groupOf[name] = g;
-  }
-  const openApiDoc = buildOpenApi(
-    names,
-    { title: "matsci-api", version: "0.1.0" },
-    FN_DOCS,
-    groupOf,
-    { flat: opts.flatRoutes ?? true },
-  );
-  app.get("/openapi.json", (_req, res) => {
-    res.json(openApiDoc);
-  });
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDoc));
-
-  /**
-   * Batch endpoint for frequent calls: one HTTP round trip for many
-   * invocations. Calls run sequentially in order; each item reports its own
-   * ok/error outcome so one failure does not sink the batch.
-   */
-  app.post("/api/batch", async (req, res) => {
-    const body = req.body;
-    if (!isJsonObject(body) || !Array.isArray(body["calls"])) {
-      res.status(400).json({
-        error: { code: "INVALID_ARGS", message: 'Expected JSON body of the form {"calls": [...]}' },
-      });
-      return;
-    }
-    const calls = body["calls"] as unknown[];
-    if (calls.length === 0 || calls.length > maxBatch) {
-      res.status(400).json({
-        error: {
-          code: "INVALID_ARGS",
-          message: `Expected 1..${maxBatch} calls, got ${calls.length}`,
-        },
-      });
-      return;
-    }
-    const results: InvokeOutcome[] = [];
-    for (const call of calls) {
-      if (!isJsonObject(call) || typeof call["fn"] !== "string" || !Array.isArray(call["args"])) {
-        results.push({
-          ok: false,
-          error: {
-            code: "INVALID_ARGS",
-            message: 'Each call must be of the form {"fn": "<name>", "args": [...]}',
-          },
-        });
-        continue;
+export function createApp() {
+  const app = new OpenAPIHono({
+    // Schema violations -> 400 naming the offending fields.
+    defaultHook: (result, c) => {
+      if (!result.success) {
+        const msg = result.error.issues
+          .map((i) => `${i.path.join(".") || "body"}: ${i.message}`)
+          .join("; ");
+        return c.json({ error: msg }, 400);
       }
-      const fn = discovery.functions.get(call["fn"]);
-      if (!fn) {
-        results.push({
-          ok: false,
-          error: { code: "UNKNOWN_FUNCTION", message: `Unknown function: ${call["fn"]}` },
-        });
-        continue;
-      }
-      results.push(await invoke(fn, call["args"] as unknown[]));
-    }
-    res.json({ results });
-  });
-
-  /** Shared single-call logic for the flat and grouped routes. */
-  async function handleCall(
-    req: express.Request,
-    res: express.Response,
-    lookup: string,
-    group: string | undefined,
-  ) {
-    const fn = discovery.functions.get(lookup);
-    if (!fn || (group !== undefined && (FN_GROUPS[lookup] ?? "") !== group)) {
-      res.status(404).json({
-        error: { code: "UNKNOWN_FUNCTION", message: `Unknown function: ${lookup}` },
-      });
-      return;
-    }
-    if (!isJsonObject(req.body) || !Array.isArray(req.body["args"])) {
-      res.status(400).json({
-        error: { code: "INVALID_ARGS", message: 'Expected JSON body of the form {"args": [...]}' },
-      });
-      return;
-    }
-    const outcome = await invoke(fn, req.body["args"] as unknown[]);
-    if (!outcome.ok) {
-      res.status(500).json({ error: outcome.error });
-      return;
-    }
-    res.json({ result: outcome.result ?? null });
-  }
-
-  app
-    .route("/api/:group/:name")
-    .post(async (req, res) => {
-      await handleCall(req, res, req.params["name"] ?? "", req.params["group"]);
-    })
-    .all((_req, res) => {
-      res
-        .status(405)
-        .json({ error: { code: "METHOD_NOT_ALLOWED", message: "Use POST with a JSON body" } });
-    });
-
-  // Flat root routes. Disabled with API_FLAT_ROUTES=false for a
-  // grouped-subpaths-only API. Registered after the grouped route (order is
-  // irrelevant: one and two segment paths never collide).
-  if (opts.flatRoutes ?? true) {
-    app
-      .route("/api/:name")
-      .post(async (req, res) => {
-        await handleCall(req, res, req.params["name"] ?? "", undefined);
-      })
-      .all((_req, res) => {
-        res
-          .status(405)
-          .json({ error: { code: "METHOD_NOT_ALLOWED", message: "Use POST with a JSON body" } });
-      });
-  }
-
-  // Unmatched /api/* paths -> JSON 404 (Express's default is an HTML page).
-  // This also covers the flat shapes when API_FLAT_ROUTES=false.
-  app.use("/api", (_req, res) => {
-    res.status(404).json({
-      error: { code: "NOT_FOUND", message: "Unknown endpoint" },
-    });
-  });
-
-  // Payload too large (and anything else downstream) -> JSON error.
-  app.use(
-    (
-      err: unknown,
-      _req: express.Request,
-      res: express.Response,
-      _next: express.NextFunction,
-    ) => {
-      if (isJsonObject(err) && err["type"] === "entity.too.large") {
-        res.status(413).json({
-          error: { code: "PAYLOAD_TOO_LARGE", message: "Request body exceeds the size limit" },
-        });
-        return;
-      }
-      res.status(500).json({
-        error: {
-          code: "INTERNAL_ERROR",
-          message: process.env["NODE_ENV"] === "production" ? "Internal error" : toMessage(err),
-        },
-      });
     },
-  );
+  });
 
-  return { app, discovery };
+  app.use("*", bodyLimit({ maxSize: 10 * 1024 * 1024 }));
+
+  // Anything not handled below is a server-side bug.
+  app.onError((err, c) => c.json({ error: err.message }, 500));
+
+  app.get("/health", (c) => c.json({ status: "ok", version: VERSION }));
+
+  for (const e of endpoints) {
+    const fn = functions[e.name]!;
+    app.openapi(routeFor(e), async (c) => {
+      const body = c.req.valid("json") as Record<string, unknown>;
+      let result: unknown;
+      try {
+        const args = e.params.map((p) => decode(p.type, body[p.name]));
+        result = await fn(...args);
+      } catch (err) {
+        // The input passed the schema but the library rejected it.
+        return c.json({ error: (err as Error).message }, 422);
+      }
+      return c.json(encode(e.returns, result) as any, 200);
+    });
+  }
+
+  app.doc31("/openapi.json", {
+    openapi: "3.1.0",
+    info: {
+      title: "matsci-parse API",
+      version: VERSION,
+      description: "Generated from the matsci-parse library's @api functions.",
+    },
+  });
+  app.get("/docs", swaggerUI({ url: "/openapi.json" }));
+
+  return app;
 }

@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+coverage
+docs
+benchmarks
+test-output
+tests
+webapp
+pseudo-webapp
+api/clients
+.git
