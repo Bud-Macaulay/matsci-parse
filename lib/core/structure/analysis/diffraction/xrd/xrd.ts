@@ -1,7 +1,7 @@
 import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
 import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
 import { Structure } from "../../../structure";
-import { occupancyOf } from "../../../../site/occupancy";
+import { scatterers, type DisorderedStructure } from "../../../disordered";
 import { SymbolToAtomicNumber } from "../../../../data/periodictable/atomicData";
 import { getXrayScatteringParams } from "../../../../data/periodictable/xrayScattering";
 import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
@@ -46,9 +46,9 @@ interface ExpandedSite {
   fz: number;
 }
 
-function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<string, number>>): ExpandedSite[] {
-  return structure.sites.map((site) => {
-    const symbol = site.species.symbol;
+function expandSites(structure: Structure | DisorderedStructure, debyeWallerFactors: Readonly<Record<string, number>>): ExpandedSite[] {
+  return scatterers(structure).map((site) => {
+    const symbol = site.symbol;
     const coeffs = getXrayScatteringParams(symbol);
 
     if (coeffs === undefined) {
@@ -68,7 +68,7 @@ function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<s
     return {
       z,
       coeffs,
-      occu: occupancyOf(site),
+      occu: site.occupancy,
       dw: debyeWallerFactors[symbol] ?? 0,
       fx: frac[0],
       fy: frac[1],
@@ -89,7 +89,7 @@ function expandSites(structure: Structure, debyeWallerFactors: Readonly<Record<s
  * @param structure - Crystal structure with lattice basis rows in angstroms.
  * @param options - Wavelength, range, scaling, Debye-Waller factors.
  * @returns Two-theta positions, intensities, Miller families, d-spacings. */
-export function calculateXrdPattern(structure: Structure, options?: XrdOptions): XrdPattern {
+export function calculateXrdPattern(structure: Structure | DisorderedStructure, options?: XrdOptions): XrdPattern {
   const wavelength = resolveWavelength(options?.wavelength ?? "CuKa");
   const range = options?.twoThetaRange === undefined ? ([0, 90] as const) : options.twoThetaRange;
   const scaled = options?.scaled ?? true;

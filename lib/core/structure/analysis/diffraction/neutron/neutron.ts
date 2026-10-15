@@ -1,7 +1,7 @@
 import { reciprocalLatticeCrystallographic } from "../../../../lattice/reciprocalLatticeCrystallographic";
 import { isHexagonal } from "../../../../lattice/properties/isHexagonal";
 import { Structure } from "../../../structure";
-import { occupancyOf } from "../../../../site/occupancy";
+import { scatterers, type DisorderedStructure } from "../../../disordered";
 import { getNeutronScatteringLength } from "../../../../data/periodictable/neutronScattering";
 import { MillerFamily, getUniqueFamilies } from "../uniqueFamilies";
 import { pointsInSphere, twoThetaRangeToRadii } from "../reciprocalPoints";
@@ -41,11 +41,11 @@ interface ExpandedSite {
 }
 
 function expandSites(
-  structure: Structure,
+  structure: Structure | DisorderedStructure,
   debyeWallerFactors: Readonly<Record<string, number>>,
 ): ExpandedSite[] {
-  return structure.sites.map((site) => {
-    const symbol = site.species.symbol;
+  return scatterers(structure).map((site) => {
+    const symbol = site.symbol;
     const length = getNeutronScatteringLength(symbol);
 
     if (length === undefined) {
@@ -56,7 +56,7 @@ function expandSites(
 
     return {
       length,
-      occu: occupancyOf(site),
+      occu: site.occupancy,
       dw: debyeWallerFactors[symbol] ?? 0,
       fx: site.frac[0],
       fy: site.frac[1],
@@ -78,7 +78,7 @@ function expandSites(
  * @param options - Wavelength, range, scaling, Debye-Waller factors.
  * @returns Two-theta positions, intensities, Miller families, d-spacings. */
 export function calculateNdPattern(
-  structure: Structure,
+  structure: Structure | DisorderedStructure,
   options?: NdOptions,
 ): NdPattern {
   const wavelength = options?.wavelength ?? 1.54184;

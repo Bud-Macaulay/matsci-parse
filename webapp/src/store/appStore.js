@@ -104,7 +104,13 @@ export const actions = {
 
     const text = await file.text();
 
-    const { structure } = parseFileText(text);
+    let structure;
+    try {
+      ({ structure } = parseFileText(text));
+    } catch (err) {
+      showToast(`${file.name}: ${err.message}`, "error");
+      throw err;
+    }
 
     const meta = {
       name: `${file.name} (${new Date().toLocaleString()})`,

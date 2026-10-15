@@ -1,11 +1,13 @@
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import { determinant } from "@/core/matrix/operations/determinant";
+import { mul } from "@/core/matrix/operations/mul";
+import { row } from "@/core/matrix/operations/row";
 import { dot } from "@/core/matrix/operations/vector/dot";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import type { Lattice } from "@/core/lattice/lattice";
 import { EPSILON } from "@/core/math/constants";
-import { gcd, lcm } from "@/core/math/numeric";
+import { clean, gcd, lcm } from "@/core/math/numeric";
 
 function reduceVector(v: number[]): number[] {
   let g = 0;
@@ -17,7 +19,7 @@ function reduceVector(v: number[]): number[] {
 }
 
 /**
- * Calculate the slab scale factor following pymatgen's `calculate_scaling_factor` algorithm.
+ * Calculate the slab scale factor for an (hkl) surface termination.
  *
  * Given Miller indices (h, k, l), builds a 3×3 integer matrix U such that:
  * - Rows 0 and 1 are real-space vectors perpendicular to the surface normal (in-plane).
@@ -35,23 +37,27 @@ export function calculateScaleFactor(
   millerIndex: [number, number, number],
   lattice: Lattice,
 ): Matrix {
-  const [h, k, l] = millerIndex;
+  // Reduce to primitive Miller index, e.g. (2, 2, 0) -> (1, 1, 0).
+  const g = gcd(
+    gcd(Math.abs(millerIndex[0]), Math.abs(millerIndex[1])),
+    Math.abs(millerIndex[2]),
+  );
+  const [h, k, l] =
+    g > 1
+      ? (millerIndex.map((m) => m / g) as [number, number, number])
+      : millerIndex;
 
   // Surface normal in Cartesian from reciprocal lattice
-  const recip = reciprocalLatticeCrystallographic(lattice);
-  const rb = recip.basis.data;
-  const normalRaw = new Float64Array([
-    h * rb[0] + k * rb[3] + l * rb[6],
-    h * rb[1] + k * rb[4] + l * rb[7],
-    h * rb[2] + k * rb[5] + l * rb[8],
-  ]);
+  const normalRaw = mul(
+    createMatrix(1, 3, [h, k, l]),
+    reciprocalLatticeCrystallographic(lattice).basis,
+  ).data;
   const normalLen = norm(normalRaw);
   if (normalLen < EPSILON) {
     throw new Error("Miller index [0,0,0] is invalid");
   }
   const normal = new Float64Array(normalRaw.map((x) => x / normalLen));
 
-  const basis = lattice.basis.data;
   const millerArr = [h, k, l];
 
   // Classify lattice vectors: in-plane (miller[i]==0) vs non-orthogonal
@@ -61,15 +67,11 @@ export function calculateScaleFactor(
   for (let idx = 0; idx < 3; idx++) {
     if (millerArr[idx] === 0) {
       // Lattice vector is already in the surface plane
-      const row = [0, 0, 0];
-      row[idx] = 1;
-      slabScaleFactor.push(row);
+      const scaleRow = [0, 0, 0];
+      scaleRow[idx] = 1;
+      slabScaleFactor.push(scaleRow);
     } else {
-      const aIdx = new Float64Array([
-        basis[idx * 3],
-        basis[idx * 3 + 1],
-        basis[idx * 3 + 2],
-      ]);
+      const aIdx = row(lattice.basis, idx);
       const aLen = norm(aIdx);
       const d = Math.abs(dot(normal, aIdx)) / aLen;
       nonOrthInd.push([idx, d]);
@@ -100,10 +102,10 @@ export function calculateScaleFactor(
       for (let jj = ii + 1; jj < nonOrthInd.length; jj++) {
         const iiIdx = nonOrthInd[ii][0];
         const jjIdx = nonOrthInd[jj][0];
-        const row = [0, 0, 0];
-        row[iiIdx] = -Math.round(lcmVal / millerArr[iiIdx]);
-        row[jjIdx] = Math.round(lcmVal / millerArr[jjIdx]);
-        slabScaleFactor.push(reduceVector(row));
+        const scaleRow = [0, 0, 0];
+        scaleRow[iiIdx] = -Math.round(lcmVal / millerArr[iiIdx]);
+        scaleRow[jjIdx] = Math.round(lcmVal / millerArr[jjIdx]);
+        slabScaleFactor.push(reduceVector(scaleRow));
         if (slabScaleFactor.length === 2) break;
       }
       if (slabScaleFactor.length === 2) break;
@@ -119,12 +121,12 @@ export function calculateScaleFactor(
   const flat = slabScaleFactor.flat();
   let mat = createMatrix(3, 3, flat);
 
-  // Ensure positive determinant (left-handed → negate first row)
+  // Ensure a right-handed cell (positive determinant) by negating the matrix.
   if (determinant(mat) < 0) {
     mat = createMatrix(
       3,
       3,
-      flat.map((x, i) => (i < 3 ? -x : x)),
+      flat.map((x) => clean(-x)),
     );
   }
 

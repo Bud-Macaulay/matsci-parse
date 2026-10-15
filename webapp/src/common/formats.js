@@ -1,4 +1,11 @@
-import { fromCIF, fromXYZ, fromPOSCAR, fromXSF, fromPW } from "matsci-parse";
+import {
+  fromCIF,
+  fromXYZ,
+  fromPOSCAR,
+  fromXSF,
+  fromPW,
+  isDisordered,
+} from "matsci-parse";
 
 export function detectFormat(fileText) {
   const lines = fileText
@@ -47,6 +54,12 @@ export function parseFileText(fileText) {
   }
 
   const structure = importer(fileText);
+
+  if (isDisordered(structure)) {
+    throw new Error(
+      "This file has partially occupied sites (a disordered structure), which the viewer doesn't support yet.",
+    );
+  }
 
   return {
     format,

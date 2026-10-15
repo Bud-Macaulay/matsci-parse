@@ -2,6 +2,14 @@ import { fromParameters } from "../../lattice/create/fromParameters";
 import { parameters } from "../../lattice/parameters";
 import { Structure } from "../../structure/structure";
 import {
+  assertOrdered,
+  type DisorderedStructure,
+} from "../../structure/disordered";
+import {
+  createDisorderedSite,
+  type DisorderedSite,
+} from "../../site/disorder";
+import {
   parseOperations,
   applyOperation,
 } from "./symmetryOperations";
@@ -27,6 +35,42 @@ function isSymOpHeader(header: string): boolean {
   );
 }
 
+const EPS = 1e-3;
+
+/** Occupancies within this of 1 count as fully occupied. */
+const FULL_OCCU_TOL = 1e-3;
+
+/** Total occupancy up to 1 + this is CIF rounding (e.g. 3 x 0.334) and is
+ * renormalized to 1; anything above is rejected as overfilled. */
+const OVERFILL_TOL = 1e-2;
+
+function wrapValue(x: number): number {
+  return ((x % 1) + 1) % 1;
+}
+
+function cleanNearZero(x: number): number {
+  return Math.abs(x) < EPS ? 0 : x;
+}
+
+function posKey(species: string, frac: number[]): string {
+  const w = frac.map((v) => {
+    const c = cleanNearZero(wrapValue(v));
+    return Math.round(c * 1000) / 1000;
+  });
+
+  return `${species}:${w[0]},${w[1]},${w[2]}`;
+}
+
+/** Occupancy from a CIF value; "." / "?" (unknown) or missing means 1. */
+function occupancyValue(raw: string | undefined): number {
+  const v = cleanValue(raw);
+  return Number.isFinite(v) ? v : 1;
+}
+
+function isPartialOccupancy(raw: string | undefined): boolean {
+  return Math.abs(occupancyValue(raw) - 1) > FULL_OCCU_TOL;
+}
+
 /** Strips oxidation-state/charge suffixes (e.g. "Na1+" -> "Na", "O2-" -> "O"). */
 function cleanSpeciesSymbol(raw: string | undefined): string {
   if (raw === undefined) return "";
@@ -35,8 +79,16 @@ function cleanSpeciesSymbol(raw: string | undefined): string {
   return m ? m[1] : unquoted;
 }
 
-/** Parses a CIF (Crystallographic Information File) string into a Structure. */
-export function fromCIF(text: string): Structure {
+/**
+ * Parses a CIF (Crystallographic Information File) string.
+ *
+ * Returns an ordered Structure unless `_atom_site_occupancy` marks a
+ * partially occupied or shared site, in which case it returns a
+ * DisorderedStructure (narrow with `isDisordered`). Occupancy is checked on
+ * the asymmetric unit, before symmetry expansion, so fully occupied files
+ * take the ordered path at negligible cost.
+ */
+export function fromCIF(text: string): Structure | DisorderedStructure {
   let a = 0;
   let b = 0;
   let c = 0;
@@ -212,30 +264,28 @@ export function fromCIF(text: string): Structure {
     };
   });
 
+  // Occupancy check on the asymmetric unit, before symmetry expansion.
+  // Hot loop for large P1 files: a string compare for the usual "1", full
+  // parsing only otherwise, and stop at the first partial occupancy.
+  const iocc = atomHeaders.findIndex((x) => x.includes("_occupancy"));
+  if (iocc >= 0) {
+    for (const row of atomRows) {
+      const raw = row[iocc];
+      if (raw === "1" || !isPartialOccupancy(raw)) continue;
+      return disorderedFromAsymmetricUnit(
+        lattice,
+        asymSites,
+        atomRows.map((r) => occupancyValue(r[iocc])),
+        symOpStrings.length > 0 ? symOpStrings : ["x,y,z"],
+      );
+    }
+  }
+
   if (symOpStrings.length === 0) {
     return { lattice, sites: asymSites };
   }
 
   const symOps = parseOperations(symOpStrings);
-
-  const EPS = 1e-3;
-
-  function wrapValue(x: number): number {
-    return ((x % 1) + 1) % 1;
-  }
-
-  function cleanNearZero(x: number): number {
-    return Math.abs(x) < EPS ? 0 : x;
-  }
-
-  function posKey(species: string, frac: number[]): string {
-    const w = frac.map((v) => {
-      const c = cleanNearZero(wrapValue(v));
-      return Math.round(c * 1000) / 1000;
-    });
-
-    return `${species}:${w[0]},${w[1]},${w[2]}`;
-  }
 
   const seen = new Set<string>();
   const sites: { species: { symbol: string }; frac: Float64Array }[] = [];
@@ -269,8 +319,84 @@ export function fromCIF(text: string): Structure {
   };
 }
 
+/**
+ * Build a DisorderedStructure from a CIF asymmetric unit with partial
+ * occupancies: rows sharing a position (e.g. Fe1 0.5 / Ni1 0.5) merge into
+ * one disordered site, then each site is expanded by the symmetry
+ * operations, deduplicated on position alone.
+ */
+function disorderedFromAsymmetricUnit(
+  lattice: Structure["lattice"],
+  asymSites: { species: { symbol: string }; frac: Float64Array }[],
+  occu: number[],
+  symOpStrings: string[],
+): DisorderedStructure {
+  // Step 1: group asymmetric-unit rows by position. The same element twice
+  // at one position (e.g. Fe2+ / Fe3+, both cleaned to Fe) sums.
+  const groups = new Map<
+    string,
+    { frac: Float64Array; fractions: Map<string, number> }
+  >();
+  asymSites.forEach((site, i) => {
+    const key = posKey("", Array.from(site.frac));
+    let g = groups.get(key);
+    if (!g) {
+      g = { frac: site.frac, fractions: new Map() };
+      groups.set(key, g);
+    }
+    const sym = site.species.symbol;
+    g.fractions.set(sym, (g.fractions.get(sym) ?? 0) + occu[i]);
+  });
+
+  const asym: DisorderedSite[] = [...groups.values()].map(
+    ({ frac, fractions }) => {
+      const total = [...fractions.values()].reduce((a, v) => a + v, 0);
+      if (total > 1 + OVERFILL_TOL) {
+        throw new Error(
+          `fromCIF: occupancies at [${Array.from(frac).join(", ")}] sum to ${+total.toFixed(4)} (overfilled site)`,
+        );
+      }
+      // Renormalize CIF rounding just above 1 (e.g. 3 x 0.334).
+      const scale = total > 1 ? 1 / total : 1;
+      return createDisorderedSite(
+        frac,
+        [...fractions].map(([symbol, fraction]) => ({
+          symbol,
+          fraction: fraction * scale,
+        })),
+      );
+    },
+  );
+
+  // Step 2: expand each disordered site by symmetry, keyed on position only.
+  const symOps = parseOperations(symOpStrings);
+  const seen = new Set<string>();
+  const sites: DisorderedSite[] = [];
+  for (const site of asym) {
+    for (const op of symOps) {
+      const operated = applyOperation(op, Array.from(site.frac));
+      const frac = [
+        cleanNearZero(wrapValue(operated[0])),
+        cleanNearZero(wrapValue(operated[1])),
+        cleanNearZero(wrapValue(operated[2])),
+      ];
+      const key = posKey("", frac);
+      if (!seen.has(key)) {
+        seen.add(key);
+        sites.push({
+          frac: new Float64Array(frac),
+          occupancy: site.occupancy.map((o) => ({ ...o })),
+        });
+      }
+    }
+  }
+
+  return { disordered: true, lattice, sites };
+}
+
 /** Serializes a Structure to a CIF string. */
 export function toCIF(structure: Structure, precision = 6): string {
+  assertOrdered(structure, "toCIF");
   const p = parameters(structure.lattice);
 
   const lines: string[] = [];
