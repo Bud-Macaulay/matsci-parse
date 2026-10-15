@@ -63,7 +63,7 @@ export default function AtomTable({
   };
 
   return (
-    <div className="bg-white rounded-md border border-b-0 overflow-hidden flex flex-col max-h-[25%]">
+    <div className="bg-white rounded-md border border-b-0 overflow-y-auto min-h-[150px] flex flex-col max-h-[25%]">
       <div className="overflow-y-auto">
         <table className="table-nice">
           <thead>

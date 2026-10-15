@@ -15,6 +15,7 @@ import HistoryBar from "./HistoryBar";
 import SpeciesModal from "./SpeciesModal";
 import SymmetryPanel from "./SymmetrySubPanel";
 import TransformLatticePanel from "./TransformLatticePanel";
+import PerturbPanel from "./PerturbPanel";
 import AddAtomPanel from "./AddAtomPanel";
 import DistanceMatrixPanel from "./DistanceMatrixPanel";
 import SlabModal from "./SlabModal";
@@ -181,6 +182,11 @@ export default function MainPanel({ tab, updateTab }) {
           />
           <LatticePanel lattice={structure.lattice} />
           <TransformLatticePanel
+            structure={structure}
+            setStructure={setStructure}
+            pushUndo={pushUndo}
+          />
+          <PerturbPanel
             structure={structure}
             setStructure={setStructure}
             pushUndo={pushUndo}

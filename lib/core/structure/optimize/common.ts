@@ -1,13 +1,14 @@
 import { determinant } from "@/core/matrix/operations/determinant";
 import { inverse3x3 } from "@/core/matrix/operations/inverse/inverse3x3";
-import { createLattice } from "@/core/lattice/lattice";
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import { mul } from "@/core/matrix/operations/mul";
 import { negate } from "@/core/matrix/operations/negate";
+import { sub } from "@/core/matrix/operations/sub";
 import { scale as scaleMatrix } from "@/core/matrix/operations/scale";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import type { Structure } from "../structure";
+import { applyStrain } from "../operations/applyStrain";
 
 /** Shared options for all force-based optimizers. */
 export interface OptimizerOptions {
@@ -110,8 +111,10 @@ export function assemble(
   return { x, g, invB };
 }
 
-/** Structure at optimizer coordinates: basis newB, fractional coords
- * f = x̃·B_ref⁻¹ (see {@link assemble}). */
+/** Structure at optimizer coordinates: move the atoms to fractional
+ * coords f = x̃·B_ref⁻¹ (see {@link assemble}), then strain the cell from
+ * its current basis B onto newB. The cell step dB = newB - B is the strain
+ * ε = (B⁻¹·dB)ᵀ, since B·(I + ε)ᵀ = B + dB (see {@link cellGeneralizedForces}). */
 export function rebuild(
   structure: Structure,
   newX: Float64Array,
@@ -127,7 +130,11 @@ export function rebuild(
     ...site,
     frac: fracs.slice(i * 3, i * 3 + 3),
   }));
-  return { lattice: createLattice(newB), sites };
+  const B = structure.lattice.basis;
+  const strain = transpose(
+    mul(inverse3x3(B), sub(createMatrix(3, 3, newB), B)),
+  );
+  return applyStrain({ lattice: structure.lattice, sites }, strain);
 }
 
 /** Cell generalized forces F_B = -∂E/∂B = -V·B⁻ᵀ·σ, plus B⁻¹.

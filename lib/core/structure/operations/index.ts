@@ -1,4 +1,6 @@
 export * from "./applyTransformationBasis";
+export * from "./applyStrain";
+export * from "./perturb";
 export * from "./canonicalize";
 export * from "./hashStructure";
 export * from "./sortSites";

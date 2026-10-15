@@ -5,7 +5,7 @@ export default function LatticePanel({ lattice }) {
   const [view, setView] = useState("matrix");
 
   return (
-    <div className="bg-white rounded-md border overflow-hidden">
+    <div className="bg-white rounded-md border min-h-[125px] overflow-hidden">
       <div className="px-3 py-2 border-b bg-gray-50 flex items-center justify-between">
         <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
           Lattice
