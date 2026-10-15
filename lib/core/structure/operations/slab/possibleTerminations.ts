@@ -1,6 +1,9 @@
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { dot } from "@/core/matrix/operations/vector/dot";
+import { mul } from "@/core/matrix/operations/mul";
+import { row } from "@/core/matrix/operations/row";
+import { createMatrix } from "@/core/matrix/matrix";
 import { calculateScaleFactor } from "./calculateScaleFactor";
 import { supercell } from "../supercell";
 import type { Structure } from "../../structure";
@@ -35,17 +38,13 @@ export function possibleTerminations(
     return [t - Math.floor(t)];
   }
 
-  const recip = reciprocalLatticeCrystallographic(structure.lattice);
-  const rb = recip.basis.data;
-  const [h, k, l] = millerIndex;
-  const normal = new Float64Array([
-    h * rb[0] + k * rb[3] + l * rb[6],
-    h * rb[1] + k * rb[4] + l * rb[7],
-    h * rb[2] + k * rb[5] + l * rb[8],
-  ]);
-  const b = ouc.lattice.basis.data;
+  // Surface normal n = (h, k, l) B*; plane-stacking height is c . n / |n|.
+  const normal = mul(
+    createMatrix(1, 3, millerIndex),
+    reciprocalLatticeCrystallographic(structure.lattice).basis,
+  ).data;
   const height =
-    Math.abs(dot(normal, new Float64Array([b[6], b[7], b[8]]))) / norm(normal);
+    Math.abs(dot(normal, row(ouc.lattice.basis, 2))) / norm(normal);
 
   // Single-linkage clustering on PBC z-distances (Kruskal, no deps).
   const edges: [number, number, number][] = [];

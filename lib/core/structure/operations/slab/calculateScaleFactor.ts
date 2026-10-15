@@ -1,5 +1,7 @@
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import { determinant } from "@/core/matrix/operations/determinant";
+import { mul } from "@/core/matrix/operations/mul";
+import { row } from "@/core/matrix/operations/row";
 import { dot } from "@/core/matrix/operations/vector/dot";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
@@ -46,20 +48,16 @@ export function calculateScaleFactor(
       : millerIndex;
 
   // Surface normal in Cartesian from reciprocal lattice
-  const recip = reciprocalLatticeCrystallographic(lattice);
-  const rb = recip.basis.data;
-  const normalRaw = new Float64Array([
-    h * rb[0] + k * rb[3] + l * rb[6],
-    h * rb[1] + k * rb[4] + l * rb[7],
-    h * rb[2] + k * rb[5] + l * rb[8],
-  ]);
+  const normalRaw = mul(
+    createMatrix(1, 3, [h, k, l]),
+    reciprocalLatticeCrystallographic(lattice).basis,
+  ).data;
   const normalLen = norm(normalRaw);
   if (normalLen < EPSILON) {
     throw new Error("Miller index [0,0,0] is invalid");
   }
   const normal = new Float64Array(normalRaw.map((x) => x / normalLen));
 
-  const basis = lattice.basis.data;
   const millerArr = [h, k, l];
 
   // Classify lattice vectors: in-plane (miller[i]==0) vs non-orthogonal
@@ -69,15 +67,11 @@ export function calculateScaleFactor(
   for (let idx = 0; idx < 3; idx++) {
     if (millerArr[idx] === 0) {
       // Lattice vector is already in the surface plane
-      const row = [0, 0, 0];
-      row[idx] = 1;
-      slabScaleFactor.push(row);
+      const scaleRow = [0, 0, 0];
+      scaleRow[idx] = 1;
+      slabScaleFactor.push(scaleRow);
     } else {
-      const aIdx = new Float64Array([
-        basis[idx * 3],
-        basis[idx * 3 + 1],
-        basis[idx * 3 + 2],
-      ]);
+      const aIdx = row(lattice.basis, idx);
       const aLen = norm(aIdx);
       const d = Math.abs(dot(normal, aIdx)) / aLen;
       nonOrthInd.push([idx, d]);
@@ -108,10 +102,10 @@ export function calculateScaleFactor(
       for (let jj = ii + 1; jj < nonOrthInd.length; jj++) {
         const iiIdx = nonOrthInd[ii][0];
         const jjIdx = nonOrthInd[jj][0];
-        const row = [0, 0, 0];
-        row[iiIdx] = -Math.round(lcmVal / millerArr[iiIdx]);
-        row[jjIdx] = Math.round(lcmVal / millerArr[jjIdx]);
-        slabScaleFactor.push(reduceVector(row));
+        const scaleRow = [0, 0, 0];
+        scaleRow[iiIdx] = -Math.round(lcmVal / millerArr[iiIdx]);
+        scaleRow[jjIdx] = Math.round(lcmVal / millerArr[jjIdx]);
+        slabScaleFactor.push(reduceVector(scaleRow));
         if (slabScaleFactor.length === 2) break;
       }
       if (slabScaleFactor.length === 2) break;
