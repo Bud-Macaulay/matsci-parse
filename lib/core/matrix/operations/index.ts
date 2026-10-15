@@ -21,5 +21,6 @@ export * from "./trace";
 export * from "./transpose";
 
 export * from "./inverse";
+export * from "./hermiteNormalForm";
 export * from "./latticePointsInSupercell";
 export * from "./vector";

@@ -6,6 +6,9 @@ import { spgroup_data } from "../spgData";
 import { parameters } from "../../../../lattice/parameters";
 
 import { determinant } from "@/core/matrix/operations/determinant";
+import { transpose } from "@/core/matrix/operations/transpose";
+import { row } from "@/core/matrix/operations/row";
+import { createMatrix } from "@/core/matrix/matrix";
 import type { KPath } from "@/core/kpoints";
 
 import { transformAP, determineExtBravais, determineAP } from "./bravais";
@@ -24,13 +27,10 @@ import { bandPathData } from "./bandPathData";
 
 const RAD2DEG = 180 / Math.PI;
 
+/** Row-major flat 3x3 -> nested rows (createMatrix checks the length). */
 function rowsFromFlat(data: ArrayLike<number>): number[][] {
-  if (data.length !== 9) throw new Error("Expected 9 lattice values");
-  return [
-    [data[0], data[1], data[2]],
-    [data[3], data[4], data[5]],
-    [data[6], data[7], data[8]],
-  ];
+  const m = createMatrix(3, 3, Array.from(data));
+  return [0, 1, 2].map((i) => Array.from(row(m, i)));
 }
 
 /** Compute [a, b, c, alphaDeg, betaDeg, gammaDeg] from a row-major 3x3 lattice. */
@@ -265,7 +265,13 @@ export async function getPath(
     volume_original_wrt_prim: origDet / primDet,
     spacegroup_number: spgrpNum,
     spacegroup_international: calcResults.hm_symbol,
-    rotation_matrix: rowsFromFlat(calcResults.std_rotation_matrix),
+    // moyo serializes matrices column-major; lattices come out as rows of
+    // basis vectors, but this rotation must be transposed back.
+    rotation_matrix: rowsFromFlat(
+      transpose(
+        createMatrix(3, 3, Array.from(calcResults.std_rotation_matrix)),
+      ).data,
+    ),
   };
 }
 

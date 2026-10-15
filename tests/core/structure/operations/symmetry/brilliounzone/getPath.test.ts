@@ -98,6 +98,35 @@ describe("getPath integration over all POSCARs", () => {
   );
 });
 
+describe("getPath rotation_matrix", () => {
+  it("matches Python seekpath for a cell rotated 30 degrees about z", async () => {
+    // Regression: moyo's matrices are column-major; this one was transposed.
+    const c = Math.cos(Math.PI / 6);
+    const s = Math.sin(Math.PI / 6);
+    const structure = fromPOSCAR(`NaCl rotated
+1
+${4 * c} ${4 * s} 0
+${-4 * s} ${4 * c} 0
+0 0 4
+Na Cl
+1 1
+Direct
+0 0 0
+0.5 0.5 0.5
+`);
+    const r = await getPath(structure);
+    // seekpath.get_path(...)["rotation_matrix"] (seekpath 2.2.1)
+    const expected = [
+      [c, s, 0],
+      [-s, c, 0],
+      [0, 0, 1],
+    ];
+    r.rotation_matrix.forEach((row, i) =>
+      row.forEach((v, j) => expect(v).toBeCloseTo(expected[i]![j]!, 6)),
+    );
+  });
+});
+
 describe("getPath known-value checks", () => {
   const diamondPoscar = `C diamond
 1

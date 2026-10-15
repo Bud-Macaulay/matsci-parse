@@ -7,6 +7,10 @@ import { transpose } from "@/core/matrix/operations/transpose";
 import { mul } from "@/core/matrix/operations/mul";
 import { determinant } from "@/core/matrix/operations/determinant";
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
+import {
+  hermiteNormalForm,
+  hermiteNormalForms,
+} from "@/core/matrix/operations/hermiteNormalForm";
 import type { Structure } from "../../structure";
 import type { DisorderedStructure } from "../../disordered";
 
@@ -59,6 +63,13 @@ function multinomial(n: number, counts: number[]): number {
   return Math.round(total);
 }
 
+/** Compact string key for small non-negative integer arrays (< 65536). */
+function keyOf(a: ArrayLike<number>): string {
+  let k = "";
+  for (let i = 0; i < a.length; i++) k += String.fromCharCode(a[i]!);
+  return k;
+}
+
 /** Wrapped fractional coordinate key (rounded after arithmetic, never before). */
 function snapKey(f: ArrayLike<number>): string {
   return [0, 1, 2]
@@ -71,43 +82,19 @@ function snapKey(f: ArrayLike<number>): string {
     .join(",");
 }
 
-/**
- * Enumerate symmetrically distinct ordered decorations of a disordered
- * parent in a fixed supercell (sandbox port of enumlib's core loop;
- * superlattice search is not included).
- *
- * Each parent orbit's species counts are fixed by its occupancy fractions times
- * its site multiplicity in the supercell (vacancies and incommensurate
- * fractions throw). Decorations are deduped under supercell translations
- * plus parent rotations preserving the supercell, using the closed group
- * (canonical minimum labeling — generators alone miss composed operations).
- *
- * @param parent - Disordered parent structure.
- * @param H - Integer supercell matrix (rows = new lattice vectors).
- * @param opts - Tolerances and search cap.
- * @returns Unique ordered supercell structures.
- * @api
- */
-export async function orderDisorderedStructure(
+/** Disordered parent, validated and symmetry-analyzed once. */
+interface ParentAnalysis {
+  parent: DisorderedStructure;
+  colored: Structure;
+  orbits: number[];
+  operations: { rotation: Matrix; translation: Matrix }[];
+  tol: number;
+}
+
+async function analyzeParent(
   parent: DisorderedStructure,
-  H: Matrix,
-  opts: EnumOptions = {},
-): Promise<Structure[]> {
-  const tol = opts.tol ?? 1e-6;
-  const maxCombinations = opts.maxCombinations ?? DEFAULT_MAX_COMBINATIONS;
-
-  if (H.rows !== 3 || H.cols !== 3) {
-    throw new Error("orderDisorderedStructure: H must be 3x3");
-  }
-  const h = Array.from(H.data);
-  if (!h.every((v) => Math.abs(v - Math.round(v)) < 1e-8)) {
-    throw new Error("orderDisorderedStructure: H must be integer");
-  }
-  const Hm = createMatrix(3, 3, h);
-  if (Math.abs(determinant(Hm)) < 0.5) {
-    throw new Error("orderDisorderedStructure: H is singular");
-  }
-
+  opts: EnumOptions,
+): Promise<ParentAnalysis> {
   // Disorder per parent position; color by occupancy signature so the
   // symmetry analysis preserves the disorder pattern.
   const positions = parent.sites;
@@ -144,14 +131,46 @@ export async function orderDisorderedStructure(
     })),
   };
   const ds = await analyzeStructure(colored, opts.symprec ?? 1e-4);
-  const orbits: number[] = Array.from(ds.orbits);
+  return {
+    parent,
+    colored,
+    orbits: Array.from(ds.orbits),
+    operations: ds.operations.map((op) => ({
+      // moyo serializes its (nalgebra) matrices column-major; transpose to
+      // the row-major rotation acting on column fractional vectors.
+      rotation: transpose(createMatrix(3, 3, Array.from(op.rotation))),
+      translation: createMatrix(3, 1, Array.from(op.translation)),
+    })),
+    tol: opts.tol ?? 1e-6,
+  };
+}
+
+/** Search-space size of one cell, or null when its composition is impossible. */
+interface CellPlan {
+  space: number;
+  run: () => Structure[];
+}
+
+/**
+ * Plan the enumeration of distinct decorations in one supercell H.
+ * `derivative` mode (used by {@link enumerateDerivativeStructures}) drops
+ * superperiodic decorations and returns null for cells that cannot hold the
+ * parent's composition; otherwise those cases throw.
+ */
+function planCell(
+  a: ParentAnalysis,
+  Hm: Matrix,
+  derivative: boolean,
+): CellPlan | null {
+  const { parent, colored, orbits, operations, tol } = a;
+  const positions = parent.sites;
 
   // Expand the colored average cell and label each supercell site with
   // its orbit.
   // Parent frac of the pre-image is p = H^T F (rows of H are new vectors),
   // i.e. row-wise P = F H, matched minimum-image since p need not lie in
   // [0, 1).
-  const sc = supercell(colored, H);
+  const sc = supercell(colored, Hm);
   const n = sc.sites.length;
   const scFrac = createMatrix(
     n,
@@ -182,7 +201,7 @@ export async function orderDisorderedStructure(
   });
 
   // Per-orbit species counts from fractions x multiplicity (must be integral).
-  const orbitIds = [...new Set(scOrbit)].sort((a, b) => a - b);
+  const orbitIds = [...new Set(scOrbit)].sort((x, y) => x - y);
   const orbitSites = new Map(orbitIds.map((o) => [o, [] as number[]]));
   scOrbit.forEach((o, i) => orbitSites.get(o)!.push(i));
   // Representative parent position per orbit for the allowed species.
@@ -203,6 +222,7 @@ export async function orderDisorderedStructure(
     for (const { symbol, fraction } of occ) {
       const c = fraction * sites.length;
       if (Math.abs(c - Math.round(c)) > 1e-6) {
+        if (derivative) return null;
         throw new Error(
           `orderDisorderedStructure: incommensurate fraction ${fraction} for ${symbol} (${sites.length} sites)`,
         );
@@ -212,142 +232,278 @@ export async function orderDisorderedStructure(
     orbitCounts.set(o, counts);
   }
 
-  // Search-space guard before generating.
   let space = 1;
   for (const o of orbitIds) {
     const counts = [...orbitCounts.get(o)!.values()];
     space *= multinomial(orbitSites.get(o)!.length, counts);
   }
-  if (space > maxCombinations) {
-    throw new Error(
-      `orderDisorderedStructure: search space ${space} exceeds cap ${maxCombinations}`,
-    );
-  }
 
-  // Group: supercell translations x compatible parent rotations, closed.
-  const indexOf = new Map(sc.sites.map((s, i) => [snapKey(s.frac), i]));
-  const at = (f: number[]) => {
-    const i = indexOf.get(snapKey(f));
-    if (i === undefined)
-      throw new Error("orderDisorderedStructure: group action leaves cell");
-    return i;
-  };
-  const generators: number[][] = [];
-  for (const t of latticePointsInSupercell(H)) {
-    generators.push(
+  const run = (): Structure[] => {
+    // Group: supercell translations x compatible parent rotations, closed.
+    const indexOf = new Map(sc.sites.map((s, i) => [snapKey(s.frac), i]));
+    const at = (f: number[]) => {
+      const i = indexOf.get(snapKey(f));
+      if (i === undefined)
+        throw new Error("orderDisorderedStructure: group action leaves cell");
+      return i;
+    };
+    const translations: number[][] = latticePointsInSupercell(Hm).map((t) =>
       sc.sites.map((s) =>
         at([s.frac[0] + t[0], s.frac[1] + t[1], s.frac[2] + t[2]]),
       ),
     );
-  }
-  const invT = transpose(inverse3x3(Hm));
-  const Ht = transpose(Hm);
-  for (const op of ds.operations) {
-    const R = createMatrix(3, 3, Array.from(op.rotation));
-    // A parent rotation preserves the supercell iff H^-T R H^T is integral.
-    const M = Array.from(mul(mul(invT, R), Ht).data);
-    if (!M.every((v) => Math.abs(v - Math.round(v)) < 1e-6)) continue;
-    const Ri = createMatrix(3, 3, M.map(Math.round));
-    const tsc = mul(invT, createMatrix(3, 1, Array.from(op.translation))).data;
-    // Row-wise F' = F Ri^T + tsc.
-    const moved = mul(scFrac, transpose(Ri)).data;
-    generators.push(
-      sc.sites.map((_, si) =>
-        at([0, 1, 2].map((d) => moved[3 * si + d] + tsc[d])),
-      ),
-    );
-  }
-  const group: number[][] = [];
-  const seenG = new Set<string>();
-  const queue = [...generators];
-  while (queue.length > 0) {
-    const p = queue.pop()!;
-    const key = p.join(",");
-    if (seenG.has(key)) continue;
-    seenG.add(key);
-    group.push(p);
-    for (const q of generators) {
-      queue.push(p.map((_, i) => p[q[i]]));
+    const generators: number[][] = [...translations];
+    const invT = transpose(inverse3x3(Hm));
+    const Ht = transpose(Hm);
+    for (const op of operations) {
+      // A parent rotation preserves the supercell iff H^-T R H^T is integral.
+      const M = Array.from(mul(mul(invT, op.rotation), Ht).data);
+      if (!M.every((v) => Math.abs(v - Math.round(v)) < 1e-6)) continue;
+      const Ri = createMatrix(3, 3, M.map(Math.round));
+      const tsc = mul(invT, op.translation).data;
+      // Row-wise F' = F Ri^T + tsc.
+      const moved = mul(scFrac, transpose(Ri)).data;
+      generators.push(
+        sc.sites.map((_, si) =>
+          at([0, 1, 2].map((d) => moved[3 * si + d] + tsc[d])),
+        ),
+      );
     }
-  }
+    // Close the generators into the full group, as site permutations.
+    const group: Int32Array[] = [];
+    const seenG = new Set<string>();
+    const gens = generators.map((g) => Int32Array.from(g));
+    const queue = [...gens];
+    while (queue.length > 0) {
+      const p = queue.pop()!;
+      const key = keyOf(p);
+      if (seenG.has(key)) continue;
+      seenG.add(key);
+      group.push(p);
+      for (const q of gens) queue.push(p.map((_, i) => p[q[i]!]!));
+    }
+    // Non-identity translations: a decoration they leave unchanged has a
+    // smaller true period (superperiodic) and belongs to a smaller cell.
+    const shifts = translations
+      .filter((t) => t.some((j, i) => j !== i))
+      .map((t) => Int32Array.from(t));
 
-  // Species ids for canonical tuples.
-  const symbols = [
-    ...new Set(orbitIds.flatMap((o) => [...orbitCounts.get(o)!.keys()])),
-  ].sort();
-  const sid = new Map(symbols.map((s, i) => [s, i]));
+    // Species as small integer ids; labelings are Uint8Arrays of ids.
+    const symbols = [
+      ...new Set(orbitIds.flatMap((o) => [...orbitCounts.get(o)!.keys()])),
+    ].sort();
+    if (symbols.length > 255) {
+      throw new Error("orderDisorderedStructure: too many species");
+    }
+    const sid = new Map(symbols.map((sym, i) => [sym, i]));
 
-  // Per-orbit assignments, then product + canonical dedup.
-  const perOrbit: { sites: number[]; labels: string[][] }[] = [];
-  for (const o of orbitIds) {
-    const sites = orbitSites.get(o)!;
-    const entries = [...orbitCounts.get(o)!.entries()].sort(([a], [b]) =>
-      a < b ? -1 : 1,
-    );
-    const last = entries[entries.length - 1];
-    if (!last)
-      throw new Error("orderDisorderedStructure: orbit has no species");
-    const [lastSym] = last;
-    let assigns: Map<number, string>[] = [new Map()];
-    for (let s = 0; s < entries.length - 1; s++) {
-      const entry = entries[s];
-      if (!entry) continue;
-      const [sym, c] = entry;
-      const next: Map<number, string>[] = [];
-      for (const a of assigns) {
-        const pool = sites.filter((i) => !a.has(i));
-        for (const ch of combinations(pool, c)) {
-          const m = new Map(a);
-          for (const i of ch) m.set(i, sym);
-          next.push(m);
+    // Per orbit, every way to place its species counts on its sites, in a
+    // fixed order (species sorted, positions in lexicographic combinations).
+    const perOrbit: { sites: number[]; patterns: Uint8Array[] }[] = [];
+    for (const o of orbitIds) {
+      const sites = orbitSites.get(o)!;
+      const entries = [...orbitCounts.get(o)!.entries()].sort(([x], [y]) =>
+        x < y ? -1 : 1,
+      );
+      const last = entries[entries.length - 1];
+      if (!last)
+        throw new Error("orderDisorderedStructure: orbit has no species");
+      const lastId = sid.get(last[0])!;
+      // Patterns index orbit-local positions 0..m-1 (-1 = unassigned).
+      let patterns: Int16Array[] = [new Int16Array(sites.length).fill(-1)];
+      for (const [sym, c] of entries.slice(0, -1)) {
+        const id = sid.get(sym)!;
+        const next: Int16Array[] = [];
+        for (const pat of patterns) {
+          const pool = [...pat.keys()].filter((j) => pat[j] === -1);
+          for (const ch of combinations(pool, c)) {
+            const q = pat.slice();
+            for (const j of ch) q[j] = id;
+            next.push(q);
+          }
         }
+        patterns = next;
       }
-      assigns = next;
+      perOrbit.push({
+        sites,
+        patterns: patterns.map((pat) =>
+          Uint8Array.from(pat, (v) => (v === -1 ? lastId : v)),
+        ),
+      });
     }
-    perOrbit.push({
-      sites,
-      labels: assigns.map((a) => {
-        const lab = new Array<string>(n).fill("");
-        for (const [i, s] of a) lab[i] = s;
-        for (const i of sites) if (!lab[i]) lab[i] = lastSym;
-        return lab;
-      }),
-    });
+
+    // Walk every labeling in that order. The first unseen labeling of each
+    // symmetry class is its representative: mark all its images under the
+    // group as seen, so every later member of the class costs one lookup.
+    const lab = new Uint8Array(n);
+    const img = new Uint8Array(n);
+    const seen = new Set<string>();
+    const reps: Uint8Array[] = [];
+    const visit = (oi: number) => {
+      const entry = perOrbit[oi];
+      if (!entry) {
+        const key = keyOf(lab);
+        if (seen.has(key)) return;
+        seen.add(key);
+        for (const g of group) {
+          for (let i = 0; i < n; i++) img[i] = lab[g[i]!]!;
+          seen.add(keyOf(img));
+        }
+        if (
+          derivative &&
+          shifts.some((t) => t.every((j, i) => lab[j] === lab[i]))
+        ) {
+          return;
+        }
+        reps.push(lab.slice());
+        return;
+      }
+      const { sites, patterns } = entry;
+      for (const pat of patterns) {
+        for (let j = 0; j < sites.length; j++) lab[sites[j]!] = pat[j]!;
+        visit(oi + 1);
+      }
+    };
+    visit(0);
+
+    return reps.map((r) => ({
+      lattice: sc.lattice,
+      sites: sc.sites.map((site, i) => ({
+        species: { symbol: symbols[r[i]!]! },
+        frac: site.frac,
+      })),
+    }));
+  };
+
+  return { space, run };
+}
+
+function checkSupercellMatrix(H: Matrix): Matrix {
+  if (H.rows !== 3 || H.cols !== 3) {
+    throw new Error("orderDisorderedStructure: H must be 3x3");
   }
+  const h = Array.from(H.data);
+  if (!h.every((v) => Math.abs(v - Math.round(v)) < 1e-8)) {
+    throw new Error("orderDisorderedStructure: H must be integer");
+  }
+  const Hm = createMatrix(3, 3, h.map(Math.round));
+  if (Math.abs(determinant(Hm)) < 0.5) {
+    throw new Error("orderDisorderedStructure: H is singular");
+  }
+  return Hm;
+}
 
-  const unique = new Map<string, string[]>();
-  const atLab = (lab: string[], i: number): string => {
-    const s = lab[i];
-    if (s === undefined || s === "")
-      throw new Error("orderDisorderedStructure: unassigned site");
-    return s;
-  };
-  const combine = (oi: number, lab: string[]) => {
-    const entry = perOrbit[oi];
-    if (!entry) {
-      let best: string | null = null;
-      for (const g of group) {
-        const key = lab
-          .map((_, i) => sid.get(atLab(lab, g[i] ?? -1)) ?? -1)
-          .join(",");
-        if (best === null || key < best) best = key;
+/**
+ * Enumerate symmetrically distinct ordered decorations of a disordered
+ * parent in one fixed supercell H (enumlib's coloring step for a single
+ * superlattice; see {@link enumerateDerivativeStructures} for the search
+ * over all supercells of a given size).
+ *
+ * Each parent orbit's species counts are fixed by its occupancy fractions times
+ * its site multiplicity in the supercell (vacancies and incommensurate
+ * fractions throw). Decorations are deduped under supercell translations
+ * plus parent rotations preserving the supercell, using the closed group
+ * (canonical minimum labeling — generators alone miss composed operations).
+ * Decorations whose true period is smaller than H are kept.
+ *
+ * @param parent - Disordered parent structure.
+ * @param H - Integer supercell matrix (rows = new lattice vectors).
+ * @param opts - Tolerances and search cap.
+ * @returns Unique ordered supercell structures.
+ * @api
+ */
+export async function orderDisorderedStructure(
+  parent: DisorderedStructure,
+  H: Matrix,
+  opts: EnumOptions = {},
+): Promise<Structure[]> {
+  const Hm = checkSupercellMatrix(H);
+  const maxCombinations = opts.maxCombinations ?? DEFAULT_MAX_COMBINATIONS;
+  const plan = planCell(await analyzeParent(parent, opts), Hm, false)!;
+  if (plan.space > maxCombinations) {
+    throw new Error(
+      `orderDisorderedStructure: search space ${plan.space} exceeds cap ${maxCombinations}`,
+    );
+  }
+  return plan.run();
+}
+
+export interface DerivativeOptions extends EnumOptions {
+  /** Smallest supercell size, in parent cells. Default 1. */
+  minSize?: number;
+  /** Largest supercell size, in parent cells. */
+  maxSize: number;
+}
+
+/**
+ * The distinct supercells of index n up to the parent's symmetry: one
+ * representative HNF per class of superlattices related by a parent
+ * rotation (lattice rows transform as H -> H R^T).
+ */
+function inequivalentSupercells(a: ParentAnalysis, n: number): Matrix[] {
+  const key = (M: Matrix) => Array.from(hermiteNormalForm(M).data).join(",");
+  const rotations = a.operations.map((op) => transpose(op.rotation));
+  const seen = new Set<string>();
+  const reps: Matrix[] = [];
+  for (const H of hermiteNormalForms(n)) {
+    if (seen.has(key(H))) continue;
+    reps.push(H);
+    for (const Rt of rotations) seen.add(key(mul(H, Rt)));
+  }
+  return reps;
+}
+
+/**
+ * Enumerate all symmetrically distinct ordered structures derived from a
+ * disordered parent with supercells of `minSize`..`maxSize` parent cells
+ * (the Hart-Forcade derivative-structure search, as in enumlib).
+ *
+ * For each size every superlattice is generated as a Hermite normal form,
+ * superlattices related by a parent rotation are reduced to one, and each
+ * representative is decorated as in {@link orderDisorderedStructure}.
+ * Decorations whose true period is smaller than their cell (superperiodic)
+ * are dropped, since they appear at their own, smaller size; cells that
+ * cannot hold the parent's composition are skipped. Sizes are counted in
+ * cells of the given parent, so pass a primitive cell to match enumlib.
+ *
+ * @param parent - Disordered parent structure.
+ * @param opts - Size range, tolerances, and a cap on the total search space.
+ * @returns Unique ordered structures, smallest cells first.
+ * @api
+ */
+export async function enumerateDerivativeStructures(
+  parent: DisorderedStructure,
+  opts: DerivativeOptions,
+): Promise<Structure[]> {
+  const { minSize = 1, maxSize } = opts;
+  if (
+    !Number.isInteger(minSize) ||
+    !Number.isInteger(maxSize) ||
+    minSize < 1 ||
+    maxSize < minSize
+  ) {
+    throw new Error(
+      "enumerateDerivativeStructures: need integers 1 <= minSize <= maxSize",
+    );
+  }
+  const maxCombinations = opts.maxCombinations ?? DEFAULT_MAX_COMBINATIONS;
+  const analysis = await analyzeParent(parent, opts);
+
+  // Plan every cell first so the cap applies to the whole search.
+  const plans: CellPlan[] = [];
+  let space = 0;
+  for (let size = minSize; size <= maxSize; size++) {
+    for (const H of inequivalentSupercells(analysis, size)) {
+      const plan = planCell(analysis, H, true);
+      if (!plan) continue;
+      space += plan.space;
+      if (space > maxCombinations) {
+        throw new Error(
+          `enumerateDerivativeStructures: search space exceeds cap ${maxCombinations} (at size ${size})`,
+        );
       }
-      if (best !== null && !unique.has(best)) unique.set(best, [...lab]);
-      return;
+      plans.push(plan);
     }
-    for (const labels of entry.labels) {
-      const next = [...lab];
-      for (const i of entry.sites) next[i] = atLab(labels, i);
-      combine(oi + 1, next);
-    }
-  };
-  combine(0, new Array<string>(n).fill(""));
-
-  return [...unique.values()].map((lab) => ({
-    lattice: sc.lattice,
-    sites: sc.sites.map((site, i) => ({
-      species: { symbol: atLab(lab, i) },
-      frac: site.frac,
-    })),
-  }));
+  }
+  return plans.flatMap((plan) => plan.run());
 }

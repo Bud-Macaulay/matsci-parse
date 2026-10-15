@@ -238,6 +238,38 @@ describe("structure", () => {
     );
   });
 
+  it("enumerateDerivativeStructures searches all supercells of a size", async () => {
+    // Primitive fcc Ag/Pd 1/2: enumlib finds 2 structures at size 2, 5 at size 4.
+    const fcc = {
+      disordered: true,
+      lattice: [
+        [0, 2, 2],
+        [2, 0, 2],
+        [2, 2, 0],
+      ],
+      sites: [
+        {
+          occupancy: [
+            { symbol: "Ag", fraction: 0.5 },
+            { symbol: "Pd", fraction: 0.5 },
+          ],
+          frac: [0, 0, 0],
+        },
+      ],
+    };
+    const { status, json } = await post("/structure/enumerateDerivativeStructures", {
+      parent: fcc,
+      opts: { minSize: 2, maxSize: 4 },
+    });
+    expect(status).toBe(200);
+    expect(json).toHaveLength(7);
+    const { status: bad } = await post("/structure/enumerateDerivativeStructures", {
+      parent: fcc,
+      opts: {},
+    });
+    expect(bad).toBe(400); // maxSize is required
+  });
+
   it("orderDisorderedStructure enumerates orderings", async () => {
     const { json } = await post("/structure/orderDisorderedStructure", {
       parent: await alloy(),

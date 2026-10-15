@@ -14,6 +14,7 @@ import {
   toXYZ,
   calculateNdPattern,
   calculateXrdPattern,
+  enumerateDerivativeStructures,
   ewaldSum,
   getExplicitKPath,
   getPath,
@@ -37,6 +38,7 @@ export const functions: Record<string, (...args: any[]) => unknown> = {
   toXYZ,
   calculateNdPattern,
   calculateXrdPattern,
+  enumerateDerivativeStructures,
   ewaldSum,
   getExplicitKPath,
   getPath,
@@ -48,6 +50,51 @@ export const functions: Record<string, (...args: any[]) => unknown> = {
 };
 
 export const types: Record<string, Desc> = {
+  "DerivativeOptions": {
+    "k": "object",
+    "props": [
+      {
+        "name": "minSize",
+        "optional": true,
+        "doc": "Smallest supercell size, in parent cells. Default 1.",
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "maxSize",
+        "optional": false,
+        "doc": "Largest supercell size, in parent cells.",
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "tol",
+        "optional": true,
+        "doc": "Fractional tolerance when matching supercell sites to parent sites. Default 1e-6.",
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "symprec",
+        "optional": true,
+        "doc": "Symmetry precision for the parent analysis. Default 1e-4.",
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "maxCombinations",
+        "optional": true,
+        "doc": "Cap on the assignment search space. Default {@link DEFAULT_MAX_COMBINATIONS}.",
+        "type": {
+          "k": "number"
+        }
+      }
+    ]
+  },
   "EnumOptions": {
     "k": "object",
     "props": [
@@ -2048,6 +2095,38 @@ export const endpoints: Endpoint[] = [
     "async": false
   },
   {
+    "name": "enumerateDerivativeStructures",
+    "tag": "structure",
+    "doc": "Enumerate all symmetrically distinct ordered structures derived from a\ndisordered parent with supercells of `minSize`..`maxSize` parent cells\n(the Hart-Forcade derivative-structure search, as in enumlib).\n\nFor each size every superlattice is generated as a Hermite normal form,\nsuperlattices related by a parent rotation are reduced to one, and each\nrepresentative is decorated as in {@link orderDisorderedStructure}.\nDecorations whose true period is smaller than their cell (superperiodic)\nare dropped, since they appear at their own, smaller size; cells that\ncannot hold the parent's composition are skipped. Sizes are counted in\ncells of the given parent, so pass a primitive cell to match enumlib.",
+    "params": [
+      {
+        "name": "parent",
+        "optional": false,
+        "doc": "Disordered parent structure.",
+        "type": {
+          "k": "disordered"
+        }
+      },
+      {
+        "name": "opts",
+        "optional": false,
+        "doc": "Size range, tolerances, and a cap on the total search space.",
+        "type": {
+          "k": "ref",
+          "name": "DerivativeOptions"
+        }
+      }
+    ],
+    "returns": {
+      "k": "array",
+      "of": {
+        "k": "structure"
+      }
+    },
+    "returnsDoc": "Unique ordered structures, smallest cells first.",
+    "async": true
+  },
+  {
     "name": "ewaldSum",
     "tag": "structure",
     "doc": "Ewald-summed electrostatic energy of a periodic point-charge structure.\n\nE = E_real + E_recip + E_point (+ E_charged for non-neutral cells), with\nE_real = 1/2 sum erfc(sqrt(eta) r) q_i q_j / r over periodic images,\nE_recip = (2 pi / V) sum_{G != 0} exp(-G^2 / 4 eta) / G^2 |S(G)|^2,\nE_point = -sqrt(eta / pi) sum q_i^2, all scaled to eV.",
@@ -2227,7 +2306,7 @@ export const endpoints: Endpoint[] = [
   {
     "name": "orderDisorderedStructure",
     "tag": "structure",
-    "doc": "Enumerate symmetrically distinct ordered decorations of a disordered\nparent in a fixed supercell (sandbox port of enumlib's core loop;\nsuperlattice search is not included).\n\nEach parent orbit's species counts are fixed by its occupancy fractions times\nits site multiplicity in the supercell (vacancies and incommensurate\nfractions throw). Decorations are deduped under supercell translations\nplus parent rotations preserving the supercell, using the closed group\n(canonical minimum labeling — generators alone miss composed operations).",
+    "doc": "Enumerate symmetrically distinct ordered decorations of a disordered\nparent in one fixed supercell H (enumlib's coloring step for a single\nsuperlattice; see {@link enumerateDerivativeStructures} for the search\nover all supercells of a given size).\n\nEach parent orbit's species counts are fixed by its occupancy fractions times\nits site multiplicity in the supercell (vacancies and incommensurate\nfractions throw). Decorations are deduped under supercell translations\nplus parent rotations preserving the supercell, using the closed group\n(canonical minimum labeling — generators alone miss composed operations).\nDecorations whose true period is smaller than H are kept.",
     "params": [
       {
         "name": "parent",
