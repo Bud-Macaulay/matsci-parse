@@ -208,6 +208,36 @@ describe("structure", () => {
     expect(json.total / 4).toBeCloseTo((-1.7475645946331822 * 14.399645468667815) / 2.82, 6);
   });
 
+  it("seekpath: getPath for rocksalt (FCC)", async () => {
+    const { status, json } = await post("/structure/getPath", { structure: await nacl() });
+    expect(status).toBe(200);
+    expect(json.bravais_lattice).toBe("cF");
+    expect(json.bravais_lattice_extended).toBe("cF2");
+    expect(json.spacegroup_number).toBe(225);
+    expect(json.path[0][0]).toBe("GAMMA");
+    expect(json.point_coords.GAMMA).toEqual([0, 0, 0]);
+  });
+
+  it("seekpath: getExplicitKPath, with intersection-typed options", async () => {
+    const coarse = await post("/structure/getExplicitKPath", {
+      structure: await nacl(),
+      opts: { referenceDistance: 0.1 },
+    });
+    const fine = await post("/structure/getExplicitKPath", {
+      structure: await nacl(),
+      opts: { referenceDistance: 0.025 },
+    });
+    expect(coarse.status).toBe(200);
+    expect(coarse.json.explicit_kpoints_labels).toContain("GAMMA");
+    expect(coarse.json.explicit_kpoints_rel.length).toBe(
+      coarse.json.explicit_kpoints_labels.length,
+    );
+    // The option reaches the library: a finer spacing gives more k-points.
+    expect(fine.json.explicit_kpoints_rel.length).toBeGreaterThan(
+      coarse.json.explicit_kpoints_rel.length,
+    );
+  });
+
   it("orderDisorderedStructure enumerates orderings", async () => {
     const { json } = await post("/structure/orderDisorderedStructure", {
       parent: await alloy(),

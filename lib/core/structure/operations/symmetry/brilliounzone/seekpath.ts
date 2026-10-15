@@ -97,6 +97,7 @@ export interface SeekPathResult {
 /**
  * Return the k-point path information for a band structure, following the
  * HPKOT recipe. Mirrors `seekpath.get_path`.
+ * @api
  */
 export async function getPath(
   structure: Structure,
@@ -363,6 +364,7 @@ export function getExplicitFromImplicit(
  * Return the k-point path for a band structure in scaled and absolute
  * coordinates, following the HPKOT recipe. Mirrors
  * `seekpath.get_explicit_k_path`.
+ * @api
  */
 export async function getExplicitKPath(
   structure: Structure,

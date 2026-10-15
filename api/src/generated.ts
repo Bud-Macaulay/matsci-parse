@@ -15,6 +15,8 @@ import {
   calculateNdPattern,
   calculateXrdPattern,
   ewaldSum,
+  getExplicitKPath,
+  getPath,
   getSymmetry,
   orderDisorderedStructure,
   possibleTerminations,
@@ -36,6 +38,8 @@ export const functions: Record<string, (...args: any[]) => unknown> = {
   calculateNdPattern,
   calculateXrdPattern,
   ewaldSum,
+  getExplicitKPath,
+  getPath,
   getSymmetry,
   orderDisorderedStructure,
   possibleTerminations,
@@ -149,6 +153,377 @@ export const types: Record<string, Desc> = {
         "name": "accuracy",
         "optional": true,
         "doc": "Significant figures each sum is converged to. Default 12.",
+        "type": {
+          "k": "number"
+        }
+      }
+    ]
+  },
+  "ExplicitKPathResult": {
+    "k": "object",
+    "props": [
+      {
+        "name": "explicit_kpoints_abs",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "explicit_kpoints_rel",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "explicit_kpoints_labels",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "string"
+          }
+        }
+      },
+      {
+        "name": "explicit_kpoints_linearcoord",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "number"
+          }
+        }
+      },
+      {
+        "name": "explicit_segments",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "tuple",
+            "of": [
+              {
+                "k": "number"
+              },
+              {
+                "k": "number"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "kpath",
+        "optional": false,
+        "type": {
+          "k": "ref",
+          "name": "KPath"
+        }
+      },
+      {
+        "name": "point_coords",
+        "optional": false,
+        "type": {
+          "k": "record",
+          "of": {
+            "k": "tuple",
+            "of": [
+              {
+                "k": "number"
+              },
+              {
+                "k": "number"
+              },
+              {
+                "k": "number"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "path",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "tuple",
+            "of": [
+              {
+                "k": "string"
+              },
+              {
+                "k": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "has_inversion_symmetry",
+        "optional": false,
+        "type": {
+          "k": "boolean"
+        }
+      },
+      {
+        "name": "augmented_path",
+        "optional": false,
+        "type": {
+          "k": "boolean"
+        }
+      },
+      {
+        "name": "bravais_lattice",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "bravais_lattice_extended",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "conv_lattice",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "conv_positions",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "conv_types",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "number"
+          }
+        }
+      },
+      {
+        "name": "primitive_lattice",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "primitive_positions",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "primitive_types",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "number"
+          }
+        }
+      },
+      {
+        "name": "reciprocal_primitive_lattice",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "inverse_primitive_transformation_matrix",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "primitive_transformation_matrix",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "volume_original_wrt_conv",
+        "optional": false,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "volume_original_wrt_prim",
+        "optional": false,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "spacegroup_number",
+        "optional": false,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "spacegroup_international",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "rotation_matrix",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "GetPathOptions": {
+    "k": "object",
+    "props": [
+      {
+        "name": "withTimeReversal",
+        "optional": true,
+        "type": {
+          "k": "boolean"
+        }
+      },
+      {
+        "name": "threshold",
+        "optional": true,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "symprec",
+        "optional": true,
+        "type": {
+          "k": "number"
+        }
+      }
+    ]
+  },
+  "KPath": {
+    "k": "object",
+    "props": [
+      {
+        "name": "kind",
+        "optional": false,
+        "type": {
+          "k": "literal",
+          "v": "path"
+        }
+      },
+      {
+        "name": "points",
+        "optional": false,
+        "type": {
+          "k": "record",
+          "of": {
+            "k": "vector"
+          }
+        }
+      },
+      {
+        "name": "segments",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "tuple",
+            "of": [
+              {
+                "k": "string"
+              },
+              {
+                "k": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "density",
+        "optional": true,
+        "doc": "Number of k-points interpolated per segment when serializing (a count,\nnot a physical spacing).  Output adapters fall back to their own default\n(typically 40) when this field is undefined.",
         "type": {
           "k": "number"
         }
@@ -972,6 +1347,238 @@ export const types: Record<string, Desc> = {
       }
     ]
   },
+  "SeekPathResult": {
+    "k": "object",
+    "props": [
+      {
+        "name": "kpath",
+        "optional": false,
+        "type": {
+          "k": "ref",
+          "name": "KPath"
+        }
+      },
+      {
+        "name": "point_coords",
+        "optional": false,
+        "type": {
+          "k": "record",
+          "of": {
+            "k": "tuple",
+            "of": [
+              {
+                "k": "number"
+              },
+              {
+                "k": "number"
+              },
+              {
+                "k": "number"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "path",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "tuple",
+            "of": [
+              {
+                "k": "string"
+              },
+              {
+                "k": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "has_inversion_symmetry",
+        "optional": false,
+        "type": {
+          "k": "boolean"
+        }
+      },
+      {
+        "name": "augmented_path",
+        "optional": false,
+        "type": {
+          "k": "boolean"
+        }
+      },
+      {
+        "name": "bravais_lattice",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "bravais_lattice_extended",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "conv_lattice",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "conv_positions",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "conv_types",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "number"
+          }
+        }
+      },
+      {
+        "name": "primitive_lattice",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "primitive_positions",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "primitive_types",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "number"
+          }
+        }
+      },
+      {
+        "name": "reciprocal_primitive_lattice",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "inverse_primitive_transformation_matrix",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "primitive_transformation_matrix",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      },
+      {
+        "name": "volume_original_wrt_conv",
+        "optional": false,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "volume_original_wrt_prim",
+        "optional": false,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "spacegroup_number",
+        "optional": false,
+        "type": {
+          "k": "number"
+        }
+      },
+      {
+        "name": "spacegroup_international",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "rotation_matrix",
+        "optional": false,
+        "type": {
+          "k": "array",
+          "of": {
+            "k": "array",
+            "of": {
+              "k": "number"
+            }
+          }
+        }
+      }
+    ]
+  },
   "SlabOptions": {
     "k": "object",
     "props": [
@@ -1477,6 +2084,89 @@ export const endpoints: Endpoint[] = [
     },
     "returnsDoc": "Energy components in eV.",
     "async": false
+  },
+  {
+    "name": "getExplicitKPath",
+    "tag": "structure",
+    "doc": "Return the k-point path for a band structure in scaled and absolute\ncoordinates, following the HPKOT recipe. Mirrors\n`seekpath.get_explicit_k_path`.",
+    "params": [
+      {
+        "name": "structure",
+        "optional": false,
+        "type": {
+          "k": "structure"
+        }
+      },
+      {
+        "name": "opts",
+        "optional": true,
+        "type": {
+          "k": "object",
+          "props": [
+            {
+              "name": "withTimeReversal",
+              "optional": true,
+              "type": {
+                "k": "boolean"
+              }
+            },
+            {
+              "name": "threshold",
+              "optional": true,
+              "type": {
+                "k": "number"
+              }
+            },
+            {
+              "name": "symprec",
+              "optional": true,
+              "type": {
+                "k": "number"
+              }
+            },
+            {
+              "name": "referenceDistance",
+              "optional": true,
+              "type": {
+                "k": "number"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "returns": {
+      "k": "ref",
+      "name": "ExplicitKPathResult"
+    },
+    "async": true
+  },
+  {
+    "name": "getPath",
+    "tag": "structure",
+    "doc": "Return the k-point path information for a band structure, following the\nHPKOT recipe. Mirrors `seekpath.get_path`.",
+    "params": [
+      {
+        "name": "structure",
+        "optional": false,
+        "type": {
+          "k": "structure"
+        }
+      },
+      {
+        "name": "opts",
+        "optional": true,
+        "type": {
+          "k": "ref",
+          "name": "GetPathOptions"
+        }
+      }
+    ],
+    "returns": {
+      "k": "ref",
+      "name": "SeekPathResult"
+    },
+    "async": true
   },
   {
     "name": "getSymmetry",

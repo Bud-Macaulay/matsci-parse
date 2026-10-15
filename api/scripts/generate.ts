@@ -97,7 +97,9 @@ function describe(t: Type, at: Node, depth = 0): Desc {
   if (t.isTuple()) return { k: "tuple", of: t.getTupleElements().map((e) => describe(e, at, depth + 1)) };
   if (t.isArray()) return { k: "array", of: describe(t.getArrayElementTypeOrThrow(), at, depth + 1) };
 
-  if (t.isObject()) {
+  // Intersections (e.g. `Options & { extra?: number }`) read as one object
+  // with the merged properties.
+  if (t.isObject() || t.isIntersection()) {
     if (t.getCallSignatures().length > 0) throw new Unsupported(`function type ${t.getText(at)}`);
     const index = t.getStringIndexType();
     const props = t.getProperties();
