@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Modal from "../common/Modal";
 import { showToast } from "../common/toastStore";
@@ -8,20 +8,19 @@ import {
   EXPORT_FORMATS,
   buildDisorderedParent,
   downloadBlob,
-  enumerateOrderings,
   exportZip,
   netCharge,
   parseOccupancy,
-  primitiveOfDisordered,
-  rankByEwald,
-  sortByEnergy,
   speciesOf,
 } from "../enumerate/enumeration";
+import {
+  isCancelled,
+  startEnumerationJob,
+} from "../enumerate/enumerationClient";
 
 const MAX_ROWS_SHOWN = 500;
 
-const numInput =
-  "w-20 px-2 py-1 text-xs border rounded font-mono text-center";
+const numInput = "w-20 px-2 py-1 text-xs border rounded font-mono text-center";
 
 function Section({ title, children, right }) {
   return (
@@ -122,42 +121,63 @@ export default function EnumerateModal({ structure }) {
     );
   };
 
+  // The running worker job, so it can be cancelled (and is, on unmount).
+  const jobRef = useRef(null);
+  useEffect(() => () => jobRef.current?.cancel(), []);
+
+  /** Run one worker job; resolves to its result, or null if cancelled. */
+  const runJob = async (message) => {
+    setError(null);
+    setProgress([0, 0]);
+    const job = startEnumerationJob(message, (msg) => {
+      setStatus(msg.stage);
+      setProgress([msg.done, msg.total]);
+    });
+    jobRef.current = job;
+    try {
+      return await job.promise;
+    } catch (e) {
+      if (!isCancelled(e)) {
+        console.error(e);
+        setError(e.message ?? String(e));
+      }
+      return null;
+    } finally {
+      jobRef.current = null;
+    }
+  };
+
   const run = async () => {
     setStatus("enumerating");
-    setError(null);
     setRows(null);
-    setProgress([0, 0]);
-    try {
-      const p = usePrimitive ? await primitiveOfDisordered(parent) : parent;
-      const found = await enumerateOrderings(p, { maxSize, maxCombinations });
-      setRunInfo({ parentSites: p.sites.length, count: found.length });
-      setStatus("ranking");
-      const ranked = await rankByEwald(found, charges, (d, t) =>
-        setProgress([d, t]),
-      );
-      setRows(sortByEnergy(ranked));
-      setStatus("done");
-    } catch (e) {
-      console.error(e);
-      setError(e.message ?? String(e));
-      setStatus("idle");
+    const result = await runJob({
+      type: "run",
+      parent,
+      usePrimitive,
+      maxSize,
+      maxCombinations,
+      charges,
+    });
+    if (result) {
+      setRows(result.rows);
+      setRunInfo({
+        parentSites: result.parentSites,
+        count: result.rows.length,
+      });
     }
+    setStatus(result ? "done" : "idle");
   };
 
   const rerank = async () => {
     if (!rows) return;
     setStatus("ranking");
-    setError(null);
-    try {
-      const ranked = await rankByEwald(rows, charges, (d, t) =>
-        setProgress([d, t]),
-      );
-      setRows(sortByEnergy(ranked));
-    } catch (e) {
-      setError(e.message ?? String(e));
-    }
+    // Cancelling keeps the previous ranking.
+    const result = await runJob({ type: "rerank", rows, charges });
+    if (result) setRows(result.rows);
     setStatus("done");
   };
+
+  const cancel = () => jobRef.current?.cancel();
 
   const shown = useMemo(() => {
     if (!rows) return [];
@@ -214,8 +234,8 @@ export default function EnumerateModal({ structure }) {
               Give a site an occupancy such as{" "}
               <code className="bg-gray-100 px-1">Cl:0.5 Br:0.5</code> or{" "}
               <code className="bg-gray-100 px-1">Ag:1/3 Pd:1/3 Pt:1/3</code>.
-              Fractions must sum to 1 (vacancies are not supported). Leave
-              blank to keep the site as is.
+              Fractions must sum to 1 (vacancies are not supported). Leave blank
+              to keep the site as is.
             </p>
             <div className="max-h-56 overflow-y-auto border rounded">
               <table className="table-nice w-full">
@@ -325,8 +345,8 @@ export default function EnumerateModal({ structure }) {
                 </label>
               </div>
               <p className="text-gray-500">
-                All symmetrically distinct orderings in every supercell shape
-                of 1..{maxSize} parent cells (Hart–Forcade, as enumlib).
+                All symmetrically distinct orderings in every supercell shape of
+                1..{maxSize} parent cells (Hart–Forcade, as enumlib).
                 {usePrimitive
                   ? " Sizes count primitive cells of the disordered parent."
                   : ` Sizes count this ${structure.sites.length}-site cell.`}
@@ -385,6 +405,15 @@ export default function EnumerateModal({ structure }) {
                   ? `Ranking ${progress[0]}/${progress[1]}…`
                   : "Enumerate"}
             </button>
+            {busy && (
+              <button
+                onClick={cancel}
+                title="Stop the enumeration (runs in a background worker)"
+                className="buttonSimple red"
+              >
+                Cancel
+              </button>
+            )}
             {rows && (
               <button
                 onClick={rerank}
@@ -480,7 +509,10 @@ export default function EnumerateModal({ structure }) {
                       </thead>
                       <tbody>
                         {shown.slice(0, MAX_ROWS_SHOWN).map((r) => (
-                          <tr key={r.id} className="text-[12px] hover:bg-gray-50">
+                          <tr
+                            key={r.id}
+                            className="text-[12px] hover:bg-gray-50"
+                          >
                             <td className="px-2 py-1 border-b">{r.rank}</td>
                             <td className="px-2 py-1 border-b">×{r.size}</td>
                             <td className="px-2 py-1 border-b">{r.nAtoms}</td>
@@ -509,8 +541,8 @@ export default function EnumerateModal({ structure }) {
                   </div>
                   {rows.length > MAX_ROWS_SHOWN && (
                     <p className="text-gray-500">
-                      Showing {MAX_ROWS_SHOWN} of {rows.length}; export
-                      includes all.
+                      Showing {MAX_ROWS_SHOWN} of {rows.length}; export includes
+                      all.
                     </p>
                   )}
                 </>
