@@ -57,7 +57,10 @@ function parseProperties(propStr: string): PropDef[] {
   return props;
 }
 
-/** Parses an extended XYZ string into a Structure. */
+/**
+ * Parses an extended XYZ string into a Structure.
+ * @api
+ */
 export function fromXYZ(text: string): Structure {
   const r = new LineReader(text);
 
@@ -168,7 +171,10 @@ function formatLattice(lattice: Lattice): string {
   return `${m[0]} ${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]} ${m[6]} ${m[7]} ${m[8]}`;
 }
 
-/** Serializes a Structure to an extended XYZ string. */
+/**
+ * Serializes a Structure to an extended XYZ string.
+ * @api
+ */
 export function toXYZ(structure: Structure): string {
   const lines: string[] = [];
 

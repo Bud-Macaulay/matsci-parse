@@ -87,6 +87,7 @@ function cleanSpeciesSymbol(raw: string | undefined): string {
  * DisorderedStructure (narrow with `isDisordered`). Occupancy is checked on
  * the asymmetric unit, before symmetry expansion, so fully occupied files
  * take the ordered path at negligible cost.
+ * @api
  */
 export function fromCIF(text: string): Structure | DisorderedStructure {
   let a = 0;
@@ -394,7 +395,10 @@ function disorderedFromAsymmetricUnit(
   return { disordered: true, lattice, sites };
 }
 
-/** Serializes a Structure to a CIF string. */
+/**
+ * Serializes a Structure to a CIF string.
+ * @api
+ */
 export function toCIF(structure: Structure, precision = 6): string {
   assertOrdered(structure, "toCIF");
   const p = parameters(structure.lattice);

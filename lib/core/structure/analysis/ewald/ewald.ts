@@ -53,6 +53,7 @@ export interface EwaldEnergies {
  * @param charges - Point charge per site, in units of e.
  * @param opts - Screening, cutoffs, and convergence options.
  * @returns Energy components in eV.
+ * @api
  */
 export function ewaldSum(
   structure: Structure,

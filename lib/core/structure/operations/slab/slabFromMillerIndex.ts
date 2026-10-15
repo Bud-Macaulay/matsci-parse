@@ -41,6 +41,7 @@ interface SlabOptions {
  * @param l - Miller index l.
  * @param opts - Slab options.
  * @returns A new Structure representing the slab.
+ * @api
  */
 export function slabFromMillerIndex(
   structure: Structure,

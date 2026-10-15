@@ -14,7 +14,10 @@ function isCartesian(line: string): boolean {
   return l.startsWith("c") || l.startsWith("k");
 }
 
-/** Parses a POSCAR/CONTCAR string into a Structure. */
+/**
+ * Parses a POSCAR/CONTCAR string into a Structure.
+ * @api
+ */
 export function fromPOSCAR(text: string): Structure {
   const r = new LineReader(text);
 
@@ -112,7 +115,10 @@ export function fromPOSCAR(text: string): Structure {
   };
 }
 
-/** Serializes a Structure to a POSCAR string. */
+/**
+ * Serializes a Structure to a POSCAR string.
+ * @api
+ */
 export function toPOSCAR(
   structure: Structure,
   options?: {

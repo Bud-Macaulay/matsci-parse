@@ -93,7 +93,10 @@ export async function analyzeStructure(
   );
 }
 
-/** Compute primitive and conventional structures plus calculation results via Moyo/SPGLIB. */
+/**
+ * Compute primitive and conventional structures plus calculation results via Moyo/SPGLIB.
+ * @api
+ */
 export async function getSymmetry(
   structure: Structure,
   tolerance = 1e-4,

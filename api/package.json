@@ -1,0 +1,29 @@
+{
+  "name": "matsci-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "REST API generated from matsci-parse's @api functions, with an OpenAPI spec for generated clients.",
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "generate:check": "tsx scripts/generate.ts --check",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "openapi": "tsx scripts/openapi.ts",
+    "client:python": "tsx scripts/openapi.ts && uvx openapi-python-client generate --path openapi.json --output-path clients/python --overwrite"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "ts-morph": "^28.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-openapi": "^1.6.3",
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
+  }
+}
