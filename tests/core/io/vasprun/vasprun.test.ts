@@ -109,3 +109,116 @@ describe("fromVasprun", () => {
     expect(v.dos).toBeNull();
   });
 });
+
+// [file, sites, sum of all pDOS values, index and value of site 0's s-orbital
+// peak (spin up)], from pymatgen 2025.6.14's Vasprun.pdos.
+const pdosRefs: [string, number, number, number, number][] = [
+  ["magmom_ldau.xml.gz", 10, 332.128, 264, 0.1676],
+  ["relaxation.xml.gz", 1, 11.3617, 275, 0.04],
+  ["sc_overflow.xml.gz", 25, 1150.6999, 281, 0.0222],
+  ["Si_bands.xml.gz", 2, 71.992, 54, 0.3211],
+  ["static_silicon.xml.gz", 2, 68.6948, 77, 0.1857],
+  ["unconverged.xml.gz", 14, 507.8406, 207, 0.0937],
+];
+
+describe.skipIf(!existsSync(FILES))(
+  "projected DOS on pymatgen's test files",
+  () => {
+    for (const [file, sites, sum, peakIndex, peak] of pdosRefs) {
+      it(`${file} matches pymatgen's pdos`, () => {
+        const text = gunzipSync(readFileSync(join(FILES, file))).toString(
+          "latin1",
+        );
+        expect(fromVasprun(text).dos!.projected).toBeUndefined(); // opt-in
+        const p = fromVasprun(text, { projectedDos: true }).dos!.projected!;
+        expect(p.orbitals).toEqual([
+          "s",
+          "py",
+          "pz",
+          "px",
+          "dxy",
+          "dyz",
+          "dz2",
+          "dxz",
+          "dx2",
+        ]);
+        expect(p.densities).toHaveLength(sites);
+        let total = 0;
+        for (const site of p.densities)
+          for (const spin of site)
+            for (const orb of spin) for (const x of orb) total += x;
+        expect(total).toBeCloseTo(sum, 3);
+        const s0 = p.densities[0]![0]![0]!;
+        expect(s0.indexOf(Math.max(...s0))).toBe(peakIndex);
+        expect(s0[peakIndex]).toBeCloseTo(peak, 10);
+      });
+    }
+  },
+);
+
+describe("fromVasprun projected DOS", () => {
+  // Two sites, one spin, LORBIT = 10 style columns (s p d).
+  const text = `<?xml version="1.0"?>
+<modeling>
+ <atominfo><array name="atoms"><set><rc><c>Na</c></rc><rc><c>Cl</c></rc></set></array></atominfo>
+ <calculation>
+  <structure>
+   <crystal><varray name="basis"><v> 4 0 0 </v><v> 0 4 0 </v><v> 0 0 4 </v></varray></crystal>
+   <varray name="positions"><v> 0 0 0 </v><v> 0.5 0.5 0.5 </v></varray>
+  </structure>
+  <energy><i name="e_fr_energy"> -1 </i><i name="e_0_energy"> -1 </i></energy>
+  <dos>
+   <i name="efermi"> 0.0 </i>
+   <total><array><set><set comment="spin 1">
+    <r> -1.0 1.0 0.0 </r><r> 0.0 2.0 1.0 </r>
+   </set></set></array></total>
+   <partial><array>
+    <field>energy</field><field> s </field><field> p </field><field> d </field>
+    <set>
+     <set comment="ion 1"><set comment="spin 1"><r> -1.0 0.1 0.2 0.3 </r><r> 0.0 0.4 0.5 0.6 </r></set></set>
+     <set comment="ion 2"><set comment="spin 1"><r> -1.0 0.7 0.8 0.9 </r><r> 0.0 1.0 1.1 1.2 </r></set></set>
+    </set>
+   </array></partial>
+  </dos>
+ </calculation>
+</modeling>`;
+
+  it("is off by default", () => {
+    expect(fromVasprun(text).dos).toEqual({
+      energies: [-1, 0],
+      densities: [[1, 2]],
+    });
+  });
+
+  it("returns orbital labels from the file and densities [site][spin][orbital]", () => {
+    const p = fromVasprun(text, { projectedDos: true }).dos!.projected!;
+    expect(p.orbitals).toEqual(["s", "p", "d"]);
+    expect(
+      p.densities.map((site) =>
+        site.map((spin) => spin.map((o) => Array.from(o))),
+      ),
+    ).toEqual([
+      [
+        [
+          [0.1, 0.4],
+          [0.2, 0.5],
+          [0.3, 0.6],
+        ],
+      ],
+      [
+        [
+          [0.7, 1.0],
+          [0.8, 1.1],
+          [0.9, 1.2],
+        ],
+      ],
+    ]);
+    expect(p.densities[0]![0]![0]).toBeInstanceOf(Float64Array);
+  });
+
+  it("is skipped together with the DOS", () => {
+    expect(
+      fromVasprun(text, { dos: false, projectedDos: true }).dos,
+    ).toBeNull();
+  });
+});

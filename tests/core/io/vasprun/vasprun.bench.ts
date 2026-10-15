@@ -24,6 +24,9 @@ if (existsSync(FILES)) {
       bench("without bands and DOS", () => {
         fromVasprun(text, { eigenvalues: false, dos: false });
       });
+      bench("with projected DOS", () => {
+        fromVasprun(text, { projectedDos: true });
+      });
     });
   }
 }

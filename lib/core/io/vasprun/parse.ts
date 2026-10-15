@@ -69,6 +69,19 @@ export interface VasprunDos {
   total: number[][];
   /** Integrated DOS, indexed [spin][point]. */
   integrated: number[][];
+  /** Site- and orbital-projected DOS; null unless requested and present. */
+  projected: VasprunProjectedDos | null;
+}
+
+/**
+ * Projected DOS. For spin-orbit (noncollinear) runs the "spin" blocks are
+ * total, then magnetization x, y, z, as VASP writes them.
+ */
+export interface VasprunProjectedDos {
+  /** Orbital labels as in the file, e.g. ["s", "py", "pz", "px", "dxy", ...]. */
+  orbitals: string[];
+  /** States/eV, indexed [site][spin][orbital], each over the energy grid. */
+  densities: Float64Array[][][];
 }
 
 export interface Vasprun {
@@ -104,6 +117,11 @@ export interface VasprunOptions {
   eigenvalues?: boolean;
   /** Parse the total density of states. Default true. */
   dos?: boolean;
+  /**
+   * Also parse the site- and orbital-projected DOS (needs `dos`). Default
+   * false: it grows with sites x orbitals x spins x energy points.
+   */
+  projectedDos?: boolean;
 }
 
 // 1 eV/Å³ = 160.21766208 GPa; VASP's stress is -σ in kBar (0.1 GPa).
@@ -259,13 +277,27 @@ function eigenvaluesOf(n: Node): VasprunEigenvalues {
   };
 }
 
-function dosOf(total: Node): VasprunDos {
+function dosOf(total: Node, partial: Node | undefined): VasprunDos {
   const spins = sets(first(first(total, "array"), "set")!).map(rows);
   return {
     energies: (spins[0] ?? []).map((r) => r[0]!),
     total: spins.map((s) => s.map((r) => r[1]!)),
     integrated: spins.map((s) => s.map((r) => r[2]!)),
+    projected: partial ? projectedDosOf(partial) : null,
   };
+}
+
+/** <partial>: sets per site, then per spin, of rows [energy, orbital...]. */
+function projectedDosOf(partial: Node): VasprunProjectedDos {
+  const array = first(partial, "array")!;
+  const orbitals = elements(array, "field").map(textOf).slice(1);
+  const densities = sets(first(array, "set")!).map((site) =>
+    sets(site).map((spin) => {
+      const r = rows(spin);
+      return orbitals.map((_, j) => Float64Array.from(r, (row) => row[j + 1]!));
+    }),
+  );
+  return { orbitals, densities };
 }
 
 function ionicStep(calc: Node, species: string[]): VasprunIonicStep {
@@ -337,7 +369,11 @@ function bareSteps(calc: Node | undefined): number {
  * @returns The parsed run.
  */
 export function parseVasprun(text: string, opts: VasprunOptions = {}): Vasprun {
-  const { eigenvalues: wantEigen = true, dos: wantDos = true } = opts;
+  const {
+    eigenvalues: wantEigen = true,
+    dos: wantDos = true,
+    projectedDos: wantProjected = false,
+  } = opts;
   const root = (parseTxml(text) as Array<Node | string>).find(
     (n): n is Node => typeof n !== "string" && n.tagName === "modeling",
   );
@@ -427,6 +463,12 @@ export function parseVasprun(text: string, opts: VasprunOptions = {}): Vasprun {
     kpoints: kpointsOf(first(root, "kpoints")),
     efermi: efermiNode ? num(textOf(efermiNode)) : null,
     eigenvalues: wantEigen && eigNode ? eigenvaluesOf(eigNode) : null,
-    dos: wantDos && totalNode ? dosOf(totalNode) : null,
+    dos:
+      wantDos && totalNode
+        ? dosOf(
+            totalNode,
+            wantProjected ? first(dosNode, "partial") : undefined,
+          )
+        : null,
   };
 }

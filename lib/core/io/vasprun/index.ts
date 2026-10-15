@@ -4,10 +4,15 @@ import {
   parseVasprun,
   type VasprunIonicStep,
   type VasprunOptions,
+  type VasprunProjectedDos,
   type VasprunValue,
 } from "./parse";
 
-export type { VasprunOptions, VasprunValue } from "./parse";
+export type {
+  VasprunOptions,
+  VasprunProjectedDos,
+  VasprunValue,
+} from "./parse";
 
 /** A VASP run read from vasprun.xml. Units: eV, Å, eV/Å, eV/Å³. */
 export interface VasprunResult {
@@ -40,8 +45,16 @@ export interface VasprunResult {
   efermi: number | null;
   /** Band energies and occupations, [spin][kpoint][band]; null if absent or skipped. */
   bands: { energies: number[][][]; occupations: number[][][] } | null;
-  /** Total density of states, densities [spin][point] in states/eV; null if absent or skipped. */
-  dos: { energies: number[]; densities: number[][] } | null;
+  /**
+   * Total density of states, densities [spin][point] in states/eV; null if
+   * absent or skipped. `projected` (opt-in via `projectedDos`) holds the
+   * site- and orbital-resolved DOS.
+   */
+  dos: {
+    energies: number[];
+    densities: number[][];
+    projected?: VasprunProjectedDos;
+  } | null;
   /** INCAR tags as given by the user. */
   incar: Record<string, VasprunValue>;
 }
@@ -96,7 +109,11 @@ export function fromVasprun(
     },
     efermi: run.efermi,
     bands: run.eigenvalues,
-    dos: run.dos && { energies: run.dos.energies, densities: run.dos.total },
+    dos: run.dos && {
+      energies: run.dos.energies,
+      densities: run.dos.total,
+      ...(run.dos.projected ? { projected: run.dos.projected } : {}),
+    },
     incar: run.incar,
   };
 }
