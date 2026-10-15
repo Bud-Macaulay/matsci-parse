@@ -220,4 +220,29 @@ describe("ewaldSum", () => {
     });
     expect(manual.total).toBeCloseTo(auto.total, 6);
   });
+
+  it("erfc backends agree with exact within their bounds", () => {
+    const exact = ewaldSum(rocksalt.s, rocksalt.q, { erfc: "exact" });
+    // Golden path is intact on the explicit-exact evaluator.
+    expect(exact.total).toBeCloseTo(-35.6940575834, 6);
+    const fast = ewaldSum(rocksalt.s, rocksalt.q, { erfc: "fast" });
+    expect(fast.total).toBeCloseTo(exact.total, 9);
+    // "auto" at default accuracy takes the fast path.
+    expect(ewaldSum(rocksalt.s, rocksalt.q).total).toBe(fast.total);
+    // Fast stays ~1e-13 even where cutoffs are coarse.
+    const ref4 = ewaldSum(rocksalt.s, rocksalt.q, {
+      accuracy: 4,
+      erfc: "exact",
+    });
+    const fast4 = ewaldSum(rocksalt.s, rocksalt.q, {
+      accuracy: 4,
+      erfc: "fast",
+    });
+    expect(Math.abs((fast4.total - ref4.total) / ref4.total)).toBeLessThan(
+      1e-9,
+    );
+    expect(ewaldSum(rocksalt.s, rocksalt.q, { accuracy: 4 }).total).toBe(
+      fast4.total,
+    );
+  });
 });
