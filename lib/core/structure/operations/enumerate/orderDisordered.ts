@@ -1,4 +1,5 @@
 import { supercell } from "../supercell";
+import { fnv1a32 } from "@/core/math/hash";
 import { totalOccupancy } from "@/core/site/disorder";
 import { analyzeStructure } from "../symmetry/spglib";
 import { latticePointsInSupercell } from "@/core/matrix/operations/latticePointsInSupercell";
@@ -91,6 +92,27 @@ interface ParentAnalysis {
   tol: number;
 }
 
+// analyzeStructure (wasm spglib) costs ~3ms per call and dominates small
+// enumerations, but the same parent is re-analyzed for every H. Cache by the
+// full parent description plus precisions; bounded FIFO so long sessions
+// can't grow it without bound.
+const analysisCache = new Map<string, ParentAnalysis>();
+const ANALYSIS_CACHE_CAP = 32;
+
+function parentKey(parent: DisorderedStructure, opts: EnumOptions): string {
+  const parts = [
+    `symprec=${opts.symprec ?? 1e-4}`,
+    `tol=${opts.tol ?? 1e-6}`,
+    `basis=${Array.from(parent.lattice.basis.data).join(",")}`,
+  ];
+  for (const site of parent.sites) {
+    parts.push(
+      `site=${Array.from(site.frac).join(",")}|${site.occupancy.map((o) => `${o.symbol}:${o.fraction}`).join(";")}`,
+    );
+  }
+  return parts.join("\n");
+}
+
 async function analyzeParent(
   parent: DisorderedStructure,
   opts: EnumOptions,
@@ -113,6 +135,9 @@ async function analyzeParent(
       );
     }
   }
+  const key = parentKey(parent, opts);
+  const hit = analysisCache.get(key);
+  if (hit) return hit;
   const signatures = positions.map((pos) =>
     pos.occupancy
       .map((o) => `${o.symbol}:${o.fraction.toFixed(6)}`)
@@ -131,7 +156,7 @@ async function analyzeParent(
     })),
   };
   const ds = await analyzeStructure(colored, opts.symprec ?? 1e-4);
-  return {
+  const out: ParentAnalysis = {
     parent,
     colored,
     orbits: Array.from(ds.orbits),
@@ -143,6 +168,12 @@ async function analyzeParent(
     })),
     tol: opts.tol ?? 1e-6,
   };
+  if (analysisCache.size >= ANALYSIS_CACHE_CAP) {
+    const oldest = analysisCache.keys().next().value;
+    if (oldest !== undefined) analysisCache.delete(oldest);
+  }
+  analysisCache.set(parentKey(parent, opts), out);
+  return out;
 }
 
 /** Search-space size of one cell, or null when its composition is impossible. */
@@ -269,18 +300,31 @@ function planCell(
         ),
       );
     }
-    // Close the generators into the full group, as site permutations.
+    // Close the generators into the full group, as site permutations. Each
+    // composition reuses one scratch buffer (no per-pair closure or
+    // allocation); only unseen products are stored and queued, so the work
+    // is |group| x |gens| compositions plus one hash each instead of
+    // re-composing every duplicate the queue used to carry.
     const group: Int32Array[] = [];
     const seenG = new Set<string>();
     const gens = generators.map((g) => Int32Array.from(g));
-    const queue = [...gens];
+    const comp = new Int32Array(n);
+    const queue: Int32Array[] = [];
+    const offer = (p: Int32Array): void => {
+      const key = keyOf(p);
+      if (seenG.has(key)) return;
+      seenG.add(key);
+      const cp = Int32Array.from(p);
+      group.push(cp);
+      queue.push(cp);
+    };
+    for (const g of gens) offer(g);
     while (queue.length > 0) {
       const p = queue.pop()!;
-      const key = keyOf(p);
-      if (seenG.has(key)) continue;
-      seenG.add(key);
-      group.push(p);
-      for (const q of gens) queue.push(p.map((_, i) => p[q[i]!]!));
+      for (const gen of gens) {
+        for (let i = 0; i < n; i++) comp[i] = p[gen[i]!]!;
+        offer(comp);
+      }
     }
     // Non-identity translations: a decoration they leave unchanged has a
     // smaller true period (superperiodic) and belongs to a smaller cell.
@@ -335,19 +379,41 @@ function planCell(
     // Walk every labeling in that order. The first unseen labeling of each
     // symmetry class is its representative: mark all its images under the
     // group as seen, so every later member of the class costs one lookup.
+    // Buckets are keyed by fnv1a32 with full memcmp on hits: a bare 32-bit
+    // hash could silently drop a structure on collision, so equality is
+    // always verified and the hash only picks the bucket.
     const lab = new Uint8Array(n);
     const img = new Uint8Array(n);
-    const seen = new Set<string>();
+    const seen = new Map<number, Uint8Array[]>();
     const reps: Uint8Array[] = [];
+    // Find-or-store in one hash.
+    const known = (a: Uint8Array): boolean => {
+      const h = fnv1a32(a);
+      const bucket = seen.get(h);
+      if (bucket === undefined) {
+        seen.set(h, [a.slice()]);
+        return false;
+      }
+      for (const b of bucket) {
+        let same = true;
+        for (let i = 0; i < n; i++) {
+          if (b[i]! !== a[i]!) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return true;
+      }
+      bucket.push(a.slice());
+      return false;
+    };
     const visit = (oi: number) => {
       const entry = perOrbit[oi];
       if (!entry) {
-        const key = keyOf(lab);
-        if (seen.has(key)) return;
-        seen.add(key);
+        if (known(lab)) return;
         for (const g of group) {
           for (let i = 0; i < n; i++) img[i] = lab[g[i]!]!;
-          seen.add(keyOf(img));
+          known(img);
         }
         if (
           derivative &&
