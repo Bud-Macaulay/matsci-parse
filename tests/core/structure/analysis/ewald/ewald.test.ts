@@ -87,6 +87,56 @@ const perovskite = build(
   ],
 );
 
+// Triclinic cells (Lattice.from_parameters matrices); references from
+// pymatgen EwaldSummation (acc_factor=16).
+// strongly skewed, neutral.
+const triNeutral = build(
+  [
+    4.9692873304047, 0.0, -1.1472503771537115, -2.119698564834602,
+    5.786293079438297, 1.3098436521518846, 0.0, 0.0, 7.2,
+  ],
+  ["Na", "Cl", "Mg", "O"],
+  [1.0, -1.0, 2.0, -2.0],
+  [
+    [0.1, 0.2, 0.3],
+    [0.6, 0.55, 0.8],
+    [0.35, 0.9, 0.05],
+    [0.85, 0.15, 0.6],
+  ],
+);
+// net +1, a zero-charge site, fracs outside [0, 1).
+const triCharged = build(
+  [
+    4.3832566716036805, 0.0, -0.38348526808969624, -2.8079987828503787,
+    4.387812133674268, 2.7698822204367564, 0.0, 0.0, 8.3,
+  ],
+  ["Ca", "O", "Ar", "Li"],
+  [2.0, -2.0, 0.0, 1.0],
+  [
+    [1.15, 0.3, -0.2],
+    [0.4, -0.45, 0.7],
+    [0.7, 0.85, 0.25],
+    [0.05, 0.6, 1.55],
+  ],
+);
+// fractional charges, net zero.
+const triFractional = build(
+  [
+    6.058844364480901, 0.0, -3.0871353982289174, 3.5770834736311032,
+    5.89915014725552, 0.12042160441725684, 0.0, 0.0, 5.2,
+  ],
+  ["Fe", "Fe", "O", "O", "O", "F"],
+  [2.5, 2.5, -1.7, -1.7, -1.6, -0.0],
+  [
+    [0.0, 0.0, 0.0],
+    [0.5, 0.5, 0.5],
+    [0.23, 0.71, 0.12],
+    [0.77, 0.29, 0.88],
+    [0.41, 0.08, 0.66],
+    [0.92, 0.47, 0.33],
+  ],
+);
+
 describe("ewaldSum", () => {
   const parity: [
     string,
@@ -144,6 +194,30 @@ describe("ewaldSum", () => {
       -40.7754782806,
       3.8514554503,
       -145.64309769,
+    ],
+    [
+      "triclinic neutral",
+      triNeutral,
+      -25.5355777661,
+      -2.2387765827,
+      5.6499806283,
+      -28.9467818117,
+    ],
+    [
+      "triclinic charged",
+      triCharged,
+      -55.5674368652,
+      -26.7717107628,
+      0.5531778121,
+      -28.4104078275,
+    ],
+    [
+      "triclinic fractional",
+      triFractional,
+      -104.1341273842,
+      -39.4251828486,
+      2.1964844105,
+      -66.9054289461,
     ],
   ];
   for (const [label, sys, total, real, recip, point] of parity) {
@@ -219,5 +293,34 @@ describe("ewaldSum", () => {
       reciprocalCutoff: 4,
     });
     expect(manual.total).toBeCloseTo(auto.total, 6);
+  });
+
+  it("erfc backends agree with exact within their bounds", () => {
+    const exact = ewaldSum(rocksalt.s, rocksalt.q, { erfc: "exact" });
+    // Golden path is intact on the explicit-exact evaluator.
+    expect(exact.total).toBeCloseTo(-35.6940575834, 6);
+    const fast = ewaldSum(rocksalt.s, rocksalt.q, { erfc: "fast" });
+    expect(fast.total).toBeCloseTo(exact.total, 9);
+    // "auto" at default accuracy takes the fast path.
+    expect(ewaldSum(rocksalt.s, rocksalt.q).total).toBe(fast.total);
+    // Fast stays ~1e-13 even where cutoffs are coarse.
+    const ref4 = ewaldSum(rocksalt.s, rocksalt.q, {
+      accuracy: 4,
+      erfc: "exact",
+    });
+    const fast4 = ewaldSum(rocksalt.s, rocksalt.q, {
+      accuracy: 4,
+      erfc: "fast",
+    });
+    expect(Math.abs((fast4.total - ref4.total) / ref4.total)).toBeLessThan(
+      1e-9,
+    );
+    expect(ewaldSum(rocksalt.s, rocksalt.q, { accuracy: 4 }).total).toBe(
+      fast4.total,
+    );
+    // Above accuracy 12 the table cannot keep up, so "auto" goes exact.
+    expect(ewaldSum(rocksalt.s, rocksalt.q, { accuracy: 14 }).total).toBe(
+      ewaldSum(rocksalt.s, rocksalt.q, { accuracy: 14, erfc: "exact" }).total,
+    );
   });
 });

@@ -260,4 +260,38 @@ export const enumCases: EnumCase[] = [
     expectedCount: 2,
     counts: { Ag: 2, Pd: 2 },
   },
+  // Large cases near the search-space cap (counts observed from this
+  // implementation; validated by per-structure composition, frac bounds,
+  // and pairwise distinctness in orderDisordered.test.ts).
+  {
+    name: "O: doubled dual-sublattice",
+    parent: rocksalt(
+      5.64,
+      [
+        ["Na", 0.5],
+        ["K", 0.5],
+      ],
+      [
+        ["Cl", 0.5],
+        ["Br", 0.5],
+      ],
+    ),
+    H: diag(2, 1, 1),
+    expectedCount: 202,
+    counts: { Na: 4, K: 4, Cl: 4, Br: 4 },
+  },
+  {
+    name: "P: quadrupled rocksalt Cl/Br 1/4 - 3/4",
+    parent: rocksalt(
+      5.64,
+      [["Na", 1]],
+      [
+        ["Cl", 0.25],
+        ["Br", 0.75],
+      ],
+    ),
+    H: diag(4, 1, 1),
+    expectedCount: 51,
+    counts: { Na: 16, Cl: 4, Br: 12 },
+  },
 ];

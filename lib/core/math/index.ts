@@ -1,3 +1,5 @@
 export { EPSILON } from "./constants";
 export { clean, gcd, lcm } from "./numeric";
-export { erfc } from "./erfc";
+export { fnv1a32 } from "./hash";
+export { erfc, erfcFast, selectErfc } from "./erfc";
+export type { ErfcMethod } from "./erfc";

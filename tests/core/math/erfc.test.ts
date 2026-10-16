@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { erfc } from "@/core/math/erfc";
+import { erfc, erfcFast } from "@/core/math/erfc";
 
 // Reference values from Python's math.erfc.
 const cases: [number, number][] = [
@@ -31,6 +31,20 @@ describe("erfc", () => {
   it("is symmetric about 1: erfc(-x) = 2 - erfc(x)", () => {
     for (const x of [0.3, 1.7, 3.1]) {
       expect(erfc(-x)).toBeCloseTo(2 - erfc(x), 14);
+    }
+  });
+
+  it("erfcFast matches exact to ~1e-13 over [0, 8] and falls back beyond", () => {
+    let max = 0;
+    for (let j = 0; j <= 8000; j++) {
+      const x = (j / 1000) * 8;
+      max = Math.max(max, Math.abs(erfcFast(x) - erfc(x)));
+    }
+    expect(max).toBeLessThan(5e-13);
+    // Beyond the table is a bit-identical fallback to exact.
+    for (const x of [8.5, 10]) expect(erfcFast(x)).toBe(erfc(x));
+    for (const x of [0.3, 3.1]) {
+      expect(erfcFast(-x)).toBeCloseTo(2 - erfcFast(x), 15);
     }
   });
 });

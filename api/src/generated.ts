@@ -199,9 +199,31 @@ export const types: Record<string, Desc> = {
       {
         "name": "accuracy",
         "optional": true,
-        "doc": "Significant figures each sum is converged to. Default 12.",
+        "doc": "Significant figures each sum is converged to. Default 8.",
         "type": {
           "k": "number"
+        }
+      },
+      {
+        "name": "erfc",
+        "optional": true,
+        "doc": "erfc evaluator for the real-space sum. `\"fast\"` is a table (~3e-13\nrelative error on the energy, ~8x quicker), so it cannot honour\n`accuracy` above ~12; `\"exact\"` (~1e-15) is the reference path.\nDefault `\"auto\"`: fast for `accuracy` <= 12, exact above.",
+        "type": {
+          "k": "union",
+          "of": [
+            {
+              "k": "literal",
+              "v": "auto"
+            },
+            {
+              "k": "literal",
+              "v": "exact"
+            },
+            {
+              "k": "literal",
+              "v": "fast"
+            }
+          ]
         }
       }
     ]

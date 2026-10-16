@@ -1,22 +1,12 @@
 import { Structure } from "../structure";
 import { canonicalize } from "./canonicalize";
 import { Vec3 } from "../../site/site";
+import { fnv1a32 } from "../../math/hash";
 
 function toFixedArray(v: Vec3, precision = 8): string {
   return Array.from(v)
     .map((x) => x.toFixed(precision))
     .join(",");
-}
-
-function fnv1a(str: string): number {
-  let hash = 2166136261;
-
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash *= 16777619;
-  }
-
-  return hash >>> 0;
 }
 
 /** FNV-1a hash of a canonicalized structure (lattice + sorted sites). */
@@ -33,7 +23,5 @@ export function hashStructure(structure: Structure): number {
     .sort()
     .join("|");
 
-  const key = latticeKey + "::" + sitesKey;
-
-  return fnv1a(key);
+  return fnv1a32(latticeKey + "::" + sitesKey);
 }
