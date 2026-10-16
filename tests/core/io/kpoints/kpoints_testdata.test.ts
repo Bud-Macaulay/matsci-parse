@@ -18,6 +18,7 @@ import {
 } from "../teststrings/kpoints";
 
 const mpOffset = (n: number) => (1 - n) / (2 * n);
+const mpShifted = (n: number, s: number) => (s + (1 - n) / 2) / n;
 
 const SIMPLE_POINTS = [
   { coordinate: [0, 0, 0] },
@@ -63,7 +64,8 @@ describe("kpoints test data", () => {
     expect(fromKPOINTS(vaspGammaShifted)).toEqual({
       kind: "grid",
       mesh: [6, 8, 10],
-      origin: [0.5, 0.5, 0],
+      // VASP shifts are in grid steps: origin = s / N.
+      origin: [0.5 / 6, 0.5 / 8, 0],
       scheme: "gamma-centered",
     });
   });
@@ -72,7 +74,8 @@ describe("kpoints test data", () => {
     expect(fromKPOINTS(vaspMPShifted)).toEqual({
       kind: "grid",
       mesh: [5, 7, 9],
-      origin: [mpOffset(5) + 0.5, mpOffset(7) + 0.5, mpOffset(9) + 0.5],
+      // (s + (1 - N)/2) / N, with the shift s in grid steps.
+      origin: [mpShifted(5, 0.5), mpShifted(7, 0.5), mpShifted(9, 0.5)],
       scheme: "monkhorst-pack",
     });
   });

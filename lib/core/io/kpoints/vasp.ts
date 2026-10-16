@@ -8,6 +8,7 @@ import type {
   KPoints,
 } from "../../kpoints/kpoints";
 import { LineReader } from "../helpers";
+import { makeGrid, originFromVasp, vaspMesh } from "../../kpoints/shift";
 
 /** Comment line written for automatic-mesh output. */
 const GRID_COMMENT = "Automatic mesh";
@@ -73,7 +74,7 @@ function parseAutomaticMesh(r: LineReader): KGrid {
   return {
     kind: "grid",
     mesh,
-    origin: monkhorstPack ? monkhorstOrigin(mesh, shift) : shift,
+    origin: originFromVasp(mesh, shift, monkhorstPack),
     scheme: monkhorstPack ? "monkhorst-pack" : "gamma-centered",
   };
 }
@@ -244,20 +245,6 @@ function parseVec3(line: string, what: string): Vec3 {
 }
 
 /**
- * Offset applied to each axis so a Monkhorst-Pack grid is symmetric about the
- * origin. KGrid index [i, j, k] sits at origin + [i/nx, j/ny, k/nz], while MP
- * points are at (2i - n - 1) / 2n, so the origin is (1 - n) / 2n per axis.
- */
-function monkhorstOrigin(mesh: GridShape, shift: Vec3): Vec3 {
-  const offset = (n: number, s: number) => (1 - n) / (2 * n) + s;
-  return [
-    offset(mesh[0], shift[0]),
-    offset(mesh[1], shift[1]),
-    offset(mesh[2], shift[2]),
-  ];
-}
-
-/**
  * Serialize k-point data back to a VASP KPOINTS file.
  *
  * Grids are written as automatic subdivision meshes. K-point sets are
@@ -282,19 +269,18 @@ export function toKPOINTS(
 }
 
 /**
- * Serialize a mesh, inferring the scheme from the origin: a grid whose origin
- * is the canonical Monkhorst-Pack offset (1 - n) / 2n for its mesh is written
- * as a Monkhorst-Pack file, anything else as a Gamma-centered file with the
- * origin as the shift. Either way the generated k-point mesh is identical.
+ * Serialize a mesh. The origin decides the k-points: an exact Monkhorst-Pack
+ * mesh is written as Monkhorst-Pack, anything else as a Gamma-centered mesh
+ * with its offset in grid steps (see {@link vaspMesh}).
  */
-function serializeGrid({ mesh, origin, scheme }: KGrid): string {
-  const shift = scheme === "monkhorst-pack" ? [0, 0, 0] : origin;
+function serializeGrid(grid: KGrid): string {
+  const { monkhorstPack, shift } = vaspMesh(grid);
 
   return [
     GRID_COMMENT,
     "0",
-    scheme === "monkhorst-pack" ? "Monkhorst-Pack" : "Gamma",
-    mesh.join(" "),
+    monkhorstPack ? "Monkhorst-Pack" : "Gamma",
+    grid.mesh.join(" "),
     shift.join(" "),
   ].join("\n");
 }
@@ -391,10 +377,5 @@ function detectGrid(data: KPointSet): KGrid | null {
     }
   }
 
-  return {
-    kind: "grid",
-    mesh,
-    origin: [axes[0][0], axes[1][0], axes[2][0]],
-    scheme: "gamma-centered",
-  };
+  return makeGrid(mesh, [axes[0][0], axes[1][0], axes[2][0]]);
 }

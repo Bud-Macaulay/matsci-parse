@@ -116,6 +116,32 @@ export function fromPOSCAR(text: string): Structure {
 }
 
 /**
+ * How a structure is laid out in a POSCAR: sites grouped by element, elements
+ * in order of first appearance. `order[i]` is the `structure.sites` index of
+ * the i-th POSCAR site; `species` and `counts` are the POSCAR species and
+ * count lines. Anything indexed by POSCAR site or species (MAGMOM, LDAUU,
+ * POTCAR order, ...) must follow this order.
+ */
+export function poscarOrder(structure: Structure): {
+  species: string[];
+  counts: number[];
+  order: number[];
+} {
+  const groups = new Map<string, number[]>();
+  structure.sites.forEach((site, i) => {
+    const symbol = site.species.symbol;
+    const group = groups.get(symbol);
+    if (group) group.push(i);
+    else groups.set(symbol, [i]);
+  });
+  return {
+    species: [...groups.keys()],
+    counts: [...groups.values()].map((g) => g.length),
+    order: [...groups.values()].flat(),
+  };
+}
+
+/**
  * Serializes a Structure to a POSCAR string.
  * @api
  */
@@ -144,27 +170,11 @@ export function toPOSCAR(
   lines.push(`${m[3]} ${m[4]} ${m[5]}`);
   lines.push(`${m[6]} ${m[7]} ${m[8]}`);
 
-  // preserve order of first appearance
-  const grouped = new Map<string, typeof structure.sites>();
-
-  for (const site of structure.sites) {
-    const symbol = site.species.symbol;
-
-    const group = grouped.get(symbol);
-
-    if (group) {
-      group.push(site);
-    } else {
-      grouped.set(symbol, [site]);
-    }
-  }
-
-
-  const species = [...grouped.keys()];
-  const sites = [...grouped.values()].flat();
+  const { species, counts, order } = poscarOrder(structure);
+  const sites = order.map((i) => structure.sites[i]);
 
   lines.push(species.join(" "));
-  lines.push(species.map((s) => (grouped.get(s) ?? []).length).join(" "));
+  lines.push(counts.join(" "));
 
   const hasSelective = structure.selectiveDynamics ?? sites.some((s) => s.properties?.selectiveDynamics);
 

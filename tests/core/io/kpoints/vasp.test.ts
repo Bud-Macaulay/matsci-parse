@@ -23,7 +23,7 @@ describe("fromKPOINTS", () => {
     });
   });
 
-  it("adds the shift to the Monkhorst-Pack origin", () => {
+  it("adds the shift (in grid steps) to the Monkhorst-Pack origin", () => {
     const text = `
 comment
 0
@@ -34,12 +34,14 @@ Monkhorst-Pack
     expect(fromKPOINTS(text)).toEqual({
       kind: "grid",
       mesh: [8, 8, 8],
-      origin: [1 / 16, 1 / 16, 1 / 16],
+      // (s + (1 - N)/2) / N = (0.5 - 3.5) / 8: an even MP mesh shifted by
+      // half a step lands back on a Gamma-centered mesh.
+      origin: [-3 / 8, -3 / 8, -3 / 8],
       scheme: "monkhorst-pack",
     });
   });
 
-  it("uses the shift as the origin of a Gamma-centered grid", () => {
+  it("converts a Gamma-centered shift in grid steps to the origin", () => {
     const text = `
 comment
 0
@@ -50,7 +52,7 @@ Gamma
     expect(fromKPOINTS(text)).toEqual({
       kind: "grid",
       mesh: [2, 2, 2],
-      origin: [0.5, 0.25, 0.1],
+      origin: [0.25, 0.125, 0.05],
       scheme: "gamma-centered",
     });
   });
@@ -356,7 +358,7 @@ describe("toKPOINTS", () => {
       toKPOINTS({
         kind: "grid",
         mesh: [2, 2, 2],
-        origin: [0.5, 0.25, 0.1],
+        origin: [0.25, 0.125, 0.05],
         scheme: "gamma-centered",
       }),
     ).toBe("Automatic mesh\n0\nGamma\n2 2 2\n0.5 0.25 0.1");
