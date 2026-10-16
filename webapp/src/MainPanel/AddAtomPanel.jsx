@@ -48,11 +48,11 @@ export default function AddAtomPanel({ structure, setStructure, pushUndo }) {
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex">
         <button
           onClick={() => setOpen(true)}
           title="Add a new atom to the structure"
-          className="buttonSimple blue w-1/2"
+          className="buttonSimple blue w-full"
         >
           + Add Atom
         </button>

@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Tailwind v4 defaults `border` to currentColor, which renders every card,
+   table and input outline near-black. Restore the v3 neutral default. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-400, currentColor);
+  }
+}
+
 .table-nice {
   @apply w-full text-xs border-separate border-spacing-0;
 }

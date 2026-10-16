@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { getSymmetry, supercell } from "matsci-parse";
 
 import Modal from "../../common/Modal";
@@ -6,20 +6,31 @@ import { formatSpaceGroupSymbol } from "../../common/textFormatting";
 
 export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
   const [open, setOpen] = useState(false);
+  // The analysis is only valid for the structure it was computed from. This
+  // component is reused across tabs and edits, so track which one that was.
   const [analysis, setAnalysis] = useState(null);
+  const [analyzedFor, setAnalyzedFor] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
 
+  const latestStructure = useRef(structure);
+  latestStructure.current = structure;
+
   const runAnalysis = useCallback(async () => {
+    const target = structure;
     setAnalyzing(true);
     try {
       let result;
       try {
-        result = await getSymmetry(structure);
+        result = await getSymmetry(target);
       } catch {
-        const sc = supercell(structure, [2, 2, 2]);
+        const sc = supercell(target, [2, 2, 2]);
         result = await getSymmetry(sc);
       }
+      // Drop results for a structure that is no longer current (tab switch
+      // or edit while the analysis was running).
+      if (latestStructure.current !== target) return;
       setAnalysis(result);
+      setAnalyzedFor(target);
     } catch (e) {
       console.error("analyzeCrystal failed:", e);
     } finally {
@@ -27,14 +38,16 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
     }
   }, [structure]);
 
+  const isCurrent = analysis !== null && analyzedFor === structure;
+
   const handleOpen = () => {
     setOpen(true);
-    if (!analysis) runAnalysis();
+    if (!isCurrent) runAnalysis();
   };
 
   const applySym = useCallback(
     (mode = "conventional") => {
-      if (!analysis) return;
+      if (!analysis || analyzedFor !== structure) return;
       pushUndo({
         action: "symmetry-transform",
         label: `Symmetry → ${mode}`,
@@ -43,10 +56,10 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
         mode === "primitive" ? analysis.primitive : analysis.conventional,
       );
     },
-    [analysis, pushUndo, setStructure],
+    [analysis, analyzedFor, structure, pushUndo, setStructure],
   );
 
-  const calc = analysis?.calculationResults;
+  const calc = isCurrent ? analysis.calculationResults : undefined;
   const cleanSymbol = calc?.hm_symbol?.replace(/\s+/g, "");
 
   return (
@@ -128,7 +141,7 @@ export default function SymmetryPanel({ structure, setStructure, pushUndo }) {
             </table>
           )}
 
-          {analysis && !calc && (
+          {isCurrent && !calc && (
             <p className="text-sm text-gray-500">
               No symmetry data found for this structure.
             </p>

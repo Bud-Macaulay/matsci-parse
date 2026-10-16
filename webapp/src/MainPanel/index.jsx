@@ -140,34 +140,9 @@ export default function MainPanel({ tab, updateTab }) {
       />
 
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
-        {/* LEFT COLUMN */}
+        {/* LEFT: STRUCTURE INFORMATION AND EDITS */}
         <div className="w-[425px] min-w-[380px] max-w-[450px] flex flex-col gap-4 overflow-y-auto">
-          <div className="flex justify-between items-center text-[12px]">
-            <span className="text-sm">Atoms ({structure.sites.length})</span>
-            <div className="flex gap-2">
-              <button
-                onClick={onCanonicalize}
-                title="Wrap fractional coords to [0,1), clean near-zero values, and sort sites"
-                className="buttonSimple blue"
-              >
-                Canonicalize
-              </button>
-              <button
-                onClick={() => setSpeciesModal({ open: true, mode: "remove" })}
-                title="Remove all atoms of a chosen element"
-                className="buttonSimple red"
-              >
-                Remove Species
-              </button>
-              <button
-                onClick={() => setSpeciesModal({ open: true, mode: "replace" })}
-                title="Replace all atoms of one element with another"
-                className="buttonSimple gray"
-              >
-                Replace Species
-              </button>
-            </div>
-          </div>
+          <span className="text-sm">Atoms ({structure.sites.length})</span>
 
           <AtomTable
             structure={structure}
@@ -176,12 +151,37 @@ export default function MainPanel({ tab, updateTab }) {
             onRemove={remove}
           />
 
-          <AddAtomPanel
-            structure={structure}
-            setStructure={setStructure}
-            pushUndo={pushUndo}
-          />
+          <div className="grid grid-cols-2 gap-2 text-[12px]">
+            <AddAtomPanel
+              structure={structure}
+              setStructure={setStructure}
+              pushUndo={pushUndo}
+            />
+            <button
+              onClick={onCanonicalize}
+              title="Wrap fractional coords to [0,1), clean near-zero values, and sort sites"
+              className="buttonSimple blue"
+            >
+              Canonicalize
+            </button>
+            <button
+              onClick={() => setSpeciesModal({ open: true, mode: "remove" })}
+              title="Remove all atoms of a chosen element"
+              className="buttonSimple red"
+            >
+              Remove Species
+            </button>
+            <button
+              onClick={() => setSpeciesModal({ open: true, mode: "replace" })}
+              title="Replace all atoms of one element with another"
+              className="buttonSimple gray"
+            >
+              Replace Species
+            </button>
+          </div>
+
           <LatticePanel lattice={structure.lattice} />
+
           <TransformLatticePanel
             structure={structure}
             setStructure={setStructure}
@@ -192,38 +192,57 @@ export default function MainPanel({ tab, updateTab }) {
             setStructure={setStructure}
             pushUndo={pushUndo}
           />
-          <div className="grid grid-cols-3 gap-2">
-            <SymmetryPanel
-              structure={structure}
-              setStructure={setStructure}
-              pushUndo={pushUndo}
-            />
-            <DistanceMatrixPanel structure={structure} />
-            <SlabModal
-              structure={structure}
-              setStructure={setStructure}
-              pushUndo={pushUndo}
-            />
-            <EnumerateModal structure={structure} />
+        </div>
+
+        {/* RIGHT: VISUALIZER, WITH TOOL POP-OUTS BENEATH */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden">
+          <VisualizerPane
+            structure={structure}
+            setStructure={setStructure}
+            pushUndo={pushUndo}
+          />
+
+          <div className="shrink-0 bg-white rounded-md border overflow-hidden">
+            <div className="px-3 py-2 border-b bg-gray-50">
+              <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                Compute
+              </h3>
+            </div>
+            <div className="p-3 grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3 text-sm [&_button]:min-h-10 [&_button]:w-full">
+              <SymmetryPanel
+                structure={structure}
+                setStructure={setStructure}
+                pushUndo={pushUndo}
+              />
+              <DistanceMatrixPanel structure={structure} />
+              <SlabModal
+                structure={structure}
+                setStructure={setStructure}
+                pushUndo={pushUndo}
+              />
+              <EnumerateModal structure={structure} />
+              <button
+                onClick={() => setMlipOpen(true)}
+                disabled={!structure}
+                title="Machine-learning interatomic potential calculator"
+                className="buttonSimple blue"
+              >
+                MLIP Calculator
+              </button>
+              <button
+                onClick={() => setNebOpen(true)}
+                disabled={!structure}
+                title="Nudged elastic band between two endpoints"
+                className="buttonSimple blue"
+              >
+                NEB…
+              </button>
+              <QEInputModal structure={structure} />
+              <BrillouinZoneModal structure={structure} />
+              <XrdModal structure={structure} />
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMlipOpen(true)}
-              disabled={!structure}
-              title="Machine-learning interatomic potential calculator"
-              className="buttonSimple blue"
-            >
-              MLIP Calculator
-            </button>
-            <button
-              onClick={() => setNebOpen(true)}
-              disabled={!structure}
-              title="Nudged elastic band between two endpoints"
-              className="buttonSimple blue"
-            >
-              NEB…
-            </button>
-          </div>
+
           {mlipOpen && (
             <Modal
               open={mlipOpen}
@@ -247,17 +266,7 @@ export default function MainPanel({ tab, updateTab }) {
               setStructure={setStructure}
             />
           )}
-          <QEInputModal structure={structure} />
-          <BrillouinZoneModal structure={structure} />
-          <XrdModal structure={structure} />
         </div>
-
-        {/* RIGHT: VISUALIZER */}
-        <VisualizerPane
-          structure={structure}
-          setStructure={setStructure}
-          pushUndo={pushUndo}
-        />
       </div>
 
       <SpeciesModal

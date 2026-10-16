@@ -98,7 +98,7 @@ export default function App() {
         onLoadStructure={handleLoadStructure}
       />
 
-      <main className="flex-1 flex flex-col h-full bg-gray-50">
+      <main className="flex-1 min-w-0 flex flex-col h-full bg-gray-50">
         <div className="flex border-b bg-gray-200 overflow-x-auto h-[58px]">
           {tabs.map((tab) => (
             <div

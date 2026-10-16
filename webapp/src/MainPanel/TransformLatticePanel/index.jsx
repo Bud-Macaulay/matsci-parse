@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
 import { supercell } from "matsci-parse";
+import { showToast } from "../../common/toastStore";
 
 export default function TransformLatticePanel({
   structure,
@@ -19,16 +20,16 @@ export default function TransformLatticePanel({
   const applyTransform = () => {
     if (!structure) return;
 
-    pushUndo({
-      action: "supercell",
-      label: `Built ${dims[0]}×${dims[1]}×${dims[2]} supercell`,
-    });
-
     try {
       const newStructure = supercell(structure, dims);
+      pushUndo({
+        action: "supercell",
+        label: `Built ${dims[0]}×${dims[1]}×${dims[2]} supercell`,
+      });
       setStructure(newStructure);
     } catch (e) {
       console.error("Supercell failed:", e);
+      showToast(`Supercell failed: ${e.message}`, "error");
     }
   };
 
