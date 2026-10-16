@@ -8,6 +8,7 @@
  */
 
 import { Matrix, createMatrix } from "../../matrix";
+import { gramSchmidtInto } from "../gramSchmidt";
 import { dot } from "../vector/dot";
 
 export interface LllResult {
@@ -49,31 +50,10 @@ export function lll(input: Matrix, delta = 0.75): LllResult {
 
   // Gram-Schmidt orthogonalization
   const gs = new Float64Array(n * n); // orthogonal vectors
-  const mu = new Float64Array(n * n); // μ[i][j]
+  const mu = new Float64Array(n * n); // μ[i][j], unit diagonal
 
   function orthogonalize() {
-    mu.fill(0);
-
-    for (let i = 0; i < n; i++) {
-      // copy b[i] into gs[i]
-      for (let k = 0; k < n; k++) gs[i * n + k] = b[i * n + k];
-
-      for (let j = 0; j < i; j++) {
-        const gj = row(gs, n, j);
-        const dotGjGj = dot(gj, gj);
-        if (dotGjGj > 1e-20) {
-          mu[i * n + j] = dot(row(b, n, i), gj) / dotGjGj;
-        } else {
-          mu[i * n + j] = 0;
-        }
-
-        // gs[i] -= μ[i][j] * gs[j]
-        const m = mu[i * n + j];
-        for (let k = 0; k < n; k++) {
-          gs[i * n + k] -= m * gs[j * n + k];
-        }
-      }
-    }
+    gramSchmidtInto(b, n, n, gs, mu);
   }
 
   function gsDot(i: number, j: number): number {

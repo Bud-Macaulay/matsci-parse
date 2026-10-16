@@ -1,6 +1,50 @@
 import { Matrix, createMatrix } from "../matrix";
 import { EPSILON } from "../../math/constants";
 
+/** Fail-soft Cholesky kernel over raw row-major n×n buffers: factors `G`
+ * into `L` (preallocated, `L.length >= n*n`), returning `false` instead of
+ * throwing when `G` is not positive definite. Only the lower triangle of `G`
+ * is read. Backs {@link cholesky} and hot paths (e.g. Minkowski SVP
+ * enumeration) that prefer a fallback over an exception. */
+export function choleskyInto(
+  G: Float64Array,
+  n: number,
+  L: Float64Array,
+): boolean {
+  L.fill(0, 0, n * n);
+
+  for (let i = 0; i < n; i++) {
+    const iOffset = i * n;
+
+    for (let j = 0; j < i; j++) {
+      const jOffset = j * n;
+      let value = G[iOffset + j];
+
+      for (let k = 0; k < j; k++) {
+        value -= L[iOffset + k] * L[jOffset + k];
+      }
+
+      L[iOffset + j] = value / L[jOffset + j];
+    }
+
+    let value = G[iOffset + i];
+
+    for (let k = 0; k < i; k++) {
+      const lik = L[iOffset + k];
+      value -= lik * lik;
+    }
+
+    // Also rejects NaN.
+    if (!(value >= EPSILON) || value === Infinity) {
+      return false;
+    }
+
+    L[iOffset + i] = Math.sqrt(value);
+  }
+
+  return true;
+}
+
 /** Compute the Cholesky decomposition of a symmetric positive-definite matrix (A = L Lᵀ).
  * @param A - Symmetric positive-definite matrix.
  * @returns The lower triangular matrix L. */
@@ -12,43 +56,8 @@ export function cholesky(A: Matrix): Matrix {
   const n = A.rows;
   const L = createMatrix(n, n);
 
-  const ad = A.data;
-  const ld = L.data;
-
-  for (let j = 0; j < n; j++) {
-    const jOffset = j * n;
-
-    let sum = 0;
-
-    for (let k = 0; k < j; k++) {
-      const ljk = ld[jOffset + k];
-      sum += ljk * ljk;
-    }
-
-    const val = ad[jOffset + j] - sum;
-
-    if (val < -EPSILON) {
-      throw new Error("Matrix is not positive definite");
-    }
-
-    const diag = val < EPSILON ? 0 : Math.sqrt(val);
-
-    if (diag <= 0) {
-      throw new Error("Matrix is not positive definite");
-    }
-
-    ld[jOffset + j] = diag;
-
-    for (let i = j + 1; i < n; i++) {
-      const iOffset = i * n;
-      let sum2 = 0;
-
-      for (let k = 0; k < j; k++) {
-        sum2 += ld[iOffset + k] * ld[jOffset + k];
-      }
-
-      ld[iOffset + j] = (ad[iOffset + j] - sum2) / diag;
-    }
+  if (!choleskyInto(A.data, n, L.data)) {
+    throw new Error("Matrix is not positive definite");
   }
 
   return L;

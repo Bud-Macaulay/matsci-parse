@@ -1,7 +1,7 @@
 import { Matrix, createMatrix } from "@/core/matrix/matrix";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { scale } from "@/core/matrix/operations/scale";
-import { gjInverse } from "@/core/matrix/operations/inverse/gaussJordan";
+import { inverseSmall } from "@/core/matrix/operations/inverse/inverseSmall";
 
 const TWO_PI = 2 * Math.PI;
 
@@ -35,12 +35,12 @@ export function cellParams(
 
 /** Reciprocal-space cell rows, such that dot(real, recip.T) = 2π I. */
 export function getReciprocalCellRows(real: Matrix): Matrix {
-  return transpose(scale(gjInverse(real), TWO_PI));
+  return transpose(scale(inverseSmall(real), TWO_PI));
 }
 
 /** Real-space cell rows given reciprocal rows, such that dot(recip, real.T) = 2π I. */
 export function getRealCellFromReciprocalRows(recip: Matrix): Matrix {
-  return transpose(scale(gjInverse(recip), TWO_PI));
+  return transpose(scale(inverseSmall(recip), TWO_PI));
 }
 
 /**

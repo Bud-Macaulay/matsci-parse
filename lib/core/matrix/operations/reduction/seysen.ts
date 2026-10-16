@@ -25,6 +25,9 @@
 
 import { Matrix, createMatrix } from "../../matrix";
 import { determinant } from "../determinant";
+import { gram } from "../gram";
+import { inverseSmall } from "../inverse/inverseSmall";
+import { mul } from "../mul";
 
 export interface SeysenResult {
   /** The reduced basis matrix (rows are lattice vectors). */
@@ -35,56 +38,10 @@ export interface SeysenResult {
   measure: number;
 }
 
-/** Inverse of a square matrix via Gauss–Jordan elimination (Float64). */
-function invert(m: Float64Array, n: number): Float64Array {
-  const w = 2 * n;
-  const aug = new Float64Array(n * w);
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) aug[i * w + j] = m[i * n + j];
-    aug[i * w + n + i] = 1;
-  }
-  for (let col = 0; col < n; col++) {
-    let piv = col;
-    for (let r = col + 1; r < n; r++) {
-      if (Math.abs(aug[r * w + col]) > Math.abs(aug[piv * w + col])) piv = r;
-    }
-    if (Math.abs(aug[piv * w + col]) < 1e-300) {
-      throw new Error("Seysen reduction requires a full-rank lattice");
-    }
-    if (piv !== col) {
-      for (let c = 0; c < w; c++) {
-        const t = aug[col * w + c];
-        aug[col * w + c] = aug[piv * w + c];
-        aug[piv * w + c] = t;
-      }
-    }
-    const pv = aug[col * w + col];
-    for (let c = 0; c < w; c++) aug[col * w + c] /= pv;
-    for (let r = 0; r < n; r++) {
-      if (r === col) continue;
-      const f = aug[r * w + col];
-      for (let c = 0; c < w; c++) aug[r * w + c] -= f * aug[col * w + c];
-    }
-  }
-  const inv = new Float64Array(n * n);
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) inv[i * n + j] = aug[i * w + n + j];
-  }
-  return inv;
-}
-
-/** Dense Gram product G = B·Bᵀ. */
-function gram(B: Float64Array, n: number): Float64Array {
-  const G = new Float64Array(n * n);
-  for (let i = 0; i < n; i++) {
-    for (let j = i; j < n; j++) {
-      let s = 0;
-      for (let k = 0; k < n; k++) s += B[i * n + k] * B[j * n + k];
-      G[i * n + j] = s;
-      G[j * n + i] = s;
-    }
-  }
-  return G;
+/** Gram matrix G = B·Bᵀ and its inverse H = G⁻¹ (Gram of the dual basis). */
+function gramPair(B: Matrix): { G: Float64Array; H: Float64Array } {
+  const G = gram(B);
+  return { G: G.data, H: inverseSmall(G).data };
 }
 
 /** Current Seysen measure S = Σᵢ G(i,i)·H(i,i). */
@@ -112,25 +69,11 @@ export function seysen(input: Matrix): SeysenResult {
     throw new Error("Seysen reduction requires a full-rank lattice");
   }
 
-  const B = new Float64Array(input.data);
-  const B0 = new Float64Array(input.data);
-  const B0inv = invert(B0, n);
-  const U = new Float64Array(n * n);
-  for (let i = 0; i < n; i++) U[i * n + i] = 1;
+  const Bm = createMatrix(n, n, input.data);
+  const B = Bm.data;
+  const B0inv = inverseSmall(input);
 
-  let G = gram(B, n);
-  let H = invert(G, n);
-
-  // Recompute the left-multiply transform U such that B = U·B0.
-  const syncTransform = () => {
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        let s = 0;
-        for (let k = 0; k < n; k++) s += B[i * n + k] * B0inv[k * n + j];
-        U[i * n + j] = Math.round(s);
-      }
-    }
-  };
+  let { G, H } = gramPair(Bm);
 
   let improved = true;
   let guard = 0;
@@ -155,9 +98,7 @@ export function seysen(input: Matrix): SeysenResult {
             s0 + 2 * t * (g01 * h11 - g00 * h01) + 2 * t * t * g00 * h11;
           if (sNew < s0 - 1e-12) {
             for (let k = 0; k < n; k++) B[b * n + k] += t * B[a * n + k];
-            G = gram(B, n);
-            H = invert(G, n);
-            syncTransform();
+            ({ G, H } = gramPair(Bm));
             improved = true;
             continue;
           }
@@ -171,9 +112,7 @@ export function seysen(input: Matrix): SeysenResult {
             s0 + 2 * s * (g11 * h01 - g01 * h00) + 2 * s * s * g11 * h00;
           if (sNew < s0 - 1e-12) {
             for (let k = 0; k < n; k++) B[a * n + k] -= s * B[b * n + k];
-            G = gram(B, n);
-            H = invert(G, n);
-            syncTransform();
+            ({ G, H } = gramPair(Bm));
             improved = true;
             // continue scanning; pair (a,b) might improve again
           }
@@ -182,9 +121,13 @@ export function seysen(input: Matrix): SeysenResult {
     }
   }
 
+  // Left-multiply transform U such that B = U·B0 (integral up to fp error).
+  const U = mul(Bm, B0inv);
+  for (let i = 0; i < U.data.length; i++) U.data[i] = Math.round(U.data[i]);
+
   return {
-    basis: createMatrix(n, n, B),
-    transform: createMatrix(n, n, U),
+    basis: Bm,
+    transform: U,
     measure: measure(G, H, n),
   };
 }

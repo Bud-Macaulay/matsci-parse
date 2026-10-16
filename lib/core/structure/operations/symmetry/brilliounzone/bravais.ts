@@ -1,7 +1,7 @@
 import { Matrix } from "@/core/matrix/matrix";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { mul } from "@/core/matrix/operations/mul";
-import { gjInverse } from "@/core/matrix/operations/inverse/gaussJordan";
+import { inverseSmall } from "@/core/matrix/operations/inverse/inverseSmall";
 import { niggli } from "@/core/matrix/operations/reduction/niggli";
 import {
   cellParams,
@@ -153,7 +153,7 @@ export async function transformAP(
     ],
   );
   const absPositions = mulRows(positions, lattice);
-  const invFinal = gjInverse(matrixFromRowMajor(finalRows.flat()));
+  const invFinal = inverseSmall(matrixFromRowMajor(finalRows.flat()));
   // f_new_col = (B⁻¹)ᵀ · p_col (row convention: p_row = f_row · B).
   const invFinalT = transpose(invFinal);
   const newPositions = absPositions.map((p) => {

@@ -22,7 +22,17 @@
  */
 
 import { Matrix, createMatrix } from "../../matrix";
+import { gcd } from "../../../math/numeric";
+import { choleskyInto } from "../cholesky";
 import { determinant } from "../determinant";
+import { gram } from "../gram";
+import { gramSchmidt } from "../gramSchmidt";
+import { inverseSmall } from "../inverse/inverseSmall";
+import { mul } from "../mul";
+import { slice } from "../slice";
+import { sub } from "../sub";
+import { transpose } from "../transpose";
+import { normalize } from "../vector/normalize";
 
 export interface MinkowskiResult {
   /** The Minkowski-reduced basis matrix (rows are lattice vectors). */
@@ -35,19 +45,6 @@ export interface MinkowskiResult {
 /* -------------------------------------------------------------------------- */
 /* Integer helpers                                                            */
 /* -------------------------------------------------------------------------- */
-
-function gcd(a: number, b: number): number {
-  a = Math.abs(Math.trunc(a));
-  b = Math.abs(Math.trunc(b));
-
-  while (b !== 0) {
-    const t = a % b;
-    a = b;
-    b = t;
-  }
-
-  return a;
-}
 
 function vecGcd(v: Int32Array): number {
   let g = 0;
@@ -168,102 +165,15 @@ function completeToUnimodular(v: Int32Array, m: number): Float64Array {
    *
    * Therefore the first row of T⁻¹ is exactly v.
    *
+   * T is unimodular (det ±1), so the inverse is integral up to fp error:
+   * round it back to integers.
+   *
    * Do not modify that row afterward: doing so can destroy unimodularity.
    */
-  return inverseSmall(T, m);
-}
+  const out = inverseSmall(createMatrix(m, m, T)).data;
 
-/**
- * Tiny-matrix inverse.
- *
- * This is only used for m <= 4, so avoiding a general-purpose matrix
- * implementation is worthwhile.
- */
-function inverseSmall(A: Float64Array, n: number): Float64Array {
-  if (n === 1) {
-    return new Float64Array([1 / A[0]]);
-  }
-
-  if (n === 2) {
-    const a = A[0];
-    const b = A[1];
-    const c = A[2];
-    const d = A[3];
-
-    const det = a * d - b * c;
-
-    return new Float64Array([d / det, -b / det, -c / det, a / det]);
-  }
-
-  /*
-   * Gauss-Jordan is acceptable here because this is only a 3×3 or 4×4
-   * unimodular matrix.
-   */
-  const width = n * 2;
-  const aug = new Float64Array(n * width);
-
-  for (let r = 0; r < n; r++) {
-    const rb = r * width;
-    const ab = r * n;
-
-    for (let c = 0; c < n; c++) {
-      aug[rb + c] = A[ab + c];
-    }
-
-    aug[rb + n + r] = 1;
-  }
-
-  for (let col = 0; col < n; col++) {
-    let pivot = col;
-    let max = Math.abs(aug[col * width + col]);
-
-    for (let r = col + 1; r < n; r++) {
-      const value = Math.abs(aug[r * width + col]);
-
-      if (value > max) {
-        max = value;
-        pivot = r;
-      }
-    }
-
-    if (pivot !== col) {
-      const a = pivot * width;
-      const b = col * width;
-
-      for (let c = 0; c < width; c++) {
-        const t = aug[a + c];
-        aug[a + c] = aug[b + c];
-        aug[b + c] = t;
-      }
-    }
-
-    const base = col * width;
-    const pv = aug[base + col];
-
-    for (let c = 0; c < width; c++) {
-      aug[base + c] /= pv;
-    }
-
-    for (let r = 0; r < n; r++) {
-      if (r === col) continue;
-
-      const rb = r * width;
-      const factor = aug[rb + col];
-
-      if (factor === 0) continue;
-
-      for (let c = 0; c < width; c++) {
-        aug[rb + c] -= factor * aug[base + c];
-      }
-    }
-  }
-
-  const out = new Float64Array(n * n);
-
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      out[r * n + c] = Math.round(aug[r * width + n + c]);
-    }
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Math.round(out[i]);
   }
 
   return out;
@@ -273,143 +183,43 @@ function inverseSmall(A: Float64Array, n: number): Float64Array {
 /* Projection / Gram matrix                                                   */
 /* -------------------------------------------------------------------------- */
 
-function buildOrthonormalBasis(
-  basis: Float64Array,
-  n: number,
-  count: number,
-  u: Float64Array,
-): void {
+/** Orthonormal basis of the span of the first `count` (fixed) rows. */
+function buildOrthonormalBasis(basis: Matrix, count: number): Matrix {
+  const n = basis.cols;
+  const U = gramSchmidt(slice(basis, 0, count)).orthogonal;
+
   for (let i = 0; i < count; i++) {
-    const dst = i * n;
-    const src = i * n;
-
-    for (let k = 0; k < n; k++) {
-      u[dst + k] = basis[src + k];
-    }
-
-    /*
-     * Modified Gram-Schmidt.
-     */
-    for (let j = 0; j < i; j++) {
-      const jo = j * n;
-
-      let projection = 0;
-
-      for (let k = 0; k < n; k++) {
-        projection += u[dst + k] * u[jo + k];
-      }
-
-      for (let k = 0; k < n; k++) {
-        u[dst + k] -= projection * u[jo + k];
-      }
-    }
-
-    let norm2 = 0;
-
-    for (let k = 0; k < n; k++) {
-      const x = u[dst + k];
-      norm2 += x * x;
-    }
-
-    if (norm2 === 0) {
-      throw new Error(
-        "Internal error: dependent fixed vectors during Minkowski reduction",
-      );
-    }
-
-    const invNorm = 1 / Math.sqrt(norm2);
-
-    for (let k = 0; k < n; k++) {
-      u[dst + k] *= invNorm;
-    }
+    const rowView = U.data.subarray(i * n, (i + 1) * n);
+    rowView.set(normalize(rowView));
   }
+
+  return U;
 }
 
-function buildProjectedGram(
-  basis: Float64Array,
-  n: number,
-  cur: number,
-  m: number,
-  u: Float64Array,
-  fixedDots: Float64Array,
-  G: Float64Array,
-): void {
-  /*
-   * Dot products against fixed orthonormal vectors.
-   */
-  for (let i = 0; i < m; i++) {
-    const row = cur + i;
-    const bo = row * n;
+/**
+ * Gram matrix of the open rows (cur..n-1) projected orthogonally to the span
+ * of the fixed rows (0..cur-1):
+ *
+ *     G = Bₜ·Bₜᵀ − F·Fᵀ,   F = Bₜ·Uᵀ
+ *
+ * where Bₜ are the open rows and U is an orthonormal basis of the fixed span.
+ */
+function buildProjectedGram(basis: Matrix, cur: number): Float64Array {
+  const open = slice(basis, cur);
+  const G = gram(open);
 
-    for (let f = 0; f < cur; f++) {
-      const uo = f * n;
-
-      let dot = 0;
-
-      for (let k = 0; k < n; k++) {
-        dot += basis[bo + k] * u[uo + k];
-      }
-
-      fixedDots[i * cur + f] = dot;
-    }
+  if (cur === 0) {
+    return G.data;
   }
 
-  /*
-   * Projected Gram matrix:
-   *
-   * Gij = <bi,bj> - Σ <bi,uf><bj,uf>
-   */
-  for (let i = 0; i < m; i++) {
-    const ri = (cur + i) * n;
+  const F = mul(open, transpose(buildOrthonormalBasis(basis, cur)));
 
-    for (let j = i; j < m; j++) {
-      const rj = (cur + j) * n;
-
-      let value = 0;
-
-      for (let k = 0; k < n; k++) {
-        value += basis[ri + k] * basis[rj + k];
-      }
-
-      for (let f = 0; f < cur; f++) {
-        value -= fixedDots[i * cur + f] * fixedDots[j * cur + f];
-      }
-
-      G[i * m + j] = value;
-      G[j * m + i] = value;
-    }
-  }
+  return sub(G, gram(F)).data;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Cholesky / SVP                                                             */
 /* -------------------------------------------------------------------------- */
-
-function cholesky(G: Float64Array, m: number, L: Float64Array): boolean {
-  L.fill(0);
-
-  for (let i = 0; i < m; i++) {
-    for (let j = 0; j <= i; j++) {
-      let value = G[i * m + j];
-
-      for (let k = 0; k < j; k++) {
-        value -= L[i * m + k] * L[j * m + k];
-      }
-
-      if (i === j) {
-        if (!(value > 0) || !Number.isFinite(value)) {
-          return false;
-        }
-
-        L[i * m + j] = Math.sqrt(value);
-      } else {
-        L[i * m + j] = value / L[j * m + j];
-      }
-    }
-  }
-
-  return true;
-}
 
 function shortestPrimitive(G: Float64Array, m: number): Int32Array {
   const best = new Int32Array(m);
@@ -432,7 +242,7 @@ function shortestPrimitive(G: Float64Array, m: number): Int32Array {
 
   const L = new Float64Array(m * m);
 
-  if (!cholesky(G, m, L)) {
+  if (!choleskyInto(G, m, L)) {
     return best;
   }
 
@@ -649,18 +459,13 @@ function minkowskiReduce(
   transform: Float64Array,
   n: number,
 ): void {
-  const u = new Float64Array(n * n);
-  const fixedDots = new Float64Array(n * n);
-  const G = new Float64Array(n * n);
+  // View over the working buffer (no copy): mutations to `basis` are visible.
+  const B: Matrix = { rows: n, cols: n, data: basis };
 
   for (let cur = 0; cur < n - 1; cur++) {
     const m = n - cur;
 
-    if (cur > 0) {
-      buildOrthonormalBasis(basis, n, cur, u);
-    }
-
-    buildProjectedGram(basis, n, cur, m, u, fixedDots, G);
+    const G = buildProjectedGram(B, cur);
 
     const shortest = shortestPrimitive(G, m);
 
