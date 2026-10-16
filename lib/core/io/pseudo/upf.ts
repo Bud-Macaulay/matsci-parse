@@ -30,7 +30,7 @@ import {
   formatFortranBool,
   escapeXmlAttr,
   formatDataArray,
-} from "./fortran-helpers";
+} from "../parseUtils/fortran-helpers";
 
 import {
   type XmlNode,
@@ -42,7 +42,7 @@ import {
   toArray,
   entries,
   parseXml,
-} from "./xml-helpers";
+} from "../parseUtils/xml-helpers";
 
 function parseData(text: string): Float64Array {
   return parseFloat64Array(text);

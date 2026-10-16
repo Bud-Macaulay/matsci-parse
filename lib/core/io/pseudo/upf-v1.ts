@@ -30,7 +30,7 @@ import {
   formatFortranNumber,
   formatDataArray,
   parseIntSafe,
-} from "./fortran-helpers";
+} from "../parseUtils/fortran-helpers";
 
 function extractSection(text: string, tag: string): string | null {
   const open = `<${tag}>`;

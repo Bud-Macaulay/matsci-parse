@@ -19,6 +19,7 @@ import type { QeIonsOptions } from "./schema/ions";
 import type { QeCellOptions } from "./schema/cell";
 import type { KPoints } from "../../kpoints/kpoints";
 import { kpointsToPW } from "../kpoints/qe";
+import { elementFromLabel } from "./labels";
 
 const BOHR_TO_ANGSTROM = 0.529177;
 
@@ -408,20 +409,6 @@ export function toPW(structure: Structure, options?: QEOptions): string {
   return lines.join("\n");
 }
 
-/**
- * Element behind a QE species label: the longest leading element symbol,
- * e.g. "Fe1" → "Fe", "Fe_up" → "Fe", "O2" → "O". Falls back to the label.
- */
-function elementFromLabel(label: string): string {
-  const letters = /^[A-Za-z]{1,2}/.exec(label)?.[0] ?? "";
-  for (const len of [2, 1]) {
-    const candidate = letters.slice(0, len);
-    if (candidate.length !== len) continue;
-    const symbol = candidate[0].toUpperCase() + candidate.slice(1).toLowerCase();
-    if (getElement(symbol)) return symbol;
-  }
-  return label;
-}
 
 /** Calculations for which pw.x reads &IONS / &CELL. */
 const IONS_CALCULATIONS = new Set(["relax", "md", "vc-relax", "vc-md"]);
@@ -673,3 +660,5 @@ function formatNamelistValue(value: unknown): string {
   if (typeof value === "boolean") return `.${value ? "TRUE" : "FALSE"}.`;
   return String(value);
 }
+
+export * from "./output";

@@ -45,7 +45,7 @@ import { makeRadialGrid } from "../../pseudopotential/operations";
 import {
   parseFortranNumber,
   formatFortranNumber,
-} from "./fortran-helpers";
+} from "../parseUtils/fortran-helpers";
 
 export interface GTHConversionCheck {
   ok: boolean;

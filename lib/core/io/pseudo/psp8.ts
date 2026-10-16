@@ -38,7 +38,7 @@ import {
   formatFortranNumber,
   formatDataArray,
   parseIntSafe,
-} from "./fortran-helpers";
+} from "../parseUtils/fortran-helpers";
 
 import { guessElement, elementToZ, pspxcToFunctional, functionalToPspxc } from "./elements";
 

@@ -87,16 +87,32 @@ export function decodeEntities(s: string): string {
   });
 }
 
-interface TxmlNode {
+/**
+ * An element of the ordered XML tree (txml's node shape). Attribute values
+ * are null for attributes written without a value.
+ */
+export interface XmlElement {
   tagName: string;
-  attributes: Record<string, string>;
-  children: Array<TxmlNode | string>;
+  attributes: Record<string, string | null>;
+  children: Array<XmlElement | string>;
 }
 
-function convertNode(node: TxmlNode, out: XmlNode): void {
+/**
+ * Parse XML into its ordered element tree. Use this when document order
+ * matters (e.g. interleaved or repeated siblings); use {@link parseXml} for
+ * the keyed object form.
+ */
+export function parseXmlTree(text: string): Array<XmlElement | string> {
+  // XML has no void elements: without noChildNodes: [], txml treats HTML
+  // names (input, link, meta, img, br, hr) as empty, breaking e.g. the
+  // <input> section of Quantum ESPRESSO XML.
+  return parseTxml(text, { noChildNodes: [] }) as Array<XmlElement | string>;
+}
+
+function convertNode(node: XmlElement, out: XmlNode): void {
   for (const k of Object.keys(node.attributes)) {
     // trimValues equivalent: attribute values are trimmed.
-    out[`@_${k}`] = decodeEntities(node.attributes[k]).trim();
+    out[`@_${k}`] = decodeEntities(node.attributes[k] ?? "").trim();
   }
   for (const child of node.children) {
     if (typeof child === "string") {
@@ -117,7 +133,7 @@ function convertNode(node: TxmlNode, out: XmlNode): void {
  * Convert one element, mirroring fast-xml-parser value collapsing:
  * attribute-less leaves become bare strings ("" when empty).
  */
-function convertElement(node: TxmlNode): XmlNode | string {
+function convertElement(node: XmlElement): XmlNode | string {
   const hasAttrs = Object.keys(node.attributes).length > 0;
   if (!hasAttrs) {
     const parts: string[] = [];
@@ -154,7 +170,7 @@ function appendChild(out: XmlNode, tag: string, sub: XmlNode | string): void {
  */
 export function parseXml(text: string): XmlNode {
   const doc: XmlNode = {};
-  for (const node of parseTxml(text) as TxmlNode[]) {
+  for (const node of parseXmlTree(text)) {
     if (typeof node === "string") continue;
     if (node.tagName.startsWith("?")) continue;
     appendChild(doc, node.tagName, convertElement(node));

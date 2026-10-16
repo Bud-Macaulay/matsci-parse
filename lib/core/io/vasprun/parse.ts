@@ -1,4 +1,4 @@
-import { parse as parseTxml } from "txml/txml";
+import { parseXmlTree, type XmlElement } from "../parseUtils/xml-helpers";
 
 import { createLattice } from "../../lattice/lattice";
 import type { Structure } from "../../structure/structure";
@@ -129,11 +129,7 @@ const KBAR_TO_EV_PER_A3 = -0.1 / 160.21766208;
 
 // ---------------------------------------------------------------- tree helpers
 
-interface Node {
-  tagName: string;
-  attributes: Record<string, string | null>;
-  children: Array<Node | string>;
-}
+type Node = XmlElement;
 
 const elements = (n: Node, tag?: string): Node[] =>
   n.children.filter(
@@ -374,7 +370,7 @@ export function parseVasprun(text: string, opts: VasprunOptions = {}): Vasprun {
     dos: wantDos = true,
     projectedDos: wantProjected = false,
   } = opts;
-  const root = (parseTxml(text) as Array<Node | string>).find(
+  const root = parseXmlTree(text).find(
     (n): n is Node => typeof n !== "string" && n.tagName === "modeling",
   );
   if (!root) throw new Error("vasprun: no <modeling> root element");

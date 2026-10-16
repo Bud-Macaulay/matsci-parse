@@ -10,7 +10,7 @@ import {
   entries,
   decodeEntities,
   parseXml,
-} from "@/core/io/pseudo/xml-helpers";
+} from "@/core/io/parseUtils/xml-helpers";
 
 describe("xml-helpers", () => {
   describe("attr family", () => {

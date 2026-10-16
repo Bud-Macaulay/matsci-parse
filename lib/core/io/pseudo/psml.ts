@@ -38,7 +38,7 @@ import {
   parseFloat64Array,
   formatFortranNumber,
   formatDataArray,
-} from "./fortran-helpers";
+} from "../parseUtils/fortran-helpers";
 
 import {
   type XmlNode,
@@ -48,7 +48,7 @@ import {
   textOf,
   toArray,
   parseXml,
-} from "./xml-helpers";
+} from "../parseUtils/xml-helpers";
 
 import { guessElement, elementToZ } from "./elements";
 
