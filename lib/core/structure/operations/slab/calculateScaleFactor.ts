@@ -1,9 +1,9 @@
 import { createMatrix, type Matrix } from "@/core/matrix/matrix";
 import { determinant } from "@/core/matrix/operations/determinant";
-import { mul } from "@/core/matrix/operations/mul";
 import { row } from "@/core/matrix/operations/row";
 import { dot } from "@/core/matrix/operations/vector/dot";
 import { norm } from "@/core/matrix/operations/vector/norm";
+import { vecMul } from "@/core/matrix/operations/vector/vecMul";
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import type { Lattice } from "@/core/lattice/lattice";
 import { EPSILON } from "@/core/math/constants";
@@ -48,10 +48,10 @@ export function calculateScaleFactor(
       : millerIndex;
 
   // Surface normal in Cartesian from reciprocal lattice
-  const normalRaw = mul(
-    createMatrix(1, 3, [h, k, l]),
+  const normalRaw = vecMul(
+    [h, k, l],
     reciprocalLatticeCrystallographic(lattice).basis,
-  ).data;
+  );
   const normalLen = norm(normalRaw);
   if (normalLen < EPSILON) {
     throw new Error("Miller index [0,0,0] is invalid");

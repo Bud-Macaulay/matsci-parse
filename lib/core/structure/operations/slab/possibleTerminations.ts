@@ -1,9 +1,9 @@
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import { norm } from "@/core/matrix/operations/vector/norm";
 import { dot } from "@/core/matrix/operations/vector/dot";
-import { mul } from "@/core/matrix/operations/mul";
+import { vecMul } from "@/core/matrix/operations/vector/vecMul";
 import { row } from "@/core/matrix/operations/row";
-import { createMatrix } from "@/core/matrix/matrix";
+import { wrapFrac } from "@/core/math/numeric";
 import { calculateScaleFactor } from "./calculateScaleFactor";
 import { supercell } from "../supercell";
 import type { Structure } from "../../structure";
@@ -35,15 +35,14 @@ export function possibleTerminations(
   if (n === 0) return [];
   const zs = ouc.sites.map((s) => s.frac[2]);
   if (n === 1) {
-    const t = zs[0] + 0.5;
-    return [t - Math.floor(t)];
+    return [wrapFrac(zs[0] + 0.5)];
   }
 
   // Surface normal n = (h, k, l) B*; plane-stacking height is c . n / |n|.
-  const normal = mul(
-    createMatrix(1, 3, millerIndex),
+  const normal = vecMul(
+    millerIndex,
     reciprocalLatticeCrystallographic(structure.lattice).basis,
-  ).data;
+  );
   const height =
     Math.abs(dot(normal, row(ouc.lattice.basis, 2))) / norm(normal);
 

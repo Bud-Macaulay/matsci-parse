@@ -7,40 +7,20 @@ import { parameters } from "../../../../lattice/parameters";
 
 import { determinant } from "@/core/matrix/operations/determinant";
 import { transpose } from "@/core/matrix/operations/transpose";
-import { row } from "@/core/matrix/operations/row";
-import { createMatrix } from "@/core/matrix/matrix";
+import { vecMul } from "@/core/matrix/operations/vector/vecMul";
+import { createMatrix, fromRows, toRows } from "@/core/matrix/matrix";
 import type { KPath } from "@/core/kpoints";
 
 import { transformAP, determineExtBravais, determineAP } from "./bravais";
 import {
-  cellParams,
   evalExpr,
   evalExprSimple,
   extendKparam,
   getPmatrix,
   getPrimitive,
   getReciprocalCellRows,
-  matrixFromRowMajor,
-  vecMulMat,
 } from "./seekpathTools";
 import { bandPathData } from "./bandPathData";
-
-const RAD2DEG = 180 / Math.PI;
-
-/** Row-major flat 3x3 -> nested rows (createMatrix checks the length). */
-function rowsFromFlat(data: ArrayLike<number>): number[][] {
-  const m = createMatrix(3, 3, Array.from(data));
-  return [0, 1, 2].map((i) => Array.from(row(m, i)));
-}
-
-/** Compute [a, b, c, alphaDeg, betaDeg, gammaDeg] from a row-major 3x3 lattice. */
-function cellParamsDegrees(data: ArrayLike<number>): number[] {
-  const [a, b, c, cosalpha, cosbeta, cosgamma] = cellParams(
-    matrixFromRowMajor(data),
-  );
-  const acos = (x: number) => Math.acos(Math.max(-1, Math.min(1, x))) * RAD2DEG;
-  return [a, b, c, acos(cosalpha), acos(cosbeta), acos(cosgamma)];
-}
 
 /** Determine the Seekpath extended Bravais lattice from symmetry data. */
 export async function getSeekPathHighSymPath(
@@ -125,9 +105,9 @@ export async function getPath(
   const bravaisLattice = `${properties[0]}${properties[1]}`;
   const hasInv = properties[2];
 
-  const [a, b, c, alphaDeg, betaDeg, gammaDeg] = cellParamsDegrees(
-    convLatticeFlat,
-  );
+  const [a, b, c, alphaDeg, betaDeg, gammaDeg] = parameters({
+    basis: createMatrix(3, 3, convLatticeFlat),
+  });
 
   // Implement all different extended Bravais lattices
   let extBravais: string;
@@ -135,7 +115,10 @@ export async function getPath(
   let convPositionsFinal: number[][];
 
   if (bravaisLattice === "aP") {
-    const ap = await transformAP(rowsFromFlat(convLatticeFlat), convPositions);
+    const ap = await transformAP(
+      toRows(createMatrix(3, 3, convLatticeFlat)),
+      convPositions,
+    );
     extBravais = ap.extBravais;
     convLattice = ap.lattice;
     convPositionsFinal = ap.positions;
@@ -150,7 +133,7 @@ export async function getPath(
       betaDeg,
       gammaDeg,
     );
-    convLattice = rowsFromFlat(convLatticeFlat);
+    convLattice = toRows(createMatrix(3, 3, convLatticeFlat));
     convPositionsFinal = convPositions;
   }
 
@@ -223,13 +206,11 @@ export async function getPath(
     path = [...basePath, ...newSegments];
   }
 
-  const primitiveMatrix = matrixFromRowMajor(primitive.lattice.flat());
+  const primitiveMatrix = fromRows(primitive.lattice);
   const reciprocalPrimitive = getReciprocalCellRows(primitiveMatrix);
 
-  const origDet = Math.abs(
-    determinant(matrixFromRowMajor(Array.from(structure.lattice.basis.data))),
-  );
-  const convDet = Math.abs(determinant(matrixFromRowMajor(convLattice.flat())));
+  const origDet = Math.abs(determinant(structure.lattice.basis));
+  const convDet = Math.abs(determinant(fromRows(convLattice)));
   const primDet = Math.abs(determinant(primitiveMatrix));
 
   return {
@@ -267,10 +248,8 @@ export async function getPath(
     spacegroup_international: calcResults.hm_symbol,
     // moyo serializes matrices column-major; lattices come out as rows of
     // basis vectors, but this rotation must be transposed back.
-    rotation_matrix: rowsFromFlat(
-      transpose(
-        createMatrix(3, 3, Array.from(calcResults.std_rotation_matrix)),
-      ).data,
+    rotation_matrix: toRows(
+      transpose(createMatrix(3, 3, calcResults.std_rotation_matrix)),
     ),
   };
 }
@@ -313,7 +292,8 @@ export function getExplicitFromImplicit(
   kpoints_linearcoord: number[];
   segments: [number, number][];
 } {
-  const recip = result.reciprocal_primitive_lattice;
+  const recip = fromRows(result.reciprocal_primitive_lattice);
+  const toAbs = (p: readonly number[]) => Array.from(vecMul(p, recip));
 
   const kpointsRel: number[][] = [];
   const kpointsLabels: string[] = [];
@@ -324,8 +304,8 @@ export function getExplicitFromImplicit(
   for (const [startLabel, stopLabel] of result.kpath.segments) {
     const startCoord = result.kpath.points[startLabel];
     const stopCoord = result.kpath.points[stopLabel];
-    const startCoordAbs = vecMulMat(startCoord, recip);
-    const stopCoordAbs = vecMulMat(stopCoord, recip);
+    const startCoordAbs = toAbs(startCoord);
+    const stopCoordAbs = toAbs(stopCoord);
     const segmentLength = vecNorm(vecSub(stopCoordAbs, startCoordAbs));
     const numPoints = Math.max(2, Math.floor(segmentLength / referenceDistance));
 
@@ -359,7 +339,7 @@ export function getExplicitFromImplicit(
 
   return {
     kpoints_rel: kpointsRel,
-    kpoints_abs: kpointsRel.map((p) => vecMulMat(p, recip)),
+    kpoints_abs: kpointsRel.map(toAbs),
     kpoints_labels: kpointsLabels,
     kpoints_linearcoord: kpointsLinearcoord,
     segments,

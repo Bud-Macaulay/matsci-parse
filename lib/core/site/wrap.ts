@@ -1,8 +1,5 @@
 import { Site, SiteProperties } from "./site";
-
-function wrapValue(x: number): number {
-  return ((x % 1) + 1) % 1;
-}
+import { wrapFrac } from "../math/numeric";
 
 /** Wrap a site's fractional coordinates into [0, 1).
  * @param site - The site to wrap.
@@ -11,9 +8,9 @@ export function wrap<T extends SiteProperties>(site: Site<T>): Site<T> {
   return {
     ...site,
     frac: [
-      wrapValue(site.frac[0]),
-      wrapValue(site.frac[1]),
-      wrapValue(site.frac[2]),
+      wrapFrac(site.frac[0]),
+      wrapFrac(site.frac[1]),
+      wrapFrac(site.frac[2]),
     ],
   };
 }

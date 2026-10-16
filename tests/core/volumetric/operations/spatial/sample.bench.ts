@@ -2,6 +2,9 @@ import { bench, describe } from "vitest";
 import { fromFunction } from "@/core/volumetric/create/fromFunction";
 import { sampleLinear } from "@/core/volumetric/operations/spatial/sampleLinear";
 import { sampleNearest } from "@/core/volumetric/operations/spatial/sampleNearest";
+import { seededRandom } from "../../../../helpers/random";
+
+const rng = seededRandom(5);
 
 const sizes: [number, number, number][] = [
   [32, 32, 32],
@@ -16,9 +19,9 @@ describe("volumetric sampling scaling", () => {
     const [D, H, W] = shape;
 
     const coords = Array.from({ length: points }, () => ({
-      x: Math.random() * (W - 1),
-      y: Math.random() * (H - 1),
-      z: Math.random() * (D - 1),
+      x: rng() * (W - 1),
+      y: rng() * (H - 1),
+      z: rng() * (D - 1),
     }));
 
     // warmup

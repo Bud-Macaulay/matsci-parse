@@ -9,8 +9,7 @@ import {
   isDisordered,
   type DisorderedStructure,
 } from "../structure/disordered";
-import { createMatrix } from "../matrix/matrix";
-import { mul } from "../matrix/operations/mul";
+import { vecMul } from "../matrix/operations/vector/vecMul";
 
 /** Slack when deciding a pymatgen site is fully occupied. */
 const FULL_OCCU_TOL = 1e-6;
@@ -148,12 +147,7 @@ export function toPymatgen(
           site.occupancy
             .map((o) => `${o.symbol}:${o.fraction.toFixed(3)}`)
             .join(", "),
-        xyz: Array.from(
-          mul(
-            createMatrix(1, 3, Array.from(site.frac)),
-            structure.lattice.basis,
-          ).data,
-        ),
+        xyz: Array.from(vecMul(site.frac, structure.lattice.basis)),
       }))
     : structure.sites.map((site) => {
         const props = site.species.properties ?? {};

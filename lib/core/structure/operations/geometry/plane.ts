@@ -1,8 +1,7 @@
 import { Structure } from "../../structure";
 import { getDisplacement } from "../distance/getDisplacement";
 import { cross } from "../../../matrix/operations/vector/cross";
-import { createMatrix } from "../../../matrix/matrix";
-import { mul } from "../../../matrix/operations/mul";
+import { vecMul } from "../../../matrix/operations/vector/vecMul";
 import { norm } from "../../../matrix/operations/vector/norm";
 import { cartesian } from "../../../site/cartesian";
 
@@ -32,7 +31,7 @@ export function planeFromSites(
 ): Plane {
   // getDisplacement returns fractional MIC; cross product needs Cartesian.
   const toCartesian = (df: Float64Array): Float64Array =>
-    mul(createMatrix(1, 3, df), structure.lattice.basis).data;
+    vecMul(df, structure.lattice.basis);
 
   const r1 = toCartesian(getDisplacement(structure, i, j));
   const r2 = toCartesian(getDisplacement(structure, i, k));

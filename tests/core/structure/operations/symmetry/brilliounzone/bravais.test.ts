@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 
+import { cosines } from "@/core/lattice/angles";
+import { fromRows } from "@/core/matrix/matrix";
 import {
   determineExtBravais,
   transformAP,
 } from "@/core/structure/operations/symmetry/brilliounzone/bravais";
 import {
   getReciprocalCellRows,
-  cellParams,
-  matrixFromRowMajor,
 } from "@/core/structure/operations/symmetry/brilliounzone/seekpathTools";
 
 describe("determineExtBravais", () => {
@@ -139,8 +139,8 @@ describe("transformAP", () => {
       [0.5, 0.7, 6],
     ];
     const out = await transformAP(lattice, [[0.1, 0.2, 0.3]]);
-    const recip = getReciprocalCellRows(matrixFromRowMajor(out.lattice.flat()));
-    const [, , , ca, cb, cg] = cellParams(recip);
+    const recip = getReciprocalCellRows(fromRows(out.lattice));
+    const [ca, cb, cg] = cosines({ basis: recip });
     if (out.extBravais === "aP2") {
       expect(ca).toBeLessThanOrEqual(1e-9);
       expect(cb).toBeLessThanOrEqual(1e-9);

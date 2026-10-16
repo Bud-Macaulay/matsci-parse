@@ -1,25 +1,22 @@
 import { bench, describe } from "vitest";
-import { createMatrix } from "@/core/matrix/matrix";
 import { lll } from "@/core/matrix/operations/reduction/lll";
+import { randomIntLattice, seededRandom } from "../../../../helpers/random";
 
-function randomIntMatrix(n: number, max = 10) {
-  const data = new Float64Array(n * n);
-  for (let i = 0; i < n * n; i++) {
-    data[i] = Math.floor(Math.random() * (2 * max + 1)) - max;
-  }
-  return createMatrix(n, n, data);
-}
+const rng = seededRandom(1);
 
+// Reduction cost depends strongly on the input, so average over a fixed set.
+const LATTICES = 10;
 const sizes = [4, 8, 16, 32];
 
 describe("lll scaling", () => {
   for (const n of sizes) {
-    const A = randomIntMatrix(n);
+    const lattices = Array.from({ length: LATTICES }, () =>
+      randomIntLattice(rng, n, 10),
+    );
+    for (const A of lattices) lll(A);
 
-    lll(A);
-
-    bench(`${n}×${n} lll`, () => {
-      lll(A);
+    bench(`${n}×${n} lll (${LATTICES} lattices)`, () => {
+      for (const A of lattices) lll(A);
     });
   }
 });

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { createMatrix, identity, clone, index } from "@/core/matrix/matrix";
+import {
+  createMatrix,
+  identity,
+  clone,
+  index,
+  fromRows,
+  toRows,
+} from "@/core/matrix/matrix";
 
 describe("matrix core", () => {
   describe("createMatrix", () => {
@@ -118,5 +125,56 @@ describe("matrix core", () => {
         }
       }
     });
+  });
+});
+
+describe("fromRows / toRows", () => {
+  it("builds a matrix from rows", () => {
+    const m = fromRows([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+
+    expect(m.rows).toBe(2);
+    expect(m.cols).toBe(3);
+    expect(Array.from(m.data)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("accepts typed-array rows", () => {
+    const m = fromRows([new Float64Array([1, 2]), new Float64Array([3, 4])]);
+
+    expect(Array.from(m.data)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("uses the explicit column count for empty input", () => {
+    const m = fromRows([], 3);
+
+    expect(m.rows).toBe(0);
+    expect(m.cols).toBe(3);
+  });
+
+  it("throws on ragged rows", () => {
+    expect(() => fromRows([[1, 2], [3]])).toThrow(
+      "Expected row of length 2, got 1",
+    );
+  });
+
+  it("round-trips through toRows", () => {
+    const rows = [
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ];
+
+    expect(toRows(fromRows(rows))).toEqual(rows);
+  });
+
+  it("toRows returns plain arrays that do not alias the matrix", () => {
+    const m = createMatrix(1, 2, [1, 2]);
+    const rows = toRows(m);
+    rows[0][0] = 99;
+
+    expect(Array.isArray(rows[0])).toBe(true);
+    expect(m.data[0]).toBe(1);
   });
 });

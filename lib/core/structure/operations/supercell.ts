@@ -3,6 +3,7 @@ import { createMatrix } from "@/core/matrix/matrix";
 import { mul } from "@/core/matrix/operations/mul";
 import { cartesian } from "@/core/site/cartesian";
 import { fractional } from "@/core/site/fractional";
+import { wrapFrac } from "@/core/math/numeric";
 import { latticePointsInSupercell } from "@/core/matrix/operations/latticePointsInSupercell";
 import type { Matrix } from "@/core/matrix/matrix";
 import type { Structure } from "../structure";
@@ -65,9 +66,7 @@ export function supercell(structure: Structure, size: SupercellSize): Structure 
 
       // Wrap to [0, 1)
       for (let d = 0; d < 3; d++) {
-        frac[d] = frac[d] - Math.floor(frac[d]);
-        if (frac[d] > 1 - 1e-10) frac[d] = 0;
-        if (frac[d] < 1e-10) frac[d] = 0;
+        frac[d] = wrapFrac(frac[d], 1e-10);
       }
 
       sites.push({

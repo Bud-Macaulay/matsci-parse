@@ -14,6 +14,7 @@ import {
   applyOperation,
 } from "./symmetryOperations";
 import { LineReader } from "../helpers";
+import { wrapFrac } from "../../math/numeric";
 
 function cleanValue(value: string | undefined): number {
   if (value === undefined) return NaN;
@@ -44,17 +45,9 @@ const FULL_OCCU_TOL = 1e-3;
  * renormalized to 1; anything above is rejected as overfilled. */
 const OVERFILL_TOL = 1e-2;
 
-function wrapValue(x: number): number {
-  return ((x % 1) + 1) % 1;
-}
-
-function cleanNearZero(x: number): number {
-  return Math.abs(x) < EPS ? 0 : x;
-}
-
 function posKey(species: string, frac: number[]): string {
   const w = frac.map((v) => {
-    const c = cleanNearZero(wrapValue(v));
+    const c = wrapFrac(v, EPS);
     return Math.round(c * 1000) / 1000;
   });
 
@@ -296,9 +289,9 @@ export function fromCIF(text: string): Structure | DisorderedStructure {
       const operated = applyOperation(op, Array.from(site.frac));
 
       const frac = [
-        cleanNearZero(wrapValue(operated[0])),
-        cleanNearZero(wrapValue(operated[1])),
-        cleanNearZero(wrapValue(operated[2])),
+        wrapFrac(operated[0], EPS),
+        wrapFrac(operated[1], EPS),
+        wrapFrac(operated[2], EPS),
       ];
 
       const key = posKey(site.species.symbol, frac);
@@ -377,9 +370,9 @@ function disorderedFromAsymmetricUnit(
     for (const op of symOps) {
       const operated = applyOperation(op, Array.from(site.frac));
       const frac = [
-        cleanNearZero(wrapValue(operated[0])),
-        cleanNearZero(wrapValue(operated[1])),
-        cleanNearZero(wrapValue(operated[2])),
+        wrapFrac(operated[0], EPS),
+        wrapFrac(operated[1], EPS),
+        wrapFrac(operated[2], EPS),
       ];
       const key = posKey("", frac);
       if (!seen.has(key)) {

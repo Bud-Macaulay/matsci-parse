@@ -1,13 +1,13 @@
-import { Matrix } from "@/core/matrix/matrix";
+import { Matrix, fromRows, toRows } from "@/core/matrix/matrix";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { mul } from "@/core/matrix/operations/mul";
 import { inverseSmall } from "@/core/matrix/operations/inverse/inverseSmall";
 import { niggli } from "@/core/matrix/operations/reduction/niggli";
+import { cosines } from "@/core/lattice/angles";
+import { lengths } from "@/core/lattice/lengths";
 import {
-  cellParams,
   getReciprocalCellRows,
   getRealCellFromReciprocalRows,
-  matrixFromRowMajor,
 } from "./seekpathTools";
 
 const M2_MATRICES = [
@@ -50,20 +50,6 @@ const M3_ZZ = [
   [0, 0, 1],
 ];
 
-function mulRows(a: number[][], b: number[][]): number[][] {
-  const out: number[][] = [];
-  for (let i = 0; i < a.length; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < b[0].length; j++) {
-      let sum = 0;
-      for (let k = 0; k < b.length; k++) sum += a[i][k] * b[k][j];
-      row.push(sum);
-    }
-    out.push(row);
-  }
-  return out;
-}
-
 export interface APTransform {
   lattice: number[][];
   positions: number[][];
@@ -79,7 +65,7 @@ export async function transformAP(
   lattice: number[][],
   positions: number[][],
 ): Promise<APTransform> {
-  const convLattice = matrixFromRowMajor(lattice.flat());
+  const convLattice = fromRows(lattice);
 
   const reciprocalCellOrig = getReciprocalCellRows(convLattice);
   const reduced = niggli(reciprocalCellOrig);
@@ -87,8 +73,10 @@ export async function transformAP(
   const reciprocalCell2 = reduced.basis;
   const realCell2 = getRealCellFromReciprocalRows(reciprocalCell2);
 
-  const [ka2, kb2, kc2, coskalpha2, coskbeta2, coskgamma2] =
-    cellParams(reciprocalCell2);
+  const [ka2, kb2, kc2] = lengths({ basis: reciprocalCell2 });
+  const [coskalpha2, coskbeta2, coskgamma2] = cosines({
+    basis: reciprocalCell2,
+  });
   const conditions = [
     Math.abs(kb2 * kc2 * coskalpha2),
     Math.abs(kc2 * ka2 * coskbeta2),
@@ -98,11 +86,11 @@ export async function transformAP(
   let smallest = 0;
   if (conditions[1] < conditions[smallest]) smallest = 1;
   if (conditions[2] < conditions[smallest]) smallest = 2;
-  const M2 = matrixFromRowMajor(M2_MATRICES[smallest].flat());
+  const M2 = fromRows(M2_MATRICES[smallest]);
   const realCell3 = mul(transpose(M2), realCell2);
 
   const reciprocalCell3 = getReciprocalCellRows(realCell3);
-  const [, , , ca3, cb3, cg3] = cellParams(reciprocalCell3);
+  const [ca3, cb3, cg3] = cosines({ basis: reciprocalCell3 });
 
   let M3: number[][];
   if ((ca3 > 0 && cb3 > 0 && cg3 > 0) || (ca3 <= 0 && cb3 <= 0 && cg3 <= 0))
@@ -127,10 +115,10 @@ export async function transformAP(
       "Problem identifying M3 matrix in aP lattice: sign pattern of cosines ambiguous",
     );
 
-  const M3mat = matrixFromRowMajor(M3.flat());
+  const M3mat = fromRows(M3);
   const realCellFinal = mul(transpose(M3mat), realCell3);
   const reciprocalCellFinal = getReciprocalCellRows(realCellFinal);
-  const [, , , ca, cb, cg] = cellParams(reciprocalCellFinal);
+  const [ca, cb, cg] = cosines({ basis: reciprocalCellFinal });
 
   let extBravais: string;
   if (ca <= 0 && cb <= 0 && cg <= 0) extBravais = "aP2";
@@ -140,27 +128,15 @@ export async function transformAP(
       "Unexpected aP lattice, neither all-obtuse nor all-acute in reciprocal space",
     );
 
-  // Express the (absolute) atomic positions in the new real cell basis
-  const finalRows = Array.from(realCellFinal.data).reduce<number[][]>(
-    (acc, x, i) => {
-      acc[Math.floor(i / 3)][i % 3] = x;
-      return acc;
-    },
-    [
-      [0, 0, 0],
-      [0, 0, 0],
-      [0, 0, 0],
-    ],
+  // Express the (absolute) atomic positions in the new real cell basis:
+  // f_new_row = p_row · B⁻¹ with p_row = f_row · lattice.
+  const finalRows = toRows(realCellFinal);
+  const newPositions = toRows(
+    mul(
+      mul(fromRows(positions, 3), fromRows(lattice)),
+      inverseSmall(realCellFinal),
+    ),
   );
-  const absPositions = mulRows(positions, lattice);
-  const invFinal = inverseSmall(matrixFromRowMajor(finalRows.flat()));
-  // f_new_col = (B⁻¹)ᵀ · p_col (row convention: p_row = f_row · B).
-  const invFinalT = transpose(invFinal);
-  const newPositions = absPositions.map((p) => {
-    const v = createVector(p);
-    const res = mul(invFinalT, v).data;
-    return [res[0], res[1], res[2]];
-  });
 
   return {
     lattice: finalRows,
@@ -169,23 +145,9 @@ export async function transformAP(
   };
 }
 
-function createVector(v: number[]): Matrix {
-  return { rows: 3, cols: 1, data: new Float64Array(v) };
-}
-
 /** Determine the aP label (aP2 / aP3) for a triclinic conventional lattice. */
 export async function determineAP(convLattice: Matrix): Promise<string> {
-  const rows = Array.from(convLattice.data).reduce<number[][]>(
-    (acc, x, i) => {
-      acc[Math.floor(i / 3)][i % 3] = x;
-      return acc;
-    },
-    [
-      [0, 0, 0],
-      [0, 0, 0],
-      [0, 0, 0],
-    ],
-  );
+  const rows = toRows(convLattice);
   const { extBravais } = await transformAP(rows, []);
   return extBravais;
 }

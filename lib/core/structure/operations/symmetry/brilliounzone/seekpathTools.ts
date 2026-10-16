@@ -1,37 +1,12 @@
-import { Matrix, createMatrix } from "@/core/matrix/matrix";
+import { Matrix, fromRows, toRows } from "@/core/matrix/matrix";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { scale } from "@/core/matrix/operations/scale";
 import { inverseSmall } from "@/core/matrix/operations/inverse/inverseSmall";
+import { determinant } from "@/core/matrix/operations/determinant";
+import { mul } from "@/core/matrix/operations/mul";
+import { wrapFrac } from "@/core/math/numeric";
 
 const TWO_PI = 2 * Math.PI;
-
-/** Build a 3x3 Matrix from 9 row-major values. */
-export function matrixFromRowMajor(data: ArrayLike<number>): Matrix {
-  if (data.length !== 9) throw new Error("Expected 9 lattice values");
-  return createMatrix(3, 3, Array.from(data));
-}
-
-/**
- * Return [a, b, c, cosalpha, cosbeta, cosgamma] for a 3x3 lattice whose
- * rows are the lattice vectors.
- */
-export function cellParams(
-  lattice: Matrix,
-): [number, number, number, number, number, number] {
-  const d = lattice.data;
-  const v1 = [d[0], d[1], d[2]];
-  const v2 = [d[3], d[4], d[5]];
-  const v3 = [d[6], d[7], d[8]];
-  const a = Math.hypot(v1[0], v1[1], v1[2]);
-  const b = Math.hypot(v2[0], v2[1], v2[2]);
-  const c = Math.hypot(v3[0], v3[1], v3[2]);
-  const dot = (u: number[], v: number[]) =>
-    u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-  const cosalpha = dot(v2, v3) / b / c;
-  const cosbeta = dot(v1, v3) / a / c;
-  const cosgamma = dot(v1, v2) / a / b;
-  return [a, b, c, cosalpha, cosbeta, cosgamma];
-}
 
 /** Reciprocal-space cell rows, such that dot(real, recip.T) = 2π I. */
 export function getReciprocalCellRows(real: Matrix): Matrix {
@@ -186,21 +161,20 @@ export function getPrimitive(
 ): PrimitiveCellResult {
   const { P, invP } = getPmatrix(bravaisLattice);
 
-  const volumeRatio = Math.round(Math.abs(det3(invP)));
+  const invPm = fromRows(invP);
+  const n = positions.length;
+
+  const volumeRatio = Math.round(Math.abs(determinant(invPm)));
 
   // (a_P, b_P, c_P) = (a, b, c) P  => prim vector j = sum_k P[k][j] * a_k,
   // i.e. prim_lattice = P^T @ lattice
-  const primLattice = matmul3(transpose3(P), lattice);
+  const primLattice = toRows(mul(transpose(fromRows(P)), fromRows(lattice)));
   // (x_P, y_P, z_P)^T = P^-1 (x, y, z)^T  => row-vector form: positions @ invP.T
-  const primPositions = matmul3(positions, transpose3(invP));
-
-  const n = positions.length;
+  const primPositions = toRows(mul(fromRows(positions, 3), transpose(invPm)));
 
   // Mark equivalent atoms (same position modulo 1, shifted so that ±0.5 wrap)
-  const match = (u: number, v: number) => {
-    const diff = Math.abs(((u - v + 0.5) % 1 + 1) % 1 - 0.5);
-    return diff < threshold;
-  };
+  const match = (u: number, v: number) =>
+    Math.abs(wrapFrac(u - v + 0.5) - 0.5) < threshold;
 
   const groups: number[][] = [];
   const assigned = new Array<boolean>(n).fill(false);
@@ -248,36 +222,6 @@ export function getPrimitive(
     types: groups.map((g) => types[g[0]]),
     mapping,
   };
-}
-
-function transpose3(m: number[][]): number[][] {
-  return [
-    [m[0][0], m[1][0], m[2][0]],
-    [m[0][1], m[1][1], m[2][1]],
-    [m[0][2], m[1][2], m[2][2]],
-  ];
-}
-
-function matmul3(a: number[][], b: number[][]): number[][] {
-  const out: number[][] = [];
-  for (let i = 0; i < a.length; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < b[0].length; j++) {
-      let sum = 0;
-      for (let k = 0; k < b.length; k++) sum += a[i][k] * b[k][j];
-      row.push(sum);
-    }
-    out.push(row);
-  }
-  return out;
-}
-
-function det3(m: number[][]): number {
-  return (
-    m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-    m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
-    m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
-  );
 }
 
 /** Evaluate an expression that only requires precomputed k-parameters. */
@@ -451,18 +395,4 @@ export function evalExpr(
         `Unknown expression, define a new case: '${expr}'`,
       );
   }
-}
-
-/** Wrap a cell in a Matrix to use matrix helpers. */
-export function toMatrix(rows: number[][]): Matrix {
-  return createMatrix(3, 3, rows.flat());
-}
-
-/** Row-vector times matrix: x_abs[i] = v . col_i(m). */
-export function vecMulMat(v: readonly number[], m: number[][]): number[] {
-  return [
-    v[0] * m[0][0] + v[1] * m[1][0] + v[2] * m[2][0],
-    v[0] * m[0][1] + v[1] * m[1][1] + v[2] * m[2][1],
-    v[0] * m[0][2] + v[1] * m[1][2] + v[2] * m[2][2],
-  ];
 }

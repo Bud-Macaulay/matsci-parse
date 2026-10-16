@@ -1,6 +1,6 @@
 import { reciprocalLatticeCrystallographic } from "@/core/lattice/reciprocalLatticeCrystallographic";
 import { Structure } from "@/core/structure/structure";
-import { dot, mul } from "@/core/matrix/operations";
+import { dot, matVec } from "@/core/matrix/operations";
 
 import { determinant } from "@/core/matrix/operations";
 import { createMatrix } from "@/core/matrix/matrix";
@@ -26,11 +26,7 @@ function intersectPlanes(
 
   const invA = inverse3x3(A);
 
-  const d = createMatrix(3, 1, [p1.offset, p2.offset, p3.offset]);
-
-  const res = mul(invA, d).data;
-
-  return new Float64Array([res[0], res[1], res[2]]);
+  return matVec(invA, [p1.offset, p2.offset, p3.offset]);
 }
 
 function key(v: Float64Array) {

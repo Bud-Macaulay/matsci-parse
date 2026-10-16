@@ -1,27 +1,22 @@
 import { bench, describe } from "vitest";
-import { createMatrix } from "@/core/matrix/matrix";
 import { seysen } from "@/core/matrix/operations/reduction/seysen";
+import { randomIntLattice, seededRandom } from "../../../../helpers/random";
 
-function randomIntLattice(n: number, max = 6) {
-  const data = new Float64Array(n * n);
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      data[i * n + j] = Math.floor(Math.random() * (2 * max + 1)) - max;
-    }
-  }
-  for (let i = 0; i < n; i++) data[i * n + i] += n * max;
-  return createMatrix(n, n, data);
-}
+const rng = seededRandom(2);
 
+// Reduction cost depends strongly on the input, so average over a fixed set.
+const LATTICES = 10;
 const sizes = [4, 8, 16, 32];
 
 describe("seysen scaling", () => {
   for (const n of sizes) {
-    const A = randomIntLattice(n);
-    seysen(A);
+    const lattices = Array.from({ length: LATTICES }, () =>
+      randomIntLattice(rng, n, 6, n * 6),
+    );
+    for (const A of lattices) seysen(A);
 
-    bench(`${n}×${n} seysen`, () => {
-      seysen(A);
+    bench(`${n}×${n} seysen (${LATTICES} lattices)`, () => {
+      for (const A of lattices) seysen(A);
     });
   }
 });

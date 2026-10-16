@@ -1,6 +1,7 @@
 import { Structure } from "../../structure/structure";
 import { composition } from "../../properties/formula";
-import { gcd } from "../../../math/numeric";
+import { EPSILON } from "../../../math/constants";
+import { gcd, wrapFrac } from "../../../math/numeric";
 import { canonicalize } from "../canonicalize";
 import { getSymmetry } from "./spglib";
 import { assignSites } from "./assign";
@@ -67,11 +68,6 @@ function noMatch(): StructureMatchResult {
   };
 }
 
-function wrapComponent(x: number): number {
-  const v = x - Math.floor(x);
-  return Math.abs(v) < 1e-12 ? 0 : v;
-}
-
 /** Apply a symmetry operation (rotation + translation, in fractional lattice
  *  coordinates) to a structure's sites, keeping its lattice unchanged. */
 function applySymmetryOperation(
@@ -100,9 +96,9 @@ function applySymmetryOperation(
     return {
       ...site,
       frac: new Float64Array([
-        wrapComponent(x),
-        wrapComponent(y),
-        wrapComponent(z),
+        wrapFrac(x, EPSILON),
+        wrapFrac(y, EPSILON),
+        wrapFrac(z, EPSILON),
       ]),
     };
   });
@@ -122,9 +118,9 @@ function translateStructure(
       return {
         ...site,
         frac: new Float64Array([
-          wrapComponent(f[0] + translation[0]),
-          wrapComponent(f[1] + translation[1]),
-          wrapComponent(f[2] + translation[2]),
+          wrapFrac(f[0] + translation[0], EPSILON),
+          wrapFrac(f[1] + translation[1], EPSILON),
+          wrapFrac(f[2] + translation[2], EPSILON),
         ]),
       };
     }),
@@ -183,9 +179,9 @@ function candidateTranslations(a: Structure, candidate: Structure): number[][] {
     const fb = site.frac;
 
     const t = [
-      wrapComponent(fa[0] - fb[0]),
-      wrapComponent(fa[1] - fb[1]),
-      wrapComponent(fa[2] - fb[2]),
+      wrapFrac(fa[0] - fb[0], EPSILON),
+      wrapFrac(fa[1] - fb[1], EPSILON),
+      wrapFrac(fa[2] - fb[2], EPSILON),
     ];
 
     const key = `${t[0].toFixed(4)},${t[1].toFixed(4)},${t[2].toFixed(4)}`;

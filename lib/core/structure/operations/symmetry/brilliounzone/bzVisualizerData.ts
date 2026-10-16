@@ -3,7 +3,8 @@ import { Structure } from "../../../structure";
 import { getExplicitKPath } from "./seekpath";
 import type { GetPathOptions } from "./seekpath";
 import { getBZPolyhedron } from "./bzPolyhedron";
-import { vecMulMat } from "./seekpathTools";
+import { fromRows } from "@/core/matrix/matrix";
+import { vecMul } from "@/core/matrix/operations/vector/vecMul";
 import type { KPath } from "@/core/kpoints";
 
 /** Data object compatible with the `brillouinzone-visualizer` widget. */
@@ -50,9 +51,10 @@ export async function getBrillouinZoneData(
 
   const kpoints: Record<string, number[]> = {};
   const kpoints_rel: Record<string, number[]> = {};
+  const recip = fromRows(res.reciprocal_primitive_lattice);
   for (const [label, rel] of Object.entries(res.kpath.points)) {
     kpoints_rel[label] = Array.from(rel);
-    kpoints[label] = vecMulMat(rel, res.reciprocal_primitive_lattice);
+    kpoints[label] = Array.from(vecMul(rel, recip));
   }
 
   return {

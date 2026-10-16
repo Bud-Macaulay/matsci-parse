@@ -30,6 +30,49 @@ export function createMatrix(
   };
 }
 
+/** Create a Matrix from an array of rows.
+ * @param rows - Row arrays, all of the same length.
+ * @param cols - Column count; defaults to the first row's length. Pass it
+ *   when `rows` may be empty (e.g. a list of 0 positions with 3 columns).
+ * @returns A new Matrix. */
+export function fromRows(
+  rows: readonly ArrayLike<number>[],
+  cols: number = rows[0]?.length ?? 0,
+): Matrix {
+  const out = createMatrix(rows.length, cols);
+  const od = out.data;
+
+  for (let r = 0; r < rows.length; r++) {
+    const src = rows[r];
+
+    if (src.length !== cols) {
+      throw new Error(`Expected row of length ${cols}, got ${src.length}`);
+    }
+
+    const offset = r * cols;
+
+    for (let c = 0; c < cols; c++) {
+      od[offset + c] = src[c];
+    }
+  }
+
+  return out;
+}
+
+/** Convert a Matrix to an array of row arrays.
+ * @param m - Input matrix.
+ * @returns One plain number array per row. */
+export function toRows(m: Matrix): number[][] {
+  const out: number[][] = [];
+
+  for (let r = 0; r < m.rows; r++) {
+    const offset = r * m.cols;
+    out.push(Array.from(m.data.subarray(offset, offset + m.cols)));
+  }
+
+  return out;
+}
+
 /** Return an identity matrix of the given size.
  * @param size - Number of rows and columns.
  * @returns A square identity matrix. */

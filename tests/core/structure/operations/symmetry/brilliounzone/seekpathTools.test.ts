@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { createMatrix } from "@/core/matrix/matrix";
+import { fromRows } from "@/core/matrix/matrix";
 import {
-  cellParams,
   evalExpr,
   evalExprSimple,
   extendKparam,
@@ -10,8 +9,6 @@ import {
   getPrimitive,
   getRealCellFromReciprocalRows,
   getReciprocalCellRows,
-  matrixFromRowMajor,
-  toMatrix,
 } from "@/core/structure/operations/symmetry/brilliounzone/seekpathTools";
 
 const eps = 1e-12;
@@ -37,51 +34,8 @@ function matmul(a: number[][], b: number[][]): number[][] {
   return out;
 }
 
-describe("matrixFromRowMajor", () => {
-  it("builds a 3x3 matrix from 9 values", () => {
-    const m = matrixFromRowMajor([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(m.rows).toBe(3);
-    expect(m.cols).toBe(3);
-    expect(Array.from(m.data)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  });
-
-  it("rejects a wrong number of values", () => {
-    expect(() => matrixFromRowMajor([1, 2, 3])).toThrow();
-  });
-});
-
-describe("cellParams", () => {
-  it("returns orthogonal angles for an orthorhombic cell", () => {
-    const m = toMatrix([
-      [2, 0, 0],
-      [0, 3, 0],
-      [0, 0, 4],
-    ]);
-    const [a, b, c, ca, cb, cg] = cellParams(m);
-    expect([a, b, c]).toEqual([2, 3, 4]);
-    expect([ca, cb, cg]).toEqual([0, 0, 0]);
-  });
-
-  it("returns the correct cosines for a monoclinic cell (beta=105deg)", () => {
-    // b along y, a along x, c in the x-z plane with beta=105deg
-    const beta = (105 * Math.PI) / 180;
-    const m = toMatrix([
-      [4, 0, 0],
-      [0, 5, 0],
-      [6 * Math.cos(beta), 0, 6 * Math.sin(beta)],
-    ]);
-    const [a, b, c, ca, cb, cg] = cellParams(m);
-    expect(Math.abs(a - 4)).toBeLessThan(eps);
-    expect(Math.abs(b - 5)).toBeLessThan(eps);
-    expect(Math.abs(c - 6)).toBeLessThan(eps);
-    expect(ca).toBeLessThan(eps);
-    expect(Math.abs(cb - Math.cos(beta))).toBeLessThan(eps);
-    expect(cg).toBeLessThan(eps);
-  });
-});
-
 describe("reciprocal cell roundtrip", () => {
-  const real = toMatrix([
+  const real = fromRows([
     [4, 0.5, 0],
     [0, 5, 0.5],
     [0.5, 0, 6],
@@ -108,7 +62,7 @@ describe("reciprocal cell roundtrip", () => {
   });
 
   it("reciprocal of an orthorhombic cell is diagonal", () => {
-    const ortho = toMatrix([
+    const ortho = fromRows([
       [4, 0, 0],
       [0, 5, 0],
       [0, 0, 6],

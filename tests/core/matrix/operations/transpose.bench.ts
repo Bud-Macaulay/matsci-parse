@@ -2,12 +2,15 @@ import { bench, describe } from "vitest";
 
 import { createMatrix } from "@/core/matrix/matrix";
 import { transpose } from "@/core/matrix/operations/transpose";
+import { seededRandom } from "../../../helpers/random";
+
+const rng = seededRandom(4);
 
 function createRandomMatrix(rows: number, cols: number) {
   const data = new Array(rows * cols);
 
   for (let i = 0; i < data.length; i++) {
-    data[i] = Math.random();
+    data[i] = rng();
   }
 
   return createMatrix(rows, cols, data);
