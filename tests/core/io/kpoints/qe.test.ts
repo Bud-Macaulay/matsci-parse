@@ -278,8 +278,9 @@ describe("kpointsFromPW", () => {
     expect(kpointsFromPW(fixtures.qeInFile)).toEqual({
       kind: "grid",
       mesh: [6, 6, 6],
-      origin: [1, 1, 1],
-      scheme: "gamma-centered",
+      // shift flags 1 1 1: displaced by half a grid step.
+      origin: [1 / 12, 1 / 12, 1 / 12],
+      scheme: "monkhorst-pack",
     });
   });
 
@@ -291,15 +292,37 @@ describe("kpointsFromPW", () => {
 });
 
 describe("kpointsToPW", () => {
-  it("writes a grid as an automatic card", () => {
+  it("writes a half-step-shifted grid as automatic shift flags", () => {
     expect(
       kpointsToPW({
         kind: "grid",
         mesh: [4, 4, 4],
-        origin: [0.5, 0.5, 0],
+        origin: [0.125, 0.125, 0],
         scheme: "gamma-centered",
       }),
-    ).toBe("K_POINTS automatic\n4 4 4 0.5 0.5 0");
+    ).toBe("K_POINTS automatic\n4 4 4 1 1 0");
+  });
+
+  it("treats whole-step offsets as no shift", () => {
+    expect(
+      kpointsToPW({
+        kind: "grid",
+        mesh: [4, 4, 4],
+        origin: [0.5, -0.25, 0],
+        scheme: "gamma-centered",
+      }),
+    ).toBe("K_POINTS automatic\n4 4 4 0 0 0");
+  });
+
+  it("rejects offsets QE automatic grids cannot express", () => {
+    expect(() =>
+      kpointsToPW({
+        kind: "grid",
+        mesh: [4, 4, 4],
+        origin: [0.05, 0, 0],
+        scheme: "gamma-centered",
+      }),
+    ).toThrow("QE automatic grids can only be shifted by 0 or half a step");
   });
 
   it("writes a reciprocal point set as a crystal list", () => {
@@ -338,6 +361,46 @@ describe("kpointsToPW", () => {
     const text12 = kpointsToPW(path, 12);
     expect(text12).toMatch(/^K_POINTS crystal_b\n3\n/);
     expect(text12).toContain("0 0 0 12");
+  });
+
+  it("keeps revisited points and writes jumps in a band path", () => {
+    // Cubic seekpath-style path: G-X-M-G-R-X | M-R (revisits G and X,
+    // and jumps from X to M).
+    const text = kpointsToPW(
+      {
+        kind: "path",
+        points: {
+          G: [0, 0, 0],
+          X: [0, 0.5, 0],
+          M: [0.5, 0.5, 0],
+          R: [0.5, 0.5, 0.5],
+        },
+        segments: [
+          ["G", "X"],
+          ["X", "M"],
+          ["M", "G"],
+          ["G", "R"],
+          ["R", "X"],
+          ["M", "R"],
+        ],
+      },
+      10,
+    );
+
+    expect(text).toBe(
+      [
+        "K_POINTS crystal_b",
+        "8",
+        "0 0 0 10 ! G",
+        "0 0.5 0 10 ! X",
+        "0.5 0.5 0 10 ! M",
+        "0 0 0 10 ! G",
+        "0.5 0.5 0.5 10 ! R",
+        "0 0.5 0 1 ! X",
+        "0.5 0.5 0 10 ! M",
+        "0.5 0.5 0.5 1 ! R",
+      ].join("\n"),
+    );
   });
 
   it("round-trips every canonical form", () => {
