@@ -9,6 +9,7 @@ import {
   buildDisorderedParent,
   downloadBlob,
   exportZip,
+  isVacancy,
   netCharge,
   parseOccupancy,
   speciesOf,
@@ -17,6 +18,11 @@ import {
   isCancelled,
   startEnumerationJob,
 } from "../enumerate/enumerationClient";
+import {
+  buildSystemArrays,
+  getSharedWorker,
+  useSharedModel,
+} from "../mlip/sharedWorker";
 
 const MAX_ROWS_SHOWN = 500;
 
@@ -54,6 +60,10 @@ export default function EnumerateModal({ structure }) {
   const [runInfo, setRunInfo] = useState(null);
   const [sortKey, setSortKey] = useState("energy");
   const [topK, setTopK] = useState("");
+
+  // PET-MAD model from the shared MLIP worker (loaded in the MLIP panel).
+  const sharedModel = useSharedModel();
+  const modelReady = sharedModel != null;
 
   const handleOpen = () => {
     // A different structure than last time: start over.
@@ -102,10 +112,13 @@ export default function EnumerateModal({ structure }) {
   const indistinct = parsed.some(
     (p) =>
       p?.occupancy?.length > 1 &&
-      new Set(p.occupancy.map((o) => charges[o.symbol])).size === 1,
+      new Set(
+        p.occupancy.map((o) => (isVacancy(o.symbol) ? 0 : charges[o.symbol])),
+      ).size === 1,
   );
 
-  const busy = status === "enumerating" || status === "ranking";
+  const busy =
+    status === "enumerating" || status === "ranking" || status === "petmad";
   const canRun = parent && nDisordered > 0 && !busy;
 
   const setOcc = (i, text) =>
@@ -123,7 +136,14 @@ export default function EnumerateModal({ structure }) {
 
   // The running worker job, so it can be cancelled (and is, on unmount).
   const jobRef = useRef(null);
-  useEffect(() => () => jobRef.current?.cancel(), []);
+  const mlipCancelRef = useRef(false);
+  useEffect(
+    () => () => {
+      mlipCancelRef.current = true;
+      jobRef.current?.cancel();
+    },
+    [],
+  );
 
   /** Run one worker job; resolves to its result, or null if cancelled. */
   const runJob = async (message) => {
@@ -177,15 +197,62 @@ export default function EnumerateModal({ structure }) {
     setStatus("done");
   };
 
-  const cancel = () => jobRef.current?.cancel();
+  /**
+   * PET-MAD energy of every row, for a new sortable column. Scores with the
+   * shared MLIP worker (the model loaded in the MLIP panel): one setSystem +
+   * predict per structure. Each prediction is async, so the modal stays
+   * responsive; cancel stops after the current structure and keeps what is
+   * done. Unlike Ewald this needs the real model, so no worker job — the
+   * geometry is fed in directly.
+   */
+  const rankMlip = async () => {
+    if (!rows || !modelReady) return;
+    setError(null);
+    setProgress([0, 0]);
+    setStatus("petmad");
+    mlipCancelRef.current = false;
+    const out = [...rows];
+    try {
+      const client = await getSharedWorker();
+      for (let i = 0; i < out.length && !mlipCancelRef.current; i++) {
+        const row = out[i];
+        await client.setSystem({
+          ...buildSystemArrays(row.structure),
+          periodic: true,
+        });
+        const { energy } = await client.predict();
+        out[i] = {
+          ...row,
+          mlipEnergy: energy,
+          mlipPerAtom: energy / row.nAtoms,
+        };
+        setProgress([i + 1, out.length]);
+      }
+    } catch (e) {
+      console.error(e);
+      setError(e.message ?? String(e));
+    } finally {
+      setRows(out);
+      setStatus("done");
+    }
+  };
+
+  const cancel = () => {
+    mlipCancelRef.current = true;
+    jobRef.current?.cancel();
+  };
 
   const shown = useMemo(() => {
     if (!rows) return [];
-    const list =
-      sortKey === "size"
-        ? [...rows].sort((a, b) => a.size - b.size || a.rank - b.rank)
-        : rows;
-    return list;
+    if (sortKey === "size") {
+      return [...rows].sort((a, b) => a.size - b.size || a.rank - b.rank);
+    }
+    if (sortKey === "petmad") {
+      return [...rows].sort(
+        (a, b) => (a.mlipPerAtom ?? Infinity) - (b.mlipPerAtom ?? Infinity),
+      );
+    }
+    return rows;
   }, [rows, sortKey]);
 
   const exportRows = (formatKey) => {
@@ -234,8 +301,10 @@ export default function EnumerateModal({ structure }) {
               Give a site an occupancy such as{" "}
               <code className="bg-gray-100 px-1">Cl:0.5 Br:0.5</code> or{" "}
               <code className="bg-gray-100 px-1">Ag:1/3 Pd:1/3 Pt:1/3</code>.
-              Fractions must sum to 1 (vacancies are not supported). Leave blank
-              to keep the site as is.
+              Fractions must sum to 1; use{" "}
+              <code className="bg-gray-100 px-1">Vac</code> for a vacancy (e.g.{" "}
+              <code className="bg-gray-100 px-1">Li:0.5 Vac:0.5</code>), which is
+              dropped from every result. Leave blank to keep the site as is.
             </p>
             <div className="max-h-56 overflow-y-auto border rounded">
               <table className="table-nice w-full">
@@ -424,6 +493,27 @@ export default function EnumerateModal({ structure }) {
                 Re-rank with charges
               </button>
             )}
+            {rows && (
+              <button
+                onClick={rankMlip}
+                disabled={!modelReady || busy}
+                title={
+                  modelReady
+                    ? "Compute the PET-MAD energy of every structure"
+                    : "Load a PET-MAD model in the MLIP panel first"
+                }
+                className="buttonSimple gray"
+              >
+                {status === "petmad"
+                  ? `PET-MAD ${progress[0]}/${progress[1]}…`
+                  : "Calculate with PET-MAD"}
+              </button>
+            )}
+            {rows && !modelReady && (
+              <span className="text-amber-700">
+                Load a PET-MAD model in the MLIP panel to compute energies here.
+              </span>
+            )}
             {!busy && nDisordered === 0 && !hasErrors && (
               <span className="text-gray-500">
                 Make at least one site disordered.
@@ -504,6 +594,14 @@ export default function EnumerateModal({ structure }) {
                           <th>Formula</th>
                           <th className="w-28">E (eV/atom)</th>
                           <th className="w-28">ΔE (meV/atom)</th>
+                          <th
+                            className="w-28 cursor-pointer"
+                            onClick={() => setSortKey("petmad")}
+                            title="Sort by PET-MAD energy"
+                          >
+                            E_PET-MAD (eV/atom)
+                            {sortKey === "petmad" ? " ▲" : ""}
+                          </th>
                           <th className="w-14" />
                         </tr>
                       </thead>
@@ -524,6 +622,11 @@ export default function EnumerateModal({ structure }) {
                             </td>
                             <td className="px-2 py-1 border-b font-mono tabular-nums">
                               {r.dE.toFixed(2)}
+                            </td>
+                            <td className="px-2 py-1 border-b font-mono tabular-nums">
+                              {r.mlipPerAtom != null
+                                ? r.mlipPerAtom.toFixed(5)
+                                : "—"}
                             </td>
                             <td className="px-1 py-1 border-b text-center">
                               <button

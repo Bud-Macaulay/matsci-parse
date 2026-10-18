@@ -26,8 +26,21 @@ function parseFraction(text) {
 }
 
 /**
- * Parse an occupancy like "Na:0.5 K:0.5" or "Ag:1/3, Pd:1/3, Pt:1/3".
- * Fractions must sum to 1 (vacancies are not supported by the enumerator).
+ * Dummy species standing for a vacancy during enumeration. The enumerator
+ * only decorates fully-occupied positions (it rejects occupancies summing
+ * below 1), so a partly-vacant site is written as `Vac:1 - sum(others)`. The
+ * dummy sites are dropped from every decoration right after the symmetry
+ * reduction, leaving a normal ordered structure with fewer atoms.
+ */
+export const VACANCY = "Vac";
+
+/** True for the vacancy token, any case. */
+export const isVacancy = (symbol) =>
+  symbol.toLowerCase() === VACANCY.toLowerCase();
+
+/**
+ * Parse an occupancy like "Na:0.5 K:0.5", "Ag:1/3, Pd:1/3, Pt:1/3" or
+ * "Li:0.5 Vac:0.5" (Vac = vacancy). Fractions must sum to 1.
  *
  * @returns {{ occupancy: {symbol: string, fraction: number}[] } | { error: string }}
  */
@@ -39,14 +52,17 @@ export function parseOccupancy(text) {
   if (tokens.length === 0) return { error: "empty" };
   const occupancy = [];
   for (const tok of tokens) {
-    const [symbol, frac, ...rest] = tok.split(":");
-    if (!symbol || frac === undefined || rest.length) {
+    const [raw, frac, ...rest] = tok.split(":");
+    if (!raw || frac === undefined || rest.length) {
       return { error: `"${tok}": use Symbol:fraction` };
     }
-    if (!elementBySymbol[symbol]) return { error: `unknown element ${symbol}` };
+    const symbol = isVacancy(raw) ? VACANCY : raw;
+    if (!isVacancy(raw) && !elementBySymbol[symbol]) {
+      return { error: `unknown element ${raw}` };
+    }
     const fraction = parseFraction(frac);
     if (!(fraction > 0 && fraction <= 1)) {
-      return { error: `bad fraction for ${symbol}` };
+      return { error: `bad fraction for ${raw}` };
     }
     if (occupancy.some((o) => o.symbol === symbol)) {
       return { error: `${symbol} listed twice` };
@@ -120,12 +136,15 @@ export async function primitiveOfDisordered(parent, symprec = 1e-4) {
   };
 }
 
-/** Species present in a disordered structure, in first-seen order. */
+/**
+ * Species present in a disordered structure, in first-seen order. The
+ * vacancy dummy is left out: it is not an atom and takes no charge.
+ */
 export function speciesOf(parent) {
   const out = [];
   for (const site of parent.sites) {
     for (const o of site.occupancy) {
-      if (!out.includes(o.symbol)) out.push(o.symbol);
+      if (!isVacancy(o.symbol) && !out.includes(o.symbol)) out.push(o.symbol);
     }
   }
   return out;
@@ -155,15 +174,27 @@ export async function enumerateOrderings(parent, { maxSize, maxCombinations }) {
     maxCombinations,
   });
   const nParent = parent.sites.length;
-  return structures.map((structure, i) => ({
-    id: i,
-    structure,
-    size: Math.round(structure.sites.length / nParent),
-    nAtoms: structure.sites.length,
-    formula: reducedFormula(structure),
-    energy: null,
-    perAtom: null,
-  }));
+  const rows = [];
+  for (const structure of structures) {
+    // Vacancy dummies did their job in the combination; drop them so every
+    // row is a normal ordered structure with the real atoms only.
+    const sites = structure.sites.filter((s) => !isVacancy(s.species.symbol));
+    if (sites.length === 0) continue; // fully vacant cell: not a structure
+    const ordered = { ...structure, sites };
+    rows.push({
+      id: rows.length,
+      structure: ordered,
+      // Size counts parent cells. The enumerated cell had every position
+      // occupied (real species or dummy), so use that length, not the
+      // post-drop atom count.
+      size: Math.round(structure.sites.length / nParent),
+      nAtoms: sites.length,
+      formula: reducedFormula(ordered),
+      energy: null,
+      perAtom: null,
+    });
+  }
+  return rows;
 }
 
 /**
