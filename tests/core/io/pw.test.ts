@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { fromPW, toPW, pwSpeciesOrder } from "@/core/io/pw";
+import { fromPW, toPW, pwSpeciesOrder, alatFromPW } from "@/core/io/pw";
 import { createLattice } from "@/core/lattice/lattice";
 import type { Structure } from "@/core/structure/structure";
 import { kspacingToGrid } from "@/core/lattice/kspacingToGrid";
@@ -548,5 +548,130 @@ Fe2 0.5 0.5 0.5
       undefined,
       "Fe2",
     ]);
+  });
+});
+
+describe("fromPW lattice units", () => {
+  const base = (system: string, cell: string, positions = "ATOMIC_POSITIONS crystal\nSi 0 0 0") =>
+    `&SYSTEM\n ${system}\n nat=1\n ntyp=1\n/\nATOMIC_SPECIES\nSi 28.086 Si.UPF\n${cell}\n${positions}\nK_POINTS gamma\n`;
+
+  it("converts CELL_PARAMETERS bohr to angstrom", () => {
+    const s = fromPW(base("ibrav=0", "CELL_PARAMETERS bohr\n 10 0 0\n 0 10 0\n 0 0 10"));
+    expect(s.lattice.basis.data[0]).toBeCloseTo(5.29177, 5);
+  });
+
+  it("accepts A instead of celldm(1)", () => {
+    const s = fromPW(base("ibrav=1, A=3.0", ""));
+    expect(s.lattice.basis.data[0]).toBeCloseTo(3.0, 6);
+    expect(alatFromPW(base("ibrav=1, A=3.0", ""))).toBeCloseTo(3.0 / 0.529177, 6);
+  });
+
+  it("uses |a1| as alat for ibrav=0, including alat-unit positions", () => {
+    const text = base(
+      "ibrav=0",
+      "CELL_PARAMETERS angstrom\n 4 0 0\n 0 5 0\n 0 0 6",
+      "ATOMIC_POSITIONS alat\nSi 0.5 0 0",
+    );
+    expect(alatFromPW(text)).toBeCloseTo(4 / 0.529177, 6);
+    expect(fromPW(text).sites[0].frac[0]).toBeCloseTo(0.5, 6);
+  });
+
+  it("reads A, B, C and cosines like the equivalent celldm (pw.x abc2celldm)", () => {
+    const A = 5, B = 6, C = 7, cAB = -0.3, cAC = 0.2, cBC = 0.1;
+    const bohrA = A / 0.529177;
+    const cases: [number, string, number[]][] = [
+      [5, `cosAB=${cAB}`, [cAB, 0, 0]],
+      [12, `cosAB=${cAB}`, [cAB, 0, 0]],
+      [-12, `cosAC=${cAC}`, [0, cAC, 0]],
+      [14, `cosAB=${cAB}, cosAC=${cAC}, cosBC=${cBC}`, [cBC, cAC, cAB]],
+    ];
+    for (const [ibrav, cosines, angles] of cases) {
+      const abc = fromPW(base(`ibrav=${ibrav}, A=${A}, B=${B}, C=${C}, ${cosines}`, ""));
+      const celldm = [bohrA, B / A, C / A, ...angles].map((v, i) => `celldm(${i + 1})=${v}`).join(", ");
+      const ref = fromPW(base(`ibrav=${ibrav}, ${celldm}`, ""));
+      expect(Array.from(abc.lattice.basis.data)).toEqual(
+        Array.from(ref.lattice.basis.data, (v) => expect.closeTo(v, 9)),
+      );
+    }
+  });
+
+  it("rejects both celldm and A, like pw.x", () => {
+    expect(() => fromPW(base("ibrav=1, celldm(1)=10, A=3.0", ""))).toThrow(/not both/);
+  });
+
+  // QE INPUT_PW: unitless CELL_PARAMETERS are alat if celldm(1)/A is set,
+  // else bohr; unitless ATOMIC_POSITIONS are alat. Both deprecated.
+  it("reads unitless CELL_PARAMETERS as bohr without a lattice parameter", () => {
+    const s = fromPW(base("ibrav=0", "CELL_PARAMETERS\n 10 0 0\n 0 10 0\n 0 0 10"));
+    expect(s.lattice.basis.data[0]).toBeCloseTo(5.29177, 5);
+  });
+
+  it("reads unitless CELL_PARAMETERS as alat with celldm(1) or A", () => {
+    const cell = "CELL_PARAMETERS\n 1 0 0\n 0 1 0\n 0 0 1";
+    expect(fromPW(base("ibrav=0, celldm(1)=10.0", cell)).lattice.basis.data[0]).toBeCloseTo(5.29177, 5);
+    expect(fromPW(base("ibrav=0, A=3.0", cell)).lattice.basis.data[0]).toBeCloseTo(3.0, 6);
+  });
+
+  it("reads unitless ATOMIC_POSITIONS as alat", () => {
+    const text = base(
+      "ibrav=1, celldm(1)=10.0",
+      "",
+      "ATOMIC_POSITIONS\nSi 0.25 0 0",
+    );
+    expect(fromPW(text).sites[0].frac[0]).toBeCloseTo(0.25, 6);
+    const ibrav0 = base(
+      "ibrav=0",
+      "CELL_PARAMETERS angstrom\n 4 0 0\n 0 4 0\n 0 0 4",
+      "ATOMIC_POSITIONS\nSi 0.5 0 0",
+    );
+    expect(fromPW(ibrav0).sites[0].frac[0]).toBeCloseTo(0.5, 6);
+  });
+});
+
+describe("fromPW validateSpecies", () => {
+  const pw = (label: string, pseudo: string, ntyp = "\n ntyp=1") =>
+    `&SYSTEM\n ibrav=1, celldm(1)=10\n nat=1${ntyp}\n/\nATOMIC_SPECIES\n${label} 55.85 ${pseudo}\nATOMIC_POSITIONS crystal\n${label} 0 0 0\nK_POINTS gamma\n`;
+  const symbol = (label: string, pseudo: string) => fromPW(pw(label, pseudo)).sites[0].species.symbol;
+
+  it("accepts labels that match the pseudopotential's element", () => {
+    expect(symbol("Fe", "Fe.pbe-spn-kjpaw_psl.0.2.1.UPF")).toBe("Fe");
+    expect(symbol("Fe1", "fe_pbe_v1.5.uspp.F.UPF")).toBe("Fe");
+    expect(symbol("Fe_up", "Fe_ONCV_PBE-1.0.upf")).toBe("Fe");
+  });
+
+  it("accepts pseudopotential names that don't start with an element", () => {
+    for (const pseudo of ["my_iron.UPF", "pseudo.UPF", "new_PP.UPF", "B3LYP.upf", "PAW_PBE_Fe.upf"]) {
+      expect(symbol("Fe", pseudo)).toBe("Fe");
+    }
+  });
+
+  it("rejects a label whose element disagrees with the pseudopotential", () => {
+    expect(() => fromPW(pw("Y2", "O.pbe.UPF"))).toThrow(/'Y2' looks like element Y.*'O.pbe.UPF' looks like O/);
+    expect(() => fromPW(pw("Fe", "In-house-v2.UPF"))).toThrow(/looks like In/);
+    expect(() => fromPW(pw("X1", "Fe.pbe.UPF"))).toThrow(/'X1' looks like no element/);
+    // also without ntyp, reading the card up to the next one
+    expect(() => fromPW(pw("Y2", "O.pbe.UPF", ""))).toThrow(/looks like O/);
+  });
+
+  it("can be disabled", () => {
+    expect(fromPW(pw("Y2", "O.pbe.UPF"), false).sites[0].species.symbol).toBe("Y");
+  });
+});
+
+describe("fromPW card layout", () => {
+  it("skips blank and comment lines inside cards, like pw.x", () => {
+    const s = fromPW(
+      "&SYSTEM\n ibrav=0\n nat=2\n ntyp=1\n/\nATOMIC_SPECIES\nSi 28.086 Si.UPF\n" +
+        "CELL_PARAMETERS angstrom\n\n! a comment\n 5 0 0\n\n 0 5 0\n # another\n 0 0 5\n" +
+        "ATOMIC_POSITIONS crystal\n\nSi 0 0 0\n! between atoms\nSi 0.25 0.25 0.25\n\nK_POINTS gamma\n",
+    );
+    expect(Array.from(s.lattice.basis.data)).toEqual([5, 0, 0, 0, 5, 0, 0, 0, 5]);
+    expect(s.sites.map((x) => Array.from(x.frac))).toEqual([[0, 0, 0], [0.25, 0.25, 0.25]]);
+  });
+
+  it("says when ATOMIC_POSITIONS has no readable atoms", () => {
+    expect(() =>
+      fromPW("&SYSTEM\n ibrav=1, celldm(1)=10, nat=1, ntyp=1\n/\nATOMIC_SPECIES\nSi 28 Si.UPF\nATOMIC_POSITIONS alat\nSi 1/4 0 0\n"),
+    ).toThrow(/No atoms read from ATOMIC_POSITIONS/);
   });
 });

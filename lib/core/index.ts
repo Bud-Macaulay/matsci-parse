@@ -10,6 +10,7 @@ export * from "./volumetric";
 
 export * from "./io";
 export * from "./pseudopotential";
+export * from "./phonon";
 
 export * from "./math";
 export * from "./units";

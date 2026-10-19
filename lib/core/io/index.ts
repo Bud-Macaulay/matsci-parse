@@ -10,6 +10,7 @@ export * from "./pdb";
 export * from "./pw"; // this may be buggy
 export * from "./kpoints";
 export * from "./pseudo";
+export * from "./phonon";
 
 export * from "./json";
 

@@ -1,11 +1,12 @@
-import { createLattice } from "../../lattice/lattice";
+import { createLattice, type Lattice } from "../../lattice/lattice";
+import { scale } from "../../matrix/operations/scale";
 import { kspacingToGrid } from "../../lattice/kspacingToGrid";
 import { ibravToLattice } from "./ibrav";
 import { fractional } from "../../site";
 import { getElement } from "../../data/periodictable/atomicData";
 import type { Site } from "../../site/site";
 import type { Structure } from "../../structure/structure";
-import { parseQeNamelist, getNumber, getString, getArray } from "./namelist";
+import { parseQeNamelist, getNumber, getString, getArray, type QeNamelist } from "./namelist";
 import type {
   AtomicSpeciesEntry,
   AtomicPositionEntry,
@@ -81,77 +82,61 @@ const QE_DEFAULTS = {
 //  fromPW — unchanged
 // ──────────────────────────────────────────────────────────────────────
 
-/** Parses a Quantum ESPRESSO PW input string into a Structure. */
-export function fromPW(text: string): Structure {
+/**
+ * The lattice parameter `alat` (in Bohr) that pw.x uses for a given input:
+ * celldm(1) (or A), else the length of the first lattice vector of an
+ * ibrav=0 cell in bohr/angstrom. Quantities that QE writes "in units of
+ * alat" or "2π/alat" (e.g. matdyn q-points) use it.
+ *
+ * This matches pw.x from QE 5.0 on (`cell_base_init`). QE 4.x differs for
+ * ibrav=0 with absolute cell units: it ignored celldm and computed alat as
+ * sqrt(a1x² + a2x² + a3x²), so for such runs read alat from the pw.x output.
+ */
+export function alatFromPW(text: string): number {
+  const namelists = parseQeNamelist(text);
+  const ibrav = getNumber(namelists, "SYSTEM", "ibrav") ?? 0;
+  const celldm1 = readCelldm(namelists, ibrav)[0];
+  return celldm1 || latticeParameter(celldm1, fromPW(text, false).lattice);
+}
+
+/**
+ * Parses a Quantum ESPRESSO PW input string into a Structure.
+ *
+ * @param validateSpecies - Check each ATOMIC_SPECIES label against its
+ *   pseudopotential file name (default true). When the file name starts with
+ *   an element symbol (`Fe.pbe-spn-kjpaw.UPF`, `fe_pbe_v1.5.uspp.F.UPF`,
+ *   `Al_ONCV_PBE-1.2.upf`) that differs from the label's element, parsing
+ *   fails instead of silently using the label's element. File names that
+ *   don't start with an element symbol (`my_iron.UPF`) are not checked.
+ */
+export function fromPW(text: string, validateSpecies = true): Structure {
   const namelists = parseQeNamelist(text);
   const lines = text.split("\n");
+  if (validateSpecies) checkSpeciesNames(namelists, lines);
 
   // --- extract &SYSTEM parameters ---
   const ibrav = getNumber(namelists, "SYSTEM", "ibrav") ?? 0;
   const nat = getNumber(namelists, "SYSTEM", "nat");
-  const celldm = getArray(namelists, "SYSTEM", "celldm", 6);
+  const celldm = readCelldm(namelists, ibrav);
 
-  // --- build lattice ---
-  let lattice: ReturnType<typeof createLattice>;
+  // --- build lattice (angstrom) ---
+  let lattice: Lattice;
 
   if (ibrav !== 0) {
-    // ibravToLattice returns lattice vectors in Bohr → convert to angstrom
-    const bohr = ibravToLattice(ibrav, celldm);
-    const m = bohr.basis.data;
-    lattice = createLattice([
-      m[0] * BOHR_TO_ANGSTROM,
-      m[1] * BOHR_TO_ANGSTROM,
-      m[2] * BOHR_TO_ANGSTROM,
-      m[3] * BOHR_TO_ANGSTROM,
-      m[4] * BOHR_TO_ANGSTROM,
-      m[5] * BOHR_TO_ANGSTROM,
-      m[6] * BOHR_TO_ANGSTROM,
-      m[7] * BOHR_TO_ANGSTROM,
-      m[8] * BOHR_TO_ANGSTROM,
-    ]);
+    // ibravToLattice returns lattice vectors in Bohr
+    lattice = createLattice(scale(ibravToLattice(ibrav, celldm).basis, BOHR_TO_ANGSTROM));
   } else {
     // ibrav=0: lattice must come from CELL_PARAMETERS block
-    const { lattice: cellLattice, units: cellUnits } =
-      parseCellParameters(lines);
-
-    if (cellUnits === "alat") {
-      if (celldm[0] === 0) {
-        throw new Error("CELL_PARAMETERS alat requires celldm(1) in &SYSTEM");
-      }
-      // lattice vectors are in units of celldm(1) Bohr → convert to angstrom
-      const factor = celldm[0] * BOHR_TO_ANGSTROM;
-      const m = cellLattice.basis.data;
-      lattice = createLattice([
-        m[0] * factor,
-        m[1] * factor,
-        m[2] * factor,
-        m[3] * factor,
-        m[4] * factor,
-        m[5] * factor,
-        m[6] * factor,
-        m[7] * factor,
-        m[8] * factor,
-      ]);
-    } else if (cellUnits === "bohr") {
-      // lattice vectors in Bohr → convert to angstrom
-      const m = cellLattice.basis.data;
-      const factor = 1 / BOHR_TO_ANGSTROM;
-      lattice = createLattice([
-        m[0] * factor,
-        m[1] * factor,
-        m[2] * factor,
-        m[3] * factor,
-        m[4] * factor,
-        m[5] * factor,
-        m[6] * factor,
-        m[7] * factor,
-        m[8] * factor,
-      ]);
-    } else {
-      // angstrom — use directly
-      lattice = cellLattice;
+    const { lattice: cell, units } = parseCellParameters(lines, celldm[0] !== 0);
+    if (units === "alat" && celldm[0] === 0) {
+      throw new Error("CELL_PARAMETERS alat requires celldm(1) or A in &SYSTEM");
     }
+    const toAngstrom =
+      units === "alat" ? celldm[0] * BOHR_TO_ANGSTROM : units === "bohr" ? BOHR_TO_ANGSTROM : 1;
+    lattice = createLattice(scale(cell.basis, toAngstrom));
   }
+
+  const alat = latticeParameter(celldm[0], lattice);
 
   // --- parse atomic positions ---
   const {
@@ -203,23 +188,9 @@ export function fromPW(text: string): Structure {
       }
 
       case "alat": {
-        // alat = celldm(1) Bohr → Bohr → angstrom → fractional
-        if (celldm[0] === 0) {
-          throw new Error(
-            "ATOMIC_POSITIONS alat requires celldm(1) in &SYSTEM",
-          );
-        }
-        const bohr = new Float64Array([
-          x * celldm[0],
-          y * celldm[0],
-          z * celldm[0],
-        ]);
-        const angstrom = new Float64Array([
-          bohr[0] * BOHR_TO_ANGSTROM,
-          bohr[1] * BOHR_TO_ANGSTROM,
-          bohr[2] * BOHR_TO_ANGSTROM,
-        ]);
-        frac = fractional(lattice, angstrom);
+        // alat (Bohr) → angstrom → fractional
+        const f = alat * BOHR_TO_ANGSTROM;
+        frac = fractional(lattice, new Float64Array([x * f, y * f, z * f]));
         break;
       }
     }
@@ -247,12 +218,107 @@ export function fromPW(text: string): Structure {
 
 // ---------- internal parsing helpers ----------
 
+/**
+ * celldm(1..6) from &SYSTEM. When A, B, C, cosAB, cosAC, cosBC are given
+ * instead, they are converted as pw.x does (`abc2celldm`, QE 7.3), so the
+ * rest of the parser only deals with celldm. celldm(1) is 0 if neither is set.
+ */
+function readCelldm(namelists: QeNamelist[], ibrav: number): number[] {
+  const celldm = getArray(namelists, "SYSTEM", "celldm", 6);
+  const A = getNumber(namelists, "SYSTEM", "A");
+  if (A === undefined) return celldm;
+  if (celldm[0] !== 0) {
+    throw new Error("Specify either celldm or A, B, C in &SYSTEM, not both");
+  }
+  const get = (key: string) => getNumber(namelists, "SYSTEM", key) ?? 0;
+  const [cosAB, cosAC, cosBC] = [get("cosAB"), get("cosAC"), get("cosBC")];
+  const angles =
+    ibrav === 14 || ibrav === 0
+      ? [cosBC, cosAC, cosAB]
+      : ibrav === -12 || ibrav === -13
+        ? [0, cosAC, 0]
+        : [5, -5, 12, 13].includes(ibrav)
+          ? [cosAB, 0, 0]
+          : [0, 0, 0];
+  return [A / BOHR_TO_ANGSTROM, get("B") / A, get("C") / A, ...angles];
+}
+
+/** pw.x's alat (Bohr): celldm(1), else the length of the first lattice vector. */
+function latticeParameter(celldm1: number, lattice: Lattice): number {
+  const m = lattice.basis.data;
+  return celldm1 || Math.hypot(m[0], m[1], m[2]) / BOHR_TO_ANGSTROM;
+}
+
+/** Throw if a species label and its pseudopotential name imply different elements. */
+function checkSpeciesNames(namelists: QeNamelist[], lines: string[]): void {
+  const ntyp = getNumber(namelists, "SYSTEM", "ntyp");
+  for (const { label, pseudo } of parseAtomicSpecies(lines, ntyp)) {
+    const fromPseudo = elementFromPseudoName(pseudo);
+    const fromLabel = elementFromLabel(label);
+    if (fromPseudo && fromPseudo !== fromLabel) {
+      throw new Error(
+        `Species '${label}' looks like ${getElement(fromLabel) ? `element ${fromLabel}` : "no element"}, ` +
+          `but its pseudopotential '${pseudo}' looks like ${fromPseudo}. ` +
+          "Rename the species or pseudopotential (or disable validateSpecies).",
+      );
+    }
+  }
+}
+
+interface AtomicSpeciesEntryRaw {
+  label: string;
+  pseudo: string;
+}
+
+/**
+ * Rows of the ATOMIC_SPECIES card: `ntyp` rows when known, otherwise rows
+ * of at least three fields up to the next blank line or card.
+ */
+function parseAtomicSpecies(lines: string[], ntyp?: number): AtomicSpeciesEntryRaw[] {
+  const start = lines.findIndex((l) => /^\s*ATOMIC_SPECIES\b/i.test(l));
+  if (start < 0) return [];
+  const rows: AtomicSpeciesEntryRaw[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (/^[!#]/.test(line)) continue;
+    if (ntyp === undefined && (!line || /^[A-Z_]+(\s|$)|^&/.test(line))) break;
+    const parts = line.split(/\s+/);
+    if (parts.length < 3) {
+      if (ntyp === undefined) break;
+      continue;
+    }
+    rows.push({ label: parts[0], pseudo: parts[2] });
+    if (rows.length === ntyp) break;
+  }
+  return rows;
+}
+
+/**
+ * The element a pseudopotential file name starts with, read like qe-tools
+ * does: the text before the first "-", "." or "_", capitalized
+ * (`fe_pbe_v1.5.uspp.F.UPF` → "Fe"). Undefined if that is not an element.
+ */
+function elementFromPseudoName(pseudo: string): string | undefined {
+  const base = pseudo.split(/[\\/]/).pop() ?? pseudo;
+  const prefix = base.split(/[-._]/)[0];
+  const symbol = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+  return getElement(symbol) ? symbol : undefined;
+}
+
 interface CellParamsResult {
   lattice: ReturnType<typeof createLattice>;
   units: string;
 }
 
-function parseCellParameters(lines: string[]): CellParamsResult {
+/**
+ * Without a unit option, QE reads CELL_PARAMETERS in units of alat when a
+ * lattice parameter (celldm(1) or A) is set, and in bohr otherwise
+ * (both deprecated, but still accepted by pw.x).
+ */
+function parseCellParameters(
+  lines: string[],
+  hasLatticeParameter: boolean,
+): CellParamsResult {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
@@ -260,14 +326,19 @@ function parseCellParameters(lines: string[]): CellParamsResult {
       const unitMatch = line.match(
         /^CELL_PARAMETERS\s*(?:\{|\()?(\w+)(?:\}|\))?/i,
       );
-      const units = unitMatch?.[1]?.toLowerCase() ?? "angstrom";
+      const units =
+        unitMatch?.[1]?.toLowerCase() ?? (hasLatticeParameter ? "alat" : "bohr");
 
+      // like pw.x, skip blank and comment lines inside the card
       const rows: number[][] = [];
-      for (let j = 1; j <= 3; j++) {
-        if (i + j >= lines.length) {
-          throw new Error("Incomplete CELL_PARAMETERS block");
-        }
-        rows.push(lines[i + j].trim().split(/\s+/).map(Number));
+      for (let j = i + 1; j < lines.length && rows.length < 3; j++) {
+        if (isBlankOrComment(lines[j])) continue;
+        const row = lines[j].trim().split(/\s+/).slice(0, 3).map(Number);
+        if (row.length < 3 || row.some(Number.isNaN)) break;
+        rows.push(row);
+      }
+      if (rows.length < 3) {
+        throw new Error("Incomplete CELL_PARAMETERS block");
       }
 
       return {
@@ -286,6 +357,11 @@ interface AtomBlockResult {
   selectiveDynamics: boolean;
 }
 
+/** Blank lines and `!`/`#` comment lines, which pw.x skips inside cards. */
+function isBlankOrComment(line: string): boolean {
+  return /^\s*([!#].*)?$/.test(line);
+}
+
 function parseAtomicPositions(lines: string[]): AtomBlockResult {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -294,8 +370,8 @@ function parseAtomicPositions(lines: string[]): AtomBlockResult {
       const unitMatch = line.match(
         /^ATOMIC_POSITIONS\s*(?:\{|\()?(\w+)(?:\}|\))?/i,
       );
-      const units = (unitMatch?.[1]?.toLowerCase() ??
-        "angstrom") as AtomCoordMode;
+      // QE reads ATOMIC_POSITIONS without a unit option as alat (deprecated)
+      const units = (unitMatch?.[1]?.toLowerCase() ?? "alat") as AtomCoordMode;
 
       const atomLines: string[] = [];
 
@@ -307,9 +383,10 @@ function parseAtomicPositions(lines: string[]): AtomBlockResult {
         j++;
       }
 
+      // like pw.x, skip blank and comment lines inside the card
       for (; j < lines.length; j++) {
         const l = lines[j].trim();
-        if (!l) break;
+        if (isBlankOrComment(l)) continue;
 
         const parts = l.split(/\s+/);
         if (
@@ -323,6 +400,11 @@ function parseAtomicPositions(lines: string[]): AtomBlockResult {
         atomLines.push(l);
       }
 
+      if (atomLines.length === 0) {
+        throw new Error(
+          "No atoms read from ATOMIC_POSITIONS: expected lines 'label x y z' with numeric coordinates",
+        );
+      }
       return { lines: atomLines, units, selectiveDynamics };
     }
   }
