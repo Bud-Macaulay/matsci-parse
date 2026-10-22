@@ -26,6 +26,7 @@ import MLIPPanel from "../mlip/MLIPPanel";
 import NEBModal from "../neb/NEBModal";
 import BrillouinZoneModal from "./BrillouinZoneModal";
 import XrdModal from "./XrdModal";
+import EosModal from "./EosModal";
 
 export default function MainPanel({ tab, updateTab }) {
   const [speciesModal, setSpeciesModal] = useState({ open: false, mode: null });
@@ -240,6 +241,11 @@ export default function MainPanel({ tab, updateTab }) {
               <QEInputModal structure={structure} />
               <BrillouinZoneModal structure={structure} />
               <XrdModal structure={structure} />
+              <EosModal
+                structure={structure}
+                setStructure={setStructure}
+                pushUndo={pushUndo}
+              />
             </div>
           </div>
 
