@@ -1,6 +1,5 @@
 import { bench, describe } from "vitest";
 
-import { fromPOSCAR } from "@/core/io/poscar";
 import { supercell } from "@/core/structure/operations/supercell";
 import {
   insertSite,
@@ -19,9 +18,10 @@ import {
   appendSites,
 } from "@/core/structure/operations/sites/appendSite";
 
-import { diamondCPOSCAR } from "../../teststrings/spglibPoscar";
+// 4-site cell, same size as the POSCAR this bench used before.
+import { cuFCC } from "../../../../fixtures/structures";
 
-const base = fromPOSCAR(diamondCPOSCAR);
+const base = cuFCC;
 const structure = supercell(base, [8, 8, 8]); // 4096 atoms
 
 describe("500 site edits", () => {

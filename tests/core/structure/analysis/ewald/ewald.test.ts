@@ -3,6 +3,8 @@ import { createLattice } from "@/core/lattice/lattice";
 import { ewaldSum } from "@/core/structure/analysis/ewald/ewald";
 import type { Structure } from "@/core/structure/structure";
 
+import { csCl, naCl, srTiO3 } from "../../../../fixtures/structures";
+
 function build(
   a: number[],
   species: string[],
@@ -31,15 +33,6 @@ const b2Na = build(
     [0.5, 0.5, 0.5],
   ],
 );
-const b2Cs = build(
-  [4.12, 0, 0, 0, 4.12, 0, 0, 0, 4.12],
-  ["Cs", "Cl"],
-  [1, -1],
-  [
-    [0, 0, 0],
-    [0.5, 0.5, 0.5],
-  ],
-);
 const b2MgO = build(
   [4.21, 0, 0, 0, 4.21, 0, 0, 0, 4.21],
   ["Mg", "O"],
@@ -49,22 +42,11 @@ const b2MgO = build(
     [0.5, 0.5, 0.5],
   ],
 );
-// True rocksalt conventional cell (8 atoms, 4 formula units).
-const rocksalt = build(
-  [5.64, 0, 0, 0, 5.64, 0, 0, 0, 5.64],
-  ["Na", "Na", "Na", "Na", "Cl", "Cl", "Cl", "Cl"],
-  [1, 1, 1, 1, -1, -1, -1, -1],
-  [
-    [0, 0, 0],
-    [0.5, 0.5, 0],
-    [0.5, 0, 0.5],
-    [0, 0.5, 0.5],
-    [0.5, 0.5, 0.5],
-    [0, 0, 0.5],
-    [0, 0.5, 0],
-    [0.5, 0, 0],
-  ],
-);
+// Catalog cells: pymatgen references with Na/Cs/Sr +, Cl -, Ti 4+, O 2-.
+const b2Cs = { s: csCl, q: [1, -1] };
+const rocksalt = { s: naCl, q: [1, 1, 1, 1, -1, -1, -1, -1] };
+const perovskite = { s: srTiO3, q: [2, 4, -2, -2, -2] };
+
 const charged = build(
   [5.64, 0, 0, 0, 5.64, 0, 0, 0, 5.64],
   ["Na", "Cl"],
@@ -74,19 +56,6 @@ const charged = build(
     [0.5, 0.5, 0.5],
   ],
 );
-const perovskite = build(
-  [3.905, 0, 0, 0, 3.905, 0, 0, 0, 3.905],
-  ["Sr", "Ti", "O", "O", "O"],
-  [2, 4, -2, -2, -2],
-  [
-    [0, 0, 0],
-    [0.5, 0.5, 0.5],
-    [0.5, 0.5, 0],
-    [0.5, 0, 0.5],
-    [0, 0.5, 0.5],
-  ],
-);
-
 // Triclinic cells (Lattice.from_parameters matrices); references from
 // pymatgen EwaldSummation (acc_factor=16).
 // strongly skewed, neutral.
@@ -158,10 +127,10 @@ describe("ewaldSum", () => {
     [
       "B2 CsCl",
       b2Cs,
-      -7.1137097419,
-      -0.5220489355,
-      0.8141124683,
-      -7.4057732747,
+      -6.9632891748,
+      -0.5110101246,
+      0.7968979257,
+      -7.249176976,
     ],
     [
       "B2 MgO",
@@ -249,7 +218,7 @@ describe("ewaldSum", () => {
     );
     // B2: alpha = 1.762674773070991, r0 = sqrt(3) a / 2.
     expect(ewaldSum(b2Cs.s, b2Cs.q).total).toBeCloseTo(
-      (-1.762674773070991 * conv) / ((Math.sqrt(3) * 4.12) / 2),
+      (-1.762674773070991 * conv) / ((Math.sqrt(3) * 4.209) / 2),
       6,
     );
   });

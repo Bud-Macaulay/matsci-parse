@@ -3,8 +3,8 @@ import { hashStructure } from "@/core/structure/operations/hashStructure";
 import { canonicalize } from "@/core/structure/operations/canonicalize";
 import { createLattice } from "@/core/lattice/lattice";
 import { supercell } from "@/core/structure/operations/supercell";
-import { fromPOSCAR } from "@/core/io/poscar";
-import { diamondCPOSCAR } from "../teststrings/spglibPoscar";
+// 4-site cell, same size as the POSCAR this bench used before.
+import { cuFCC } from "../../../fixtures/structures";
 
 const cubic = createLattice([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 
@@ -45,7 +45,7 @@ describe("canonicalize scaling", () => {
 });
 
 describe("supercell scaling", () => {
-  const base = fromPOSCAR(diamondCPOSCAR);
+  const base = cuFCC;
 
   for (const n of [2, 4, 8] as const) {
     supercell(base, [n, n, n]);

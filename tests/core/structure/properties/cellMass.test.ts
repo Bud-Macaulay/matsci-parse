@@ -1,57 +1,37 @@
 import { describe, expect, it } from "vitest";
 
-import { fromPOSCAR } from "@/core/io/poscar";
 import { cellMass } from "@/core/structure/properties/cellMass";
 
 import { createLattice } from "@/core/lattice/lattice";
 import { Structure } from "@/core/structure/structure";
 
 import {
-  simpleCubic,
-  simpleHexagonal,
-  layeredStructure,
-  mc3d_10007,
-  mc3d_1011,
-  diamondCPOSCAR,
-} from "../teststrings/spglibPoscar";
+  poSC,
+  siDiamond,
+  srTiO3,
+  al2O3Corundum,
+  zrO2Baddeleyite,
+} from "../../../fixtures/structures";
 
 describe("cellMass", () => {
-  it("simple cubic Na", () => {
-    const s = fromPOSCAR(simpleCubic);
-
-    expect(cellMass(s)).toBeCloseTo(22.98976928);
+  it("simple cubic Po", () => {
+    expect(cellMass(poSC)).toBeCloseTo(209);
   });
 
-  it("simple hexagonal Na", () => {
-    const s = fromPOSCAR(simpleHexagonal);
-
-    expect(cellMass(s)).toBeCloseTo(22.98976928);
+  it("diamond Si", () => {
+    expect(cellMass(siDiamond)).toBeCloseTo(8 * 28.0855);
   });
 
-  it("diamond", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
-
-    expect(cellMass(s)).toBeCloseTo(48.0428);
+  it("perovskite SrTiO3", () => {
+    expect(cellMass(srTiO3)).toBeCloseTo(87.62 + 47.867 + 3 * 15.9994);
   });
 
-  it("layered LiCoO2", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(cellMass(s)).toBeCloseTo(6.941 + 58.933195 + 2 * 15.9994);
+  it("corundum Al2O3", () => {
+    expect(cellMass(al2O3Corundum)).toBeCloseTo(4 * 26.9815386 + 6 * 15.9994);
   });
 
-  it("mc3d_10007", () => {
-    const s = fromPOSCAR(mc3d_10007);
-
-    expect(cellMass(s)).toBeCloseTo(16 * 118.71 + 4 * 102.9055);
-  });
-
-  it("mc3d_1011", () => {
-    const s = fromPOSCAR(mc3d_1011);
-
-    expect(cellMass(s)).toBeCloseTo(
-      6 * 6.941 + 2 * 40.078 + 2 * 54.938045 + 6 * 14.0067,
-    );
+  it("monoclinic ZrO2", () => {
+    expect(cellMass(zrO2Baddeleyite)).toBeCloseTo(4 * 91.224 + 8 * 15.9994);
   });
 
   describe("cellMass overrides", () => {

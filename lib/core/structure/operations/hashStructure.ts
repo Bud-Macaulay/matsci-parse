@@ -3,7 +3,7 @@ import { canonicalize } from "./canonicalize";
 import { Vec3 } from "../../site/site";
 import { fnv1a32 } from "../../math/hash";
 
-function toFixedArray(v: Vec3, precision = 8): string {
+function toFixedArray(v: Readonly<Vec3>, precision = 8): string {
   return Array.from(v)
     .map((x) => x.toFixed(precision))
     .join(",");

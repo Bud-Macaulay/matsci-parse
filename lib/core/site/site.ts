@@ -6,10 +6,15 @@ export type SiteProperties = Record<string, any>;
 /** A 3D vector type. */
 export type Vec3 = [number, number, number] | Float64Array | number[];
 
-/** A site with a species, fractional coordinates, and optional properties. */
+/**
+ * A site with a species, fractional coordinates, and optional properties.
+ * Species and frac are readonly: operations share site objects between input
+ * and output, so replace a site rather than editing it. Properties stay
+ * mutable (and are shared the same way).
+ */
 export type Site<P extends SiteProperties = SiteProperties> = {
-  species: Species;
-  frac: Vec3;
+  readonly species: Readonly<Species>;
+  readonly frac: Readonly<Vec3>;
   properties?: P;
 };
 

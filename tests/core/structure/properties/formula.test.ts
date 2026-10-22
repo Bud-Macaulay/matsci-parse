@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { fromPOSCAR } from "@/core/io/poscar";
-
 import {
   alphabeticalFormula,
   anonymousFormula,
@@ -18,180 +16,120 @@ import {
   subscriptFormula,
 } from "@/core/structure/properties/formula";
 
-import { supercell } from "@/core/structure/operations/supercell";
-
 import {
-  simpleCubic,
-  simpleHexagonal,
-  layeredStructure,
-  mc3d_10007,
-  mc3d_1011,
-  diamondCPOSCAR,
-} from "../teststrings/spglibPoscar";
+  ALL_STRUCTURES,
+  poSC,
+  graphite,
+  siDiamond,
+  srTiO3,
+  tiO2Rutile,
+  al2O3Corundum,
+  zrO2Baddeleyite,
+} from "../../../fixtures/structures";
 
 describe("composition", () => {
-  it("simple cubic", () => {
-    const s = fromPOSCAR(simpleCubic);
-
-    expect(composition(s)).toEqual({
-      Na: 1,
-    });
-
-    expect(hillFormula(s)).toBe("Na");
-    expect(reducedFormula(s)).toBe("Na");
+  it("simple cubic Po", () => {
+    expect(composition(poSC)).toEqual({ Po: 1 });
+    expect(hillFormula(poSC)).toBe("Po");
+    expect(reducedFormula(poSC)).toBe("Po");
   });
 
-  it("simple hexagonal", () => {
-    const s = fromPOSCAR(simpleHexagonal);
-
-    expect(composition(s)).toEqual({
-      Na: 1,
-    });
-
-    expect(hillFormula(s)).toBe("Na");
-    expect(reducedFormula(s)).toBe("Na");
+  it("graphite", () => {
+    expect(composition(graphite)).toEqual({ C: 4 });
+    expect(hillFormula(graphite)).toBe("C4");
+    expect(reducedFormula(graphite)).toBe("C");
   });
 
-  it("diamond", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
-
-    expect(composition(s)).toEqual({
-      C: 4,
-    });
-
-    expect(hillFormula(s)).toBe("C4");
-    expect(reducedFormula(s)).toBe("C");
+  it("diamond Si", () => {
+    expect(composition(siDiamond)).toEqual({ Si: 8 });
+    expect(hillFormula(siDiamond)).toBe("Si8");
+    expect(reducedFormula(siDiamond)).toBe("Si");
   });
 
-  it("layered LiCoO2", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(composition(s)).toEqual({
-      Li: 1,
-      Co: 1,
-      O: 2,
-    });
-
-    expect(hillFormula(s)).toBe("CoLiO2");
-    expect(reducedFormula(s)).toBe("CoLiO2");
+  it("perovskite SrTiO3", () => {
+    expect(composition(srTiO3)).toEqual({ Sr: 1, Ti: 1, O: 3 });
+    expect(hillFormula(srTiO3)).toBe("O3SrTi");
+    expect(reducedFormula(srTiO3)).toBe("O3SrTi");
   });
 
-  it("mc3d_10007", () => {
-    const s = fromPOSCAR(mc3d_10007);
-
-    expect(composition(s)).toEqual({
-      Sn: 16,
-      Rh: 4,
-    });
-
-    expect(hillFormula(s)).toBe("Rh4Sn16");
-    expect(reducedFormula(s)).toBe("RhSn4");
+  it("corundum Al2O3", () => {
+    expect(composition(al2O3Corundum)).toEqual({ Al: 4, O: 6 });
+    expect(hillFormula(al2O3Corundum)).toBe("Al4O6");
+    expect(reducedFormula(al2O3Corundum)).toBe("Al2O3");
   });
 
-  it("mc3d_1011", () => {
-    const s = fromPOSCAR(mc3d_1011);
-
-    expect(composition(s)).toEqual({
-      Li: 6,
-      Ca: 2,
-      Mn: 2,
-      N: 6,
-    });
-
-    expect(hillFormula(s)).toBe("Ca2Li6Mn2N6");
-    expect(reducedFormula(s)).toBe("CaLi3MnN3");
+  it("monoclinic ZrO2", () => {
+    expect(composition(zrO2Baddeleyite)).toEqual({ Zr: 4, O: 8 });
+    expect(hillFormula(zrO2Baddeleyite)).toBe("O8Zr4");
+    expect(reducedFormula(zrO2Baddeleyite)).toBe("O2Zr");
   });
 });
 
 describe("alphabeticalFormula", () => {
-  it("diamond", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
-
-    expect(alphabeticalFormula(s)).toBe("C4");
-    expect(reducedAlphabeticalFormula(s)).toBe("C");
+  it("diamond Si", () => {
+    expect(alphabeticalFormula(siDiamond)).toBe("Si8");
+    expect(reducedAlphabeticalFormula(siDiamond)).toBe("Si");
   });
 
-  it("layered LiCoO2", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(alphabeticalFormula(s)).toBe("CoLiO2");
-    expect(reducedAlphabeticalFormula(s)).toBe("CoLiO2");
+  it("perovskite SrTiO3", () => {
+    expect(alphabeticalFormula(srTiO3)).toBe("O3SrTi");
+    expect(reducedAlphabeticalFormula(srTiO3)).toBe("O3SrTi");
   });
 });
 
 describe("iupacFormula", () => {
-  it("layered LiCoO2 orders by increasing electronegativity", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(iupacFormula(s)).toBe("LiCoO2");
-    expect(reducedIUPACFormula(s)).toBe("LiCoO2");
+  it("SrTiO3 orders by increasing electronegativity", () => {
+    expect(iupacFormula(srTiO3)).toBe("SrTiO3");
+    expect(reducedIUPACFormula(srTiO3)).toBe("SrTiO3");
   });
 
-  it("mc3d_10007", () => {
-    const s = fromPOSCAR(mc3d_10007);
-
-    expect(iupacFormula(s)).toBe("Sn16Rh4");
-    expect(reducedIUPACFormula(s)).toBe("Sn4Rh");
+  it("rutile TiO2", () => {
+    expect(iupacFormula(tiO2Rutile)).toBe("Ti2O4");
+    expect(reducedIUPACFormula(tiO2Rutile)).toBe("TiO2");
   });
 
-  it("mc3d_1011", () => {
-    const s = fromPOSCAR(mc3d_1011);
-
-    expect(iupacFormula(s)).toBe("Li6Ca2Mn2N6");
-    expect(reducedIUPACFormula(s)).toBe("Li3CaMnN3");
+  it("monoclinic ZrO2", () => {
+    expect(iupacFormula(zrO2Baddeleyite)).toBe("Zr4O8");
+    expect(reducedIUPACFormula(zrO2Baddeleyite)).toBe("ZrO2");
   });
 });
 
 describe("anonymousFormula", () => {
-  it("diamond", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
-
-    expect(anonymousFormula(s)).toBe("A4");
-    expect(reducedAnonymousFormula(s)).toBe("A");
+  it("diamond Si", () => {
+    expect(anonymousFormula(siDiamond)).toBe("A8");
+    expect(reducedAnonymousFormula(siDiamond)).toBe("A");
   });
 
-  it("layered LiCoO2 labels by decreasing abundance", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(anonymousFormula(s)).toBe("A2BC");
-    expect(reducedAnonymousFormula(s)).toBe("A2BC");
+  it("SrTiO3 labels by decreasing abundance, ties alphabetically", () => {
+    expect(anonymousFormula(srTiO3)).toBe("A3BC");
+    expect(reducedAnonymousFormula(srTiO3)).toBe("A3BC");
   });
 
-  it("mc3d_10007", () => {
-    const s = fromPOSCAR(mc3d_10007);
-
-    expect(anonymousFormula(s)).toBe("A16B4");
-    expect(reducedAnonymousFormula(s)).toBe("A4B");
+  it("corundum Al2O3", () => {
+    expect(anonymousFormula(al2O3Corundum)).toBe("A6B4");
+    expect(reducedAnonymousFormula(al2O3Corundum)).toBe("A3B2");
   });
 
-  it("mc3d_1011 breaks ties alphabetically", () => {
-    const s = fromPOSCAR(mc3d_1011);
-
-    expect(anonymousFormula(s)).toBe("A6B6C2D2");
-    expect(reducedAnonymousFormula(s)).toBe("A3B3CD");
+  it("monoclinic ZrO2", () => {
+    expect(anonymousFormula(zrO2Baddeleyite)).toBe("A8B4");
+    expect(reducedAnonymousFormula(zrO2Baddeleyite)).toBe("A2B");
   });
 });
 
 describe("subscriptFormula", () => {
-  it("diamond", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
-
-    expect(subscriptFormula(s)).toBe("C₄");
-    expect(reducedSubscriptFormula(s)).toBe("C");
+  it("diamond Si", () => {
+    expect(subscriptFormula(siDiamond)).toBe("Si₈");
+    expect(reducedSubscriptFormula(siDiamond)).toBe("Si");
   });
 
-  it("layered LiCoO2", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(subscriptFormula(s)).toBe("CoLiO₂");
-    expect(reducedSubscriptFormula(s)).toBe("CoLiO₂");
+  it("perovskite SrTiO3", () => {
+    expect(subscriptFormula(srTiO3)).toBe("O₃SrTi");
+    expect(reducedSubscriptFormula(srTiO3)).toBe("O₃SrTi");
   });
 
-  it("mc3d_10007", () => {
-    const s = fromPOSCAR(mc3d_10007);
-
-    expect(subscriptFormula(s)).toBe("Rh₄Sn₁₆");
-    expect(reducedSubscriptFormula(s)).toBe("RhSn₄");
+  it("monoclinic ZrO2", () => {
+    expect(subscriptFormula(zrO2Baddeleyite)).toBe("O₈Zr₄");
+    expect(reducedSubscriptFormula(zrO2Baddeleyite)).toBe("O₂Zr");
   });
 });
 
@@ -248,14 +186,7 @@ describe("parseFormula", () => {
   });
 
   it("round-trips structure formulas", () => {
-    for (const poscar of [
-      simpleCubic,
-      diamondCPOSCAR,
-      layeredStructure,
-      mc3d_1011,
-    ]) {
-      const s = fromPOSCAR(poscar);
-
+    for (const s of Object.values(ALL_STRUCTURES)) {
       expect(parseFormula(hillFormula(s))).toEqual(composition(s));
     }
   });
@@ -271,9 +202,9 @@ describe("parseFormula", () => {
 
 describe("numAtoms", () => {
   it("counts sites", () => {
-    expect(numAtoms(fromPOSCAR(simpleCubic))).toBe(1);
-    expect(numAtoms(fromPOSCAR(diamondCPOSCAR))).toBe(4);
-    expect(numAtoms(fromPOSCAR(mc3d_10007))).toBe(20);
-    expect(numAtoms(fromPOSCAR(mc3d_1011))).toBe(16);
+    expect(numAtoms(poSC)).toBe(1);
+    expect(numAtoms(siDiamond)).toBe(8);
+    expect(numAtoms(al2O3Corundum)).toBe(10);
+    expect(numAtoms(zrO2Baddeleyite)).toBe(12);
   });
 });

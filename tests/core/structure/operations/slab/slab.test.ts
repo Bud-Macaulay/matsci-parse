@@ -26,20 +26,9 @@ import { cross } from "@/core/matrix/operations/vector/cross";
 import { getDistance } from "@/core/structure/operations/distance/getDistance";
 import type { Structure } from "@/core/structure/structure";
 
-function cubicSi(): Structure {
-  const a = 5.43;
-  return {
-    lattice: createLattice([a, 0, 0, 0, a, 0, 0, 0, a]),
-    sites: [
-      { species: { symbol: "Si" }, frac: new Float64Array([0, 0, 0]) },
-      { species: { symbol: "Si" }, frac: new Float64Array([0.5, 0.5, 0]) },
-      { species: { symbol: "Si" }, frac: new Float64Array([0.5, 0, 0.5]) },
-      { species: { symbol: "Si" }, frac: new Float64Array([0, 0.5, 0.5]) },
-    ],
-  };
-}
+import { siDiamond } from "../../../../fixtures/structures";
 
-function toCart(lattice: ReturnType<typeof createLattice>, frac: Float64Array): Float64Array {
+function toCart(lattice: ReturnType<typeof createLattice>, frac: ArrayLike<number>): Float64Array {
   const bT = transpose(lattice.basis);
   const vec = { rows: 3, cols: 1, data: new Float64Array([frac[0], frac[1], frac[2]]) };
   const r = mul(bT, vec);
@@ -71,7 +60,7 @@ function getNormal(h: number, k: number, l: number, lattice: ReturnType<typeof c
 
 describe("reorientToNormal", () => {
   it("aligns [0,0,1] normal (already along z)", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const r = reorientToNormal(s, new Float64Array([0, 0, 1]));
     const b = r.lattice.basis.data;
     expect(b[6]).toBeCloseTo(0, 10);
@@ -80,16 +69,16 @@ describe("reorientToNormal", () => {
   });
 
   it("aligns [1,0,0] normal: c-vector ends up along x", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const r = reorientToNormal(s, new Float64Array([1, 0, 0]));
     const b = r.lattice.basis.data;
-    expect(Math.abs(b[6])).toBeCloseTo(5.43, 8);
+    expect(Math.abs(b[6])).toBeCloseTo(5.431, 8);
     expect(b[7]).toBeCloseTo(0, 8);
     expect(b[8]).toBeCloseTo(0, 8);
   });
 
   it("aligns c with the normal and preserves pairwise distances (rigid rotation)", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const normals = [
       new Float64Array([1, 0, 0]),
       new Float64Array([0, 1, 0]),
@@ -107,7 +96,7 @@ describe("reorientToNormal", () => {
       const cos = (c[0] * n[0] + c[1] * n[1] + c[2] * n[2]) / cn / nn;
       expect(Math.abs(cos)).toBeCloseTo(1, 6);
       // same c length (rotation, not rescaling)
-      expect(cn).toBeCloseTo(5.43, 8);
+      expect(cn).toBeCloseTo(5.431, 8);
       // rigid: pairwise Cartesian distances unchanged
       for (let i = 0; i < s.sites.length; i++) {
         for (let j = i + 1; j < s.sites.length; j++) {
@@ -161,7 +150,7 @@ describe("reorientToNormal", () => {
 
 describe("addVacuum", () => {
   it("extends c-vector by vacuum thickness", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const origCLen = norm(new Float64Array([s.lattice.basis.data[6], s.lattice.basis.data[7], s.lattice.basis.data[8]]));
     const vac = addVacuum(s, 10.0);
     const newCLen = norm(new Float64Array([vac.lattice.basis.data[6], vac.lattice.basis.data[7], vac.lattice.basis.data[8]]));
@@ -169,7 +158,7 @@ describe("addVacuum", () => {
   });
 
   it("preserves Cartesian positions", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const vac = addVacuum(s, 15.0);
     for (let i = 0; i < s.sites.length; i++) {
       const cOrig = toCart(s.lattice, s.sites[i].frac);
@@ -181,7 +170,7 @@ describe("addVacuum", () => {
   });
 
   it("returns same structure for thickness <= 0", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     expect(addVacuum(s, 0)).toBe(s);
     expect(addVacuum(s, -5)).toBe(s);
   });
@@ -191,7 +180,7 @@ describe("addVacuum", () => {
 
 describe("calculateScaleFactor", () => {
   it("returns integer matrix with nonzero determinant", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const cases: [number, number, number][] = [
       [1, 0, 0], [0, 1, 0], [0, 0, 1],
       [1, 1, 0], [1, 0, 1], [0, 1, 1],
@@ -209,7 +198,7 @@ describe("calculateScaleFactor", () => {
   });
 
   it("in-plane rows are perpendicular to the surface normal", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const cases: [number, number, number][] = [
       [1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 2, 3], [2, 1, 0],
     ];
@@ -248,7 +237,7 @@ describe("latticePointsInSupercell", () => {
   });
 
   it("returns |det(U)| points for non-diagonal U", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const U = calculateScaleFactor([1, 1, 1], s.lattice);
     const absDet = Math.abs(Math.round(determinant(U)));
     expect(latticePointsInSupercell(U).length).toBe(absDet);
@@ -259,18 +248,18 @@ describe("latticePointsInSupercell", () => {
 
 describe("supercell (general)", () => {
   it("identity produces same structure", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     expect(supercell(s, identity(3)).sites.length).toBe(s.sites.length);
   });
 
   it("diag(2,1,1) doubles atoms along a", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const U = createMatrix(3, 3, [2, 0, 0, 0, 1, 0, 0, 0, 1]);
-    expect(supercell(s, U).sites.length).toBe(8);
+    expect(supercell(s, U).sites.length).toBe(16);
   });
 
   it("preserves inter-atomic distances", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const U = calculateScaleFactor([1, 1, 1], s.lattice);
     const sc = supercell(s, U);
     const origDists = micPairwiseDistances(s);
@@ -285,7 +274,7 @@ describe("supercell (general)", () => {
 
 describe("slabFromMillerIndex", () => {
   it("all fractional coords in [0,1)", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const cases: [number, number, number][] = [
       [1, 0, 0], [0, 1, 0], [0, 0, 1],
       [1, 1, 0], [1, 1, 1], [1, 2, 3],
@@ -303,21 +292,21 @@ describe("slabFromMillerIndex", () => {
   });
 
   it("(001) with vacuum has correct c-length", () => {
-    const s = cubicSi();
-    const a = 5.43;
+    const s = siDiamond;
+    const a = 5.431;
     const slab = slabFromMillerIndex(s, 0, 0, 1, { layers: 3, vacuum: 20 });
     const cLen = norm(new Float64Array([slab.lattice.basis.data[6], slab.lattice.basis.data[7], slab.lattice.basis.data[8]]));
     expect(cLen).toBeCloseTo(3 * a + 20, 8);
   });
 
   it("(111) has correct site count", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const slab = slabFromMillerIndex(s, 1, 1, 1, { layers: 4 });
     expect(slab.sites.length).toBe(s.sites.length * 4);
   });
 
   it("(111) preserves inter-atomic distances", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const origDists = micPairwiseDistances(s);
     const slabDists = micPairwiseDistances(slabFromMillerIndex(s, 1, 1, 1, { layers: 2 }));
     for (const d of origDists) {
@@ -326,7 +315,7 @@ describe("slabFromMillerIndex", () => {
   });
 
   it("(110) preserves inter-atomic distances", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const origDists = micPairwiseDistances(s);
     const slabDists = micPairwiseDistances(slabFromMillerIndex(s, 1, 1, 0, { layers: 2 }));
     for (const d of origDists) {
@@ -335,7 +324,7 @@ describe("slabFromMillerIndex", () => {
   });
 
   it("(100) preserves inter-atomic distances", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const origDists = micPairwiseDistances(s);
     const slabDists = micPairwiseDistances(slabFromMillerIndex(s, 1, 0, 0, { layers: 2 }));
     for (const d of origDists) {
@@ -344,7 +333,7 @@ describe("slabFromMillerIndex", () => {
   });
 
   it("(123) works for non-symmetric indices", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const slab = slabFromMillerIndex(s, 1, 2, 3, { layers: 2 });
     expect(slab.sites.length).toBeGreaterThan(0);
     for (const site of slab.sites) {
@@ -356,7 +345,7 @@ describe("slabFromMillerIndex", () => {
   });
 
   it("minimum interatomic distance never drops below physical threshold", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const cases: [number, number, number][] = [
       [1, 0, 0], [0, 1, 0], [0, 0, 1],
       [1, 1, 0], [1, 0, 1], [0, 1, 1],
@@ -370,7 +359,7 @@ describe("slabFromMillerIndex", () => {
   });
 
   it("bulk atoms retain their coordination within cutoff", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const origDists = micPairwiseDistances(s);
     const nnCutoff = origDists[0] * 1.2;
     const origCoord = micPairwiseDistances(s).filter((d) => d < nnCutoff).length / s.sites.length;
@@ -394,7 +383,7 @@ describe("slabFromMillerIndex", () => {
 
 describe("slabFromSites", () => {
   it("preserves inter-atomic distances", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const origDists = micPairwiseDistances(s);
     const slabDists = micPairwiseDistances(slabFromSites(s, 0, 1, 2, { layers: 2 }));
     for (const d of origDists) {
@@ -403,7 +392,7 @@ describe("slabFromSites", () => {
   });
 
   it("preserves species", () => {
-    const s = cubicSi();
+    const s = siDiamond;
     const slab = slabFromSites(s, 0, 1, 2, { layers: 2 });
     for (const site of slab.sites) {
       expect(site.species.symbol).toBe("Si");
@@ -441,7 +430,7 @@ describe("slabFromSites", () => {
   }
 
   it("terminates on the chosen (111)-type plane", () => {
-    expectSurfaceOnPlane(cubicSi(), 0, 1, 2);
+    expectSurfaceOnPlane(siDiamond, 0, 1, 2);
   });
 
   it("terminates on the chosen plane in a skewed cell", () => {
@@ -460,7 +449,7 @@ describe("slabFromSites", () => {
   });
 
   it("finds Miller indices of the plane through the sites", () => {
-    const hkl = millerIndexFromSites(cubicSi(), 0, 1, 2);
+    const hkl = millerIndexFromSites(siDiamond, 0, 1, 2);
     expect(hkl.map(Math.abs)).toEqual([1, 1, 1]);
   });
 

@@ -153,8 +153,8 @@ function realTranslations(
  * `out` (allocation-free).
  */
 function wrappedOffset(
-  fi: Vec3,
-  fj: Vec3,
+  fi: Readonly<Vec3>,
+  fj: Readonly<Vec3>,
   B: Float64Array,
   out: Float64Array,
 ): void {

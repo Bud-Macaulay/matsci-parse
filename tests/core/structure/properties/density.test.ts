@@ -1,54 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import { fromPOSCAR } from "@/core/io/poscar";
 import { density } from "@/core/structure/properties/density";
 
 import {
-  simpleCubic,
-  simpleHexagonal,
-  layeredStructure,
-  mc3d_10007,
-  mc3d_1011,
-  diamondCPOSCAR,
-} from "../teststrings/spglibPoscar";
+  poSC,
+  graphite,
+  siDiamond,
+  srTiO3,
+  zrO2Baddeleyite,
+  h2oBox,
+} from "../../../fixtures/structures";
 
+// density() is cell mass / volume in amu/Å^3.
 describe("density", () => {
-  it("computes density for simple cubic Na", () => {
-    const s = fromPOSCAR(simpleCubic);
-
-    // 22.98976928 / 1
-    expect(density(s)).toBeCloseTo(22.98976928, 6);
+  it("simple cubic Po", () => {
+    expect(density(poSC)).toBeCloseTo(209 / 3.359 ** 3, 10);
   });
 
-  it("computes density for simple hexagonal Na", () => {
-    const s = fromPOSCAR(simpleHexagonal);
-
-    // 22.98976928 / (1 * 1 * 4 * sin(120°))
-    expect(density(s)).toBeCloseTo(6.6365747412, 6);
+  it("diamond Si", () => {
+    expect(density(siDiamond)).toBeCloseTo((8 * 28.0855) / 5.431 ** 3, 10);
   });
 
-  it("computes density for diamond", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
-
-    // 1 * 12.0107 / 3.57^3
-    expect(density(s)).toBeCloseTo(1.055902116, 6);
+  it("hexagonal graphite", () => {
+    expect(density(graphite)).toBeCloseTo(1.3371953566, 8);
   });
 
-  it("computes density for layered LiCoO2", () => {
-    const s = fromPOSCAR(layeredStructure);
-
-    expect(density(s)).toBeCloseTo(3.1058679556, 6);
+  it("perovskite SrTiO3", () => {
+    expect(density(srTiO3)).toBeCloseTo(183.4852 / 3.905 ** 3, 8);
   });
 
-  it("computes density for mc3d_10007", () => {
-    const s = fromPOSCAR(mc3d_10007);
-
-    expect(density(s)).toBeCloseTo(5.1161825906, 6);
+  it("monoclinic ZrO2", () => {
+    expect(density(zrO2Baddeleyite)).toBeCloseTo(3.4986396833, 8);
   });
 
-  it("computes density for mc3d_1011", () => {
-    const s = fromPOSCAR(mc3d_1011);
-
-    expect(density(s)).toBeCloseTo(1.9184852034, 6);
+  it("molecule in vacuum", () => {
+    expect(density(h2oBox)).toBeCloseTo(18.01528 / 1000, 10);
   });
 });

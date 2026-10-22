@@ -1,41 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { fromPOSCAR, toPOSCAR } from "@/core/io/poscar";
-import { getSymmetry } from "@/core/structure/operations/symmetry/spglib";
-import {
-  mc3d_10007,
-  mc3d_1011,
-  diamondCPOSCAR,
-  layeredStructure,
-} from "../teststrings/spglibPoscar";
 
 import { supercell } from "@/core/structure/operations/supercell";
+import { createMatrix } from "@/core/matrix/matrix";
+import { volume } from "@/core/structure/properties/volume";
+import { density } from "@/core/structure/properties/density";
+
+import {
+  ALL_STRUCTURES,
+  siDiamond,
+  znOWurtzite,
+} from "../../../fixtures/structures";
 
 describe("supercell", () => {
   it("creates 2x2x2 expansion", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
+    const sc = supercell(siDiamond, [2, 2, 2]);
 
-    const sc = supercell(s, [2, 2, 2]);
-
-    expect(sc.sites.length).toBe(s.sites.length * 8);
-
-    expect(sc.lattice.basis.data[0]).toBeCloseTo(s.lattice.basis.data[0] * 2);
-
-    expect(sc.lattice.basis.data[4]).toBeCloseTo(s.lattice.basis.data[4] * 2);
-
-    expect(sc.lattice.basis.data[8]).toBeCloseTo(s.lattice.basis.data[8] * 2);
+    expect(sc.sites.length).toBe(64);
+    expect(sc.lattice.basis.data[0]).toBeCloseTo(2 * 5.431);
+    expect(sc.lattice.basis.data[4]).toBeCloseTo(2 * 5.431);
+    expect(sc.lattice.basis.data[8]).toBeCloseTo(2 * 5.431);
   });
 
   it("creates 4x4x4 expansion with scalar argument", () => {
-    const s = fromPOSCAR(diamondCPOSCAR);
+    const sc = supercell(siDiamond, 4);
 
-    const sc = supercell(s, 4);
+    expect(sc.sites.length).toBe(512);
+    expect(sc.lattice.basis.data[0]).toBeCloseTo(4 * 5.431);
+    expect(sc.lattice.basis.data[4]).toBeCloseTo(4 * 5.431);
+    expect(sc.lattice.basis.data[8]).toBeCloseTo(4 * 5.431);
+  });
 
-    expect(sc.sites.length).toBe(s.sites.length * 64);
+  it("builds the √3×√3 hexagonal supercell from a matrix", () => {
+    const sc = supercell(znOWurtzite, createMatrix(3, 3, [2, 1, 0, -1, 1, 0, 0, 0, 1]));
 
-    expect(sc.lattice.basis.data[0]).toBeCloseTo(s.lattice.basis.data[0] * 4);
+    expect(sc.sites.length).toBe(12);
+    expect(volume(sc)).toBeCloseTo(3 * volume(znOWurtzite), 8);
+  });
 
-    expect(sc.lattice.basis.data[4]).toBeCloseTo(s.lattice.basis.data[4] * 4);
+  it.each(Object.entries(ALL_STRUCTURES))("preserves density: %s", (_, s) => {
+    const sc = supercell(s, [2, 1, 3]);
 
-    expect(sc.lattice.basis.data[8]).toBeCloseTo(s.lattice.basis.data[8] * 4);
+    expect(sc.sites.length).toBe(6 * s.sites.length);
+    expect(density(sc)).toBeCloseTo(density(s), 10);
   });
 });

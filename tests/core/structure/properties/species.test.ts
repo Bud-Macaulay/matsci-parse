@@ -6,62 +6,31 @@ import {
   getSpeciesCounts,
 } from "@/core/structure/properties/species";
 
-describe("species properties", () => {
-  const structure = {
-    lattice: {},
-    sites: [
-      {
-        species: { symbol: "Si" },
-        frac: [0, 0, 0],
-      },
-      {
-        species: { symbol: "O" },
-        frac: [0.25, 0.25, 0.25],
-      },
-      {
-        species: { symbol: "O" },
-        frac: [0.5, 0.5, 0.5],
-      },
-    ],
-  };
+import { siDiamond, tiO2Rutile } from "../../../fixtures/structures";
 
+describe("species properties", () => {
   it("gets unique species", () => {
-    const species = getSpecies(structure);
+    const species = getSpecies(tiO2Rutile);
 
     expect(species).toHaveLength(2);
-    // Periodic-table order (O, Z=8 before Si, Z=14), not insertion order.
-    expect(species.map((s) => s.symbol)).toEqual(["O", "Si"]);
+    // Periodic-table order (O, Z=8 before Ti, Z=22), not insertion order.
+    expect(species.map((s) => s.symbol)).toEqual(["O", "Ti"]);
   });
 
   it("gets unique elements", () => {
-    const elements = getElements(structure);
-
-    expect(elements).toEqual(["O", "Si"]);
+    expect(getElements(tiO2Rutile)).toEqual(["O", "Ti"]);
   });
 
   it("counts species", () => {
-    const counts = getSpeciesCounts(structure);
+    const counts = getSpeciesCounts(tiO2Rutile);
 
-    expect(counts.get("Si")).toBe(1);
-    expect(counts.get("O")).toBe(2);
+    expect(counts.get("Ti")).toBe(2);
+    expect(counts.get("O")).toBe(4);
   });
 
   it("does not depend on species object identity", () => {
-    const duplicatedObjects = {
-      lattice: {},
-      sites: [
-        {
-          species: { symbol: "Si" },
-          frac: [0, 0, 0],
-        },
-        {
-          species: { symbol: "Si" },
-          frac: [0.5, 0.5, 0.5],
-        },
-      ],
-    };
-
-    const species = getSpecies(duplicatedObjects);
+    // Every fixture site carries its own species object.
+    const species = getSpecies(siDiamond);
 
     expect(species).toHaveLength(1);
     expect(species[0].symbol).toBe("Si");

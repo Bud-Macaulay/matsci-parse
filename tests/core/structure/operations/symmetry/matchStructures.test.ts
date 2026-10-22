@@ -4,128 +4,88 @@ import { matchStructures } from "@/core/structure/operations/symmetry/matchStruc
 import type { Structure } from "@/core/structure";
 
 import { getSymmetry } from "@/core/structure/operations/symmetry/spglib";
+import { supercell } from "@/core/structure/operations/supercell";
+import { perturb } from "@/core/structure/operations/perturb";
+import { sortSites } from "@/core/structure/operations/sortSites";
 
-function makeStructure(
-  positions: [number, number, number][],
-  symbol = "Si",
-): Structure {
+import { seededRandom } from "../../../../helpers/random";
+import {
+  csCl,
+  cuFCC,
+  cuFCCPrimitive,
+  naCl,
+  siDiamond,
+  triclinicP1,
+} from "../../../../fixtures/structures";
+
+/** Rigidly shift every site by `t` (fractional). */
+function translate(s: Structure, t: [number, number, number]): Structure {
   return {
-    lattice: createLattice([3.57, 0, 0, 0, 3.57, 0, 0, 0, 3.57]),
-    species: [{ symbol }],
-    sites: positions.map((frac) => ({
-      species: { symbol },
-      frac: new Float64Array(frac),
-    })),
-  };
-}
-
-function makeSupercell2x2x2(structure: Structure): Structure {
-  const sites = [];
-
-  for (const site of structure.sites) {
-    for (let i = 0; i < 2; i++) {
-      for (let j = 0; j < 2; j++) {
-        for (let k = 0; k < 2; k++) {
-          sites.push({
-            species: site.species,
-            frac: new Float64Array([
-              (site.frac[0] + i) / 2,
-              (site.frac[1] + j) / 2,
-              (site.frac[2] + k) / 2,
-            ]),
-          });
-        }
-      }
-    }
-  }
-
-  return {
-    ...structure,
-    lattice: createLattice([7.14, 0, 0, 0, 7.14, 0, 0, 0, 7.14]),
-    sites,
-  };
-}
-
-function addNoise(structure: Structure, amplitude: number): Structure {
-  return {
-    ...structure,
-    sites: structure.sites.map((site, i) => ({
+    ...s,
+    sites: s.sites.map((site) => ({
       ...site,
-      frac: new Float64Array([
-        site.frac[0] + (i % 3 === 0 ? amplitude : 0),
-        site.frac[1] + (i % 3 === 1 ? amplitude : 0),
-        site.frac[2] + (i % 3 === 2 ? amplitude : 0),
-      ]),
+      frac: [site.frac[0] + t[0], site.frac[1] + t[1], site.frac[2] + t[2]],
     })),
   };
 }
 
-const structureA = makeStructure([
-  [0.0, 0.0, 0.0],
-  [0.25, 0.25, 0.25],
-]);
-
-const structureB = makeStructure([
-  [1.0, 0.0, 0.0],
-  [1.25, 0.25, 0.25],
-]);
+function relabel(s: Structure, from: string, to: string): Structure {
+  return {
+    ...s,
+    sites: s.sites.map((site) =>
+      site.species.symbol === from ? { ...site, species: { symbol: to } } : site,
+    ),
+  };
+}
 
 describe("matchStructures", () => {
-  it("matches equivalent structures", async () => {
-    const result = await matchStructures(structureA, structureB);
+  it("matches a structure shifted by a lattice vector", async () => {
+    const result = await matchStructures(siDiamond, translate(siDiamond, [1, 0, 0]));
 
     expect(result.matches).toBe(true);
     expect(result.rms).toBeCloseTo(0);
     expect(result.maxDistance).toBeCloseTo(0);
   });
 
-  it("does not match different compositions", async () => {
-    const different = makeStructure(
-      [
-        [0.0, 0.0, 0.0],
-        [0.25, 0.25, 0.25],
-      ],
-      "Ge",
-    );
+  it("matches under an origin shift and site permutation", async () => {
+    const moved = { ...naCl, sites: sortSites(translate(naCl, [0.5, 0, 0]).sites) };
+    const result = await matchStructures(naCl, moved);
 
-    const result = await matchStructures(structureA, different);
+    expect(result.matches).toBe(true);
+    expect(result.rms).toBeCloseTo(0);
+  });
+
+  it("does not match different compositions", async () => {
+    const result = await matchStructures(siDiamond, relabel(siDiamond, "Si", "Ge"));
 
     expect(result.matches).toBe(false);
   });
 
-  it("does not match different structures", async () => {
-    const different = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.35, 0.35, 0.35],
-    ]);
-
-    const result = await matchStructures(structureA, different, 0.01);
+  // Known bug: b's lattice is never compared with a's (b's fracs are measured
+  // in a's lattice), so both 2-site primitives at (0,0,0)+(½,½,½) "match"
+  // although one cell is fcc (60°) and the other simple cubic.
+  it.fails("does not match polymorphs: rocksalt vs CsCl-type NaCl", async () => {
+    const b2 = relabel(csCl, "Cs", "Na");
+    const result = await matchStructures(naCl, b2);
 
     expect(result.matches).toBe(false);
     expect(result.rms).toBeNull();
     expect(result.maxDistance).toBeNull();
   });
 
+  // Perturbed P1 cells: rms is the displacement in angstrom.
   it("matches within positional tolerance", async () => {
-    const slightlyDisplaced = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.252, 0.25, 0.25],
-    ]);
-
-    const result = await matchStructures(structureA, slightlyDisplaced, 0.3);
+    const moved = perturb(triclinicP1, 0.005, { rng: seededRandom(1) });
+    const result = await matchStructures(triclinicP1, moved, 0.01);
 
     expect(result.matches).toBe(true);
-    expect(result.rms).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeGreaterThan(0);
+    expect(result.rms).toBeCloseTo(0.005, 8);
+    expect(result.maxDistance).toBeCloseTo(0.005, 8);
   });
 
   it("rejects structures outside positional tolerance", async () => {
-    const displaced = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.35, 0.25, 0.25],
-    ]);
-
-    const result = await matchStructures(structureA, displaced, 0.01);
+    const moved = perturb(triclinicP1, 0.02, { rng: seededRandom(1) });
+    const result = await matchStructures(triclinicP1, moved, 0.01);
 
     expect(result.matches).toBe(false);
     expect(result.rms).toBeNull();
@@ -134,8 +94,8 @@ describe("matchStructures", () => {
 
   it("standardizes equivalent structures consistently", async () => {
     const [a, b] = await Promise.all([
-      getSymmetry(structureA),
-      getSymmetry(structureB),
+      getSymmetry(siDiamond),
+      getSymmetry(translate(siDiamond, [0.1, 0.2, 0.3])),
     ]);
 
     expect(a.primitive.sites.length).toBe(b.primitive.sites.length);
@@ -144,88 +104,41 @@ describe("matchStructures", () => {
 });
 
 describe("supercell equivalence", () => {
-  it("matches a primitive cell to its 2x2x2 supercell", async () => {
-    const primitive = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.25, 0.25, 0.25],
-    ]);
-
-    const supercell = makeSupercell2x2x2(primitive);
-
-    expect(primitive.sites.length).toBe(2);
-    expect(supercell.sites.length).toBe(16);
-
-    const result = await matchStructures(primitive, supercell);
+  it("matches the fcc primitive cell to the conventional cell", async () => {
+    const result = await matchStructures(cuFCCPrimitive, cuFCC);
 
     expect(result.matches).toBe(true);
     expect(result.rms).toBeCloseTo(0);
-    expect(result.maxDistance).toBeCloseTo(0);
   });
 
-  it("matches a 2x2x2 supercell to its primitive cell", async () => {
-    const primitive = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.25, 0.25, 0.25],
-    ]);
+  it("matches a cell to its 2x2x2 supercell, in either order", async () => {
+    const sc = supercell(siDiamond, 2);
 
-    const supercell = makeSupercell2x2x2(primitive);
-
-    const result = await matchStructures(supercell, primitive);
-
-    expect(result.matches).toBe(true);
+    expect((await matchStructures(siDiamond, sc)).matches).toBe(true);
+    expect((await matchStructures(sc, siDiamond)).matches).toBe(true);
   });
 
   it("matches two equivalent 2x2x2 supercells", async () => {
-    const primitive = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.25, 0.25, 0.25],
-    ]);
-
-    const a = makeSupercell2x2x2(primitive);
-    const b = makeSupercell2x2x2(primitive);
-
-    const result = await matchStructures(a, b);
+    const result = await matchStructures(supercell(siDiamond, 2), supercell(siDiamond, 2));
 
     expect(result.matches).toBe(true);
     expect(result.rms).toBeCloseTo(0);
     expect(result.maxDistance).toBeCloseTo(0);
   });
 
+  // Noise is added to the primitive cell before expanding, so the supercell
+  // stays periodic with the same primitive cell.
   it("matches a slightly noisy supercell to the primitive cell", async () => {
-    const primitive = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.25, 0.25, 0.25],
-    ]);
-
-    const noisyPrimitive = makeStructure([
-      [0.0002, 0.0, 0.0],
-      [0.25, 0.2502, 0.25],
-    ]);
-
-    const noisy = makeSupercell2x2x2(noisyPrimitive);
-
-    const result = await matchStructures(primitive, noisy, 0.01);
+    const noisy = supercell(perturb(triclinicP1, 0.005, { rng: seededRandom(3) }), 2);
+    const result = await matchStructures(triclinicP1, noisy, 0.01);
 
     expect(result.matches).toBe(true);
-    expect(result.rms).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeLessThan(0.01);
+    expect(result.rms).toBeCloseTo(0.005, 8);
   });
 
-  it("does not a significantly noisy supercell to the primitive cell", async () => {
-    const primitive = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.25, 0.25, 0.25],
-    ]);
-
-    const noisyPrimitive = makeStructure([
-      [0.0012, 0.0, 0.0],
-      [0.25, 0.262, 0.25],
-    ]);
-
-    const noisy = makeSupercell2x2x2(noisyPrimitive);
-
-    const result = await matchStructures(primitive, noisy, 0.01);
+  it("does not match a significantly noisy supercell to the primitive cell", async () => {
+    const noisy = supercell(perturb(triclinicP1, 0.05, { rng: seededRandom(3) }), 2);
+    const result = await matchStructures(triclinicP1, noisy, 0.01);
 
     expect(result.matches).toBe(false);
     expect(result.rms).toBeNull();
@@ -233,24 +146,29 @@ describe("supercell equivalence", () => {
   });
 
   it("matches the noisy supercell with wider tolerance 0.1", async () => {
-    const primitive = makeStructure([
-      [0.0, 0.0, 0.0],
-      [0.25, 0.25, 0.25],
-    ]);
-
-    const noisyPrimitive = makeStructure([
-      [0.0012, 0.0, 0.0],
-      [0.25, 0.262, 0.25],
-    ]);
-
-    const noisy = makeSupercell2x2x2(noisyPrimitive);
-
-    const result = await matchStructures(primitive, noisy, 0.1);
+    const noisy = supercell(perturb(triclinicP1, 0.05, { rng: seededRandom(3) }), 2);
+    const result = await matchStructures(triclinicP1, noisy, 0.1);
 
     expect(result.matches).toBe(true);
-    expect(result.rms).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeGreaterThan(0);
-    expect(result.maxDistance).toBeGreaterThan(0.01);
+    expect(result.rms).toBeCloseTo(0.05, 8);
+  });
+
+  it("matches a noisy diamond supercell when the noise leaves it triclinic", async () => {
+    const prim = (await getSymmetry(siDiamond)).primitive;
+    // seed 3: perturbed cell is P-1 (2).
+    const noisy = supercell(perturb(prim, 0.001, { rng: seededRandom(3) }), 2);
+
+    expect((await matchStructures(prim, noisy, 0.01)).matches).toBe(true);
+  });
+
+  // Known bug: when the perturbed cell is detected as a centred subgroup
+  // (here C2/m, 12) the standardized primitive bases differ and no match is
+  // found at any tolerance, even without the supercell.
+  it.fails("matches noisy diamond detected as a centred subgroup", async () => {
+    const prim = (await getSymmetry(siDiamond)).primitive;
+    const noisy = perturb(prim, 0.001, { rng: seededRandom(1) });
+
+    expect((await matchStructures(prim, noisy, 0.3)).matches).toBe(true);
   });
 });
 

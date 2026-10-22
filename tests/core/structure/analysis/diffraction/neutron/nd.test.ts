@@ -1,25 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
 import { Structure } from "@/core/structure/structure";
+import { replaceSite } from "@/core/structure/operations/sites/replaceSite";
 import { calculateNdPattern, NdOptions } from "@/core/structure/analysis/diffraction/neutron/neutron";
+import { LiFePO4, Li10GeP2S12 } from "../xrd/teststrings/structures";
+import { csCl as CsCl, graphite as Graphite } from "../../../../../fixtures/structures";
 import {
-  CsCl,
-  LiFePO4,
-  Li10GeP2S12,
-  Graphite,
-} from "../xrd/teststrings/structures";
-
-interface FixtureHkl {
-  hkl: number[];
-  multiplicity: number;
-}
-
-interface FixturePattern {
-  two_theta: number[];
-  intensities: number[];
-  hkls: FixtureHkl[][];
-  d_spacings: number[];
-}
+  expectHklsClose,
+  expectPatternClose,
+  loadPatterns,
+} from "../../../../../helpers/diffraction";
 
 const structures: Record<string, Structure> = {
   CsCl,
@@ -28,42 +17,10 @@ const structures: Record<string, Structure> = {
   Graphite,
 };
 
-const ndFixtures = JSON.parse(
-  readFileSync(new URL("./fixtures/nd_fixtures.json", import.meta.url), "utf-8"),
-) as Record<string, Record<string, FixturePattern>>;
+const ndFixtures = loadPatterns(new URL("./fixtures/nd_fixtures.json", import.meta.url));
 
 function toStructure(name: string): Structure {
   return structures[name];
-}
-
-/** Relative tolerance: pymatgen parity up to libm last-ulp differences. */
-function expectPatternClose(
-  actual: { twoTheta: number[]; intensities: number[]; dSpacings: number[] },
-  expected: FixturePattern,
-) {
-  expect(actual.twoTheta.length).toBe(expected.two_theta.length);
-  expect(actual.intensities.length).toBe(expected.intensities.length);
-
-  for (let i = 0; i < expected.two_theta.length; i++) {
-    for (const [a, b] of [
-      [actual.twoTheta[i], expected.two_theta[i]],
-      [actual.intensities[i], expected.intensities[i]],
-      [actual.dSpacings[i], expected.d_spacings[i]],
-    ] as const) {
-      expect(Math.abs(a - b) / Math.max(1, Math.abs(b))).toBeLessThan(1e-9);
-    }
-  }
-}
-
-function expectHklsClose(actual: FixtureHkl[][], expected: FixtureHkl[][]) {
-  expect(actual.length).toBe(expected.length);
-
-  // Families within a peak are compared order-insensitively (see xrd.test.ts).
-  const key = (f: FixtureHkl) => `${f.multiplicity}:${f.hkl.join(",")}`;
-
-  for (let i = 0; i < expected.length; i++) {
-    expect(actual[i].map(key).sort()).toEqual(expected[i].map(key).sort());
-  }
 }
 
 function checkFull(name: string, patternKey: string, options?: NdOptions) {
@@ -119,7 +76,7 @@ describe("calculateNdPattern pymatgen parity", () => {
     expect(pattern.twoTheta[0]).toBeCloseTo(26.21057350859598, 9);
     expect(pattern.intensities[0]).toBeCloseTo(100, 9);
     expect(pattern.twoTheta[2]).toBeCloseTo(44.39599754, 6);
-    expect(pattern.intensities[2]).toBeCloseTo(42.62382267, 6);
+    expect(pattern.intensities[2]).toBeCloseTo(42.62382517, 6);
     expect(pattern.hkls[0][0].hkl.length).toBe(4);
 
     const dw = calculateNdPattern(structure, { debyeWallerFactors: { C: 1 } });
@@ -127,14 +84,12 @@ describe("calculateNdPattern pymatgen parity", () => {
     expect(dw.twoTheta[0]).toBeCloseTo(26.21057350859598, 9);
     expect(dw.intensities[0]).toBeCloseTo(100, 9);
     expect(dw.twoTheta[2]).toBeCloseTo(44.39599754, 6);
-    expect(dw.intensities[2]).toBeCloseTo(39.47151474, 6);
+    expect(dw.intensities[2]).toBeCloseTo(39.47151705, 6);
     expectPatternClose(dw, ndFixtures.Graphite.pattern_nd_dw);
   });
 
   it("rejects elements without scattering lengths", () => {
-    const structure: Structure = structuredClone(CsCl);
-
-    structure.sites[0].species.symbol = "Cm";
+    const structure = replaceSite(CsCl, 0, { ...CsCl.sites[0], species: { symbol: "Cm" } });
 
     expect(() => calculateNdPattern(structure)).toThrow(/no scattering coefficients for Cm/);
   });

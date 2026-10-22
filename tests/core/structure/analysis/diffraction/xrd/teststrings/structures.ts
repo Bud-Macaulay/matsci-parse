@@ -5,18 +5,11 @@ import { Structure } from "@/core/structure/structure";
 
 /** Reference structures for diffraction parity tests.
  *
- * CsCl, LiFePO4, Li10GeP2S12 and Graphite mirror pymatgen's TEST_STRUCTURES;
- * TetragonalSiRuPr and TungstenBCC mirror the bespoke cases in test_xrd.py.
+ * LiFePO4 and Li10GeP2S12 mirror pymatgen's TEST_STRUCTURES; TetragonalSiRuPr
+ * mirrors a bespoke case in test_xrd.py. CsCl, graphite and bcc W come from
+ * the shared catalog in tests/fixtures/structures.ts.
  * Multi-species sites are expanded (the Structure model is single-species-per-site).
  */
-
-export const CsCl: Structure = {
-  lattice: createLattice([4.209, 0.0, 0.0, 0.0, 4.209, 0.0, 0.0, 0.0, 4.209]),
-  sites: [
-    createSite(createSpecies("Cs"), [0.0, 0.0, 0.0]),
-    createSite(createSpecies("Cl"), [0.5, 0.5, 0.5]),
-  ],
-};
 
 export const LiFePO4: Structure = {
   lattice: createLattice([0.0, 0.0, -4.7448, -0.053122654367700306, -6.065537365280947, 0.00038324092231544317, 10.41036999994276, 0.0, 3.452209424235223e-05]),
@@ -51,7 +44,6 @@ export const LiFePO4: Structure = {
     createSite(createSpecies("O"), [0.70842, 0.7488900000000001, 0.9568399999999998]),
   ],
 };
-
 
 // The XRD Module also supports partial occupancies!
 export const Li10GeP2S12: Structure = {
@@ -122,16 +114,6 @@ export const Li10GeP2S12: Structure = {
   ],
 };
 
-export const Graphite: Structure = {
-  lattice: createLattice([-1.235, -2.139082747347564, 0, -1.235, 2.139082747347564, 0, 0, 0, -6.8]),
-  sites: [
-    createSite(createSpecies("C"), [0.6667, 0.33330, 0.75]),
-    createSite(createSpecies("C"), [0.33329999999999993, 0.66670, 0.25]),
-    createSite(createSpecies("C"), [0.0, 0.0, 0.75]),
-    createSite(createSpecies("C"), [0.0, 0.0, 0.25]),
-  ],
-};
-
 export const TetragonalSiRuPr: Structure = {
   lattice: createLattice([4.192, 0, 0, 0, 4.192, 0, 0.0, 0.0, 6.88]),
   sites: [
@@ -144,10 +126,3 @@ export const TetragonalSiRuPr: Structure = {
   ],
 };
 
-export const TungstenBCC: Structure = {
-  lattice: createLattice([3.1653, 0.0, 0.0, 0.0, 3.1653, 0.0, 0.0, 0.0, 3.1653]),
-  sites: [
-    createSite(createSpecies("W"), [0.0, 0.0, 0.0]),
-    createSite(createSpecies("W"), [0.5, 0.5, 0.5]),
-  ],
-};

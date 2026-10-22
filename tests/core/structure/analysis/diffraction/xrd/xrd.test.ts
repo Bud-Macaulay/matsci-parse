@@ -1,48 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
 import { Structure } from "@/core/structure/structure";
+import { replaceSite } from "@/core/structure/operations/sites/replaceSite";
 import { calculateXrdPattern, XrdOptions } from "@/core/structure/analysis/diffraction/xrd/xrd";
+import { LiFePO4, Li10GeP2S12, TetragonalSiRuPr } from "./teststrings/structures";
 import {
-  CsCl,
-  LiFePO4,
-  Li10GeP2S12,
-  Graphite,
-  TetragonalSiRuPr,
-  TungstenBCC,
-} from "./teststrings/structures";
+  csCl as CsCl,
+  graphite as Graphite,
+  wBCC as TungstenBCC,
+} from "../../../../../fixtures/structures";
+import {
+  expectHklsClose,
+  expectPatternClose,
+  loadPatterns,
+} from "../../../../../helpers/diffraction";
 
-interface FixtureHkl {
-  hkl: number[];
-  multiplicity: number;
-}
+const fixtures = loadPatterns(new URL("./fixtures/xrd_fixtures.json", import.meta.url));
 
-interface FixturePattern {
-  two_theta: number[];
-  intensities: number[];
-  hkls: FixtureHkl[][];
-  d_spacings: number[];
-}
-
-interface Fixtures {
-  CsCl: { pattern_cu_0_90: FixturePattern; pattern_mo_0_90: FixturePattern };
-  LiFePO4: { pattern_cu_0_90: FixturePattern; pattern_tol5: FixturePattern };
-  Li10GeP2S12: { pattern_cu_0_90: FixturePattern; pattern_tol5: FixturePattern };
-  Graphite: { pattern_cu_0_90: FixturePattern };
-  TetragonalSiRuPr: {
-    pattern_cu_0_90: FixturePattern;
-    pattern_cu_0_60: FixturePattern;
-  };
-  TungstenBCC: {
-    pattern_unscaled: FixturePattern;
-    pattern_unscaled_dw: FixturePattern;
-  };
-}
-
-const fixtures = JSON.parse(
-  readFileSync(new URL("./fixtures/xrd_fixtures.json", import.meta.url), "utf-8"),
-) as Fixtures;
-
-const structures: Record<keyof Fixtures, Structure> = {
+const structures: Record<string, Structure> = {
   CsCl,
   LiFePO4,
   Li10GeP2S12,
@@ -51,42 +25,8 @@ const structures: Record<keyof Fixtures, Structure> = {
   TungstenBCC,
 };
 
-/** Relative tolerance: pymatgen parity up to libm last-ulp differences. */
-function expectPatternClose(
-  actual: { twoTheta: number[]; intensities: number[]; dSpacings: number[] },
-  expected: FixturePattern,
-) {
-  expect(actual.twoTheta.length).toBe(expected.two_theta.length);
-  expect(actual.intensities.length).toBe(expected.intensities.length);
-
-  for (let i = 0; i < expected.two_theta.length; i++) {
-    for (const [a, b] of [
-      [actual.twoTheta[i], expected.two_theta[i]],
-      [actual.intensities[i], expected.intensities[i]],
-      [actual.dSpacings[i], expected.d_spacings[i]],
-    ] as const) {
-      expect(Math.abs(a - b) / Math.max(1, Math.abs(b))).toBeLessThan(1e-9);
-    }
-  }
-}
-
-function expectHklsClose(actual: FixtureHkl[][], expected: FixtureHkl[][]) {
-  expect(actual.length).toBe(expected.length);
-
-  // Families within a peak are compared order-insensitively: families with
-  // analytically identical d-spacings (e.g. (5,0,6) vs (4,3,6) when
-  // 5^2 == 4^2 + 3^2) are ordered by last-ulp floating point noise, which
-  // varies with the reciprocal-lattice inverse implementation and BLAS build.
-  const key = (f: FixtureHkl) => `${f.multiplicity}:${f.hkl.join(",")}`;
-
-  for (let i = 0; i < expected.length; i++) {
-    expect(actual[i].map(key).sort()).toEqual(expected[i].map(key).sort());
-  }
-}
-
-function checkFull(name: keyof Fixtures, patternKey: string, options?: XrdOptions) {
-  const entry = fixtures[name] as unknown as Record<string, FixturePattern>;
-  const expected = entry[patternKey] as FixturePattern;
+function checkFull(name: string, patternKey: string, options?: XrdOptions) {
+  const expected = fixtures[name][patternKey];
   const actual = calculateXrdPattern(structures[name], options);
 
   expectPatternClose(actual, expected);
@@ -224,9 +164,7 @@ describe("calculateXrdPattern input validation", () => {
   });
 
   it("rejects elements without scattering coefficients", () => {
-    const structure: Structure = structuredClone(CsCl);
-
-    structure.sites[0].species.symbol = "Xx";
+    const structure = replaceSite(CsCl, 0, { ...CsCl.sites[0], species: { symbol: "Xx" } });
 
     expect(() => calculateXrdPattern(structure)).toThrow(/no scattering coefficients for Xx/);
   });
