@@ -118,6 +118,54 @@ describe("connectBands", () => {
     expect(modeEigenvector(connected, 3, 0)[0]).toEqual([[1, 0], [0, 0], [0, 0]]);
   });
 
+  it("matches modes optimally where greedy matching fails", () => {
+    // q0: modes along x, y, z. q1: an orthonormal set whose squared overlaps
+    // with them (rows: x, y, z; columns: c0, c1, c2) are
+    //   x [0.36 0.352 0.288]
+    //   y [0.64 0.198 0.162]
+    //   z [0    0.45  0.55 ]
+    // Greedy in mode order gives x its best match c0, leaving y on c1
+    // (total 1.108); the optimum is x→c1, y→c0, z→c2 (total 1.542).
+    const [c, s] = [Math.sqrt(0.55), Math.sqrt(0.45)];
+    const vec = ([x, y, z]: number[]) => [x, 0, y, 0, z, 0];
+    const bands = createPhononBands({
+      structure: cubic,
+      qpoints: segment([0, 0, 0], [0.5, 0, 0], 2).flat(),
+      frequencies: [1, 2, 3, 1.1, 2.1, 3.1],
+      eigenvectors: [
+        [1, 0, 0], [0, 1, 0], [0, 0, 1],
+        [0.6, 0.8, 0], [-0.8 * c, 0.6 * c, s], [-0.8 * s, 0.6 * s, -c],
+      ].flatMap(vec),
+    });
+    expect(Array.from(connectBands(bands).frequencies)).toEqual([1, 2, 3, 2.1, 1.1, 3.1]);
+  });
+
+  it("keeps the frequency order when overlaps tie", () => {
+    const bands = onPath(cubic, segment([0, 0, 0], [0.5, 0, 0], 3));
+    const freqs = Float64Array.from({ length: 9 }, (_, i) => i);
+    const connected = connectBands({ ...bands, frequencies: freqs });
+    expect(connected.frequencies).toEqual(freqs);
+  });
+
+  it("does not mutate its input", () => {
+    const ex = [1, 0, 0, 0, 0, 0];
+    const ey = [0, 0, 1, 0, 0, 0];
+    const ez = [0, 0, 0, 0, 1, 0];
+    const bands = createPhononBands({
+      structure: cubic,
+      qpoints: [0, 0, 0, 0.1, 0, 0],
+      frequencies: [1, 2, 3, 1, 2, 3],
+      eigenvectors: [ex, ey, ez, ey, ex, ez].flat(),
+    });
+    const freqs = bands.frequencies.slice();
+    const vecs = bands.eigenvectors.slice();
+    const connected = connectBands(bands);
+    expect(connected).not.toBe(bands);
+    expect(Array.from(connected.frequencies)).toEqual([1, 2, 3, 2, 1, 3]);
+    expect(bands.frequencies).toEqual(freqs);
+    expect(bands.eigenvectors).toEqual(vecs);
+  });
+
   it("keeps the order across path breaks", () => {
     const ex = [1, 0, 0, 0, 0, 0];
     const ey = [0, 0, 1, 0, 0, 0];
@@ -130,6 +178,56 @@ describe("connectBands", () => {
       labels: [{ index: 0, label: "A" }, { index: 1, label: "B" }],
     });
     expect(connectBands(bands).frequencies).toEqual(bands.frequencies);
+  });
+
+  describe("with masses", () => {
+    // Two atoms (masses 1 and 16) moving along x. The two x-modes are true
+    // eigenvectors rotated by 10° at q0 and 70° at q1 in (x1, x2), so their
+    // squared overlaps are [[0.25, 0.75], [0.75, 0.25]]: the branches swap.
+    // The file stores displacements u_s ∝ e_s / √M_s, whose plain overlaps
+    // favour keeping the order instead. The other four modes are pure y/z.
+    const masses = [1, 16];
+    const diatomic = {
+      lattice: createLattice([2, 2, 2]),
+      sites: [
+        { species: { symbol: "H" }, frac: [0, 0, 0] },
+        { species: { symbol: "O" }, frac: [0.5, 0.5, 0.5] },
+      ],
+    };
+    /** Normalized displacement pattern of a true eigenvector, [site][xyz][re, im]. */
+    const displacement = (e: number[]) => {
+      const u = e.map((x, k) => x / Math.sqrt(masses[Math.floor(k / 3)]));
+      const norm = Math.hypot(...u);
+      return u.flatMap((x) => [x / norm, 0]);
+    };
+    const xModes = (deg: number) => {
+      const t = (deg * Math.PI) / 180;
+      return [
+        [Math.cos(t), 0, 0, Math.sin(t), 0, 0],
+        [-Math.sin(t), 0, 0, Math.cos(t), 0, 0],
+      ];
+    };
+    const yzModes = [1, 4, 2, 5].map((k) => [0, 1, 2, 3, 4, 5].map((j) => (j === k ? 1 : 0)));
+    const bands = createPhononBands({
+      structure: diatomic,
+      qpoints: segment([0, 0, 0], [0.5, 0, 0], 2).flat(),
+      frequencies: [1, 2, 3, 4, 5, 6, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1],
+      eigenvectors: [...xModes(10), ...yzModes, ...xModes(70), ...yzModes].flatMap(displacement),
+    });
+
+    it("matches displacement patterns by their mass-weighted eigenvectors", () => {
+      const connected = connectBands(bands, { masses });
+      expect(Array.from(bandFrequencies(connected, 0))).toEqual([1, 2.1]);
+      expect(Array.from(bandFrequencies(connected, 1))).toEqual([2, 1.1]);
+    });
+
+    it("is misled by the unweighted displacements", () => {
+      expect(connectBands(bands).frequencies).toEqual(bands.frequencies);
+    });
+
+    it("rejects a mass list of the wrong length", () => {
+      expect(() => connectBands(bands, { masses: [1] })).toThrow(/Expected 2 masses/);
+    });
   });
 });
 

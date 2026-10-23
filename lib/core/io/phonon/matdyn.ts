@@ -1,5 +1,5 @@
 import type { Structure } from "../../structure/structure";
-import { createPhononBands, type PhononBands, type QPointLabel } from "../../phonon/phonon";
+import { createPhononBands, siteMasses, type PhononBands, type QPointLabel } from "../../phonon/phonon";
 import { connectBands } from "../../phonon/operations/connectBands";
 import { labelCorners } from "../../phonon/operations/labels";
 import { fromPW, alatFromPW } from "../pw";
@@ -190,7 +190,8 @@ export function alatFromPWOutput(text: string, structure?: Structure): number {
  *
  * Without explicit `labels`, the corners of the path get generic "Q_n"
  * labels; use {@link labelHighSymmetryPoints} to name them. Bands are
- * connected through crossings unless `connect` is false.
+ * connected through crossings unless `connect` is false, using
+ * periodic-table masses (pw.x inputs' ATOMIC_SPECIES masses are not read).
  */
 export function fromQEPhonon(params: {
   pwInput: string;
@@ -207,5 +208,6 @@ export function fromQEPhonon(params: {
 
   let bands = fromMatdynModes(matdynModes, structure, { alat, labels });
   if (!labels) bands = labelCorners(bands);
-  return connect ? connectBands(bands) : bands;
+  // matdyn.modes holds displacement patterns: mass-weight them for overlaps
+  return connect ? connectBands(bands, { masses: siteMasses(structure) }) : bands;
 }

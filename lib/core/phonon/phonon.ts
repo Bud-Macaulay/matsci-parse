@@ -15,6 +15,8 @@
  */
 
 import type { Structure } from "../structure/structure";
+import type { Site } from "../site/site";
+import { getElement } from "../data/periodictable/atomicData";
 
 /** A named q-point on the path, e.g. `{ index: 0, label: "Γ" }`. */
 export interface QPointLabel {
@@ -137,4 +139,21 @@ export function modeEigenvector(
     ]);
   }
   return out;
+}
+
+/**
+ * Atomic mass (amu) of a site: `site.properties.mass` (e.g. as read from
+ * phonopy), else `species.properties.mass`, else the periodic table value.
+ */
+export function siteMass(site: Site): number {
+  const mass = site.properties?.mass ?? site.species.properties?.mass ?? getElement(site.species.symbol)?.mass;
+  if (typeof mass !== "number") {
+    throw new Error(`No mass for species '${site.species.symbol}': set site.properties.mass`);
+  }
+  return mass;
+}
+
+/** Atomic masses (amu) of every site of a structure; see {@link siteMass}. */
+export function siteMasses(structure: Structure): Float64Array {
+  return Float64Array.from(structure.sites, siteMass);
 }
