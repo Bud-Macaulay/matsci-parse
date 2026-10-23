@@ -1,5 +1,7 @@
 import type { PhononBands, QPointLabel } from "../phonon";
 import { reciprocalLatticeCrystallographic } from "../../lattice/reciprocalLatticeCrystallographic";
+import { createMatrix } from "../../matrix/matrix";
+import { mul } from "../../matrix/operations/mul";
 
 /**
  * Collapse path discontinuities in a label list: two consecutive q-points
@@ -38,16 +40,8 @@ export function pathBreaks(bands: PhononBands): number[] {
 
 /** Cartesian q-points (Å⁻¹, crystallographic: no 2π), [nqpts × 3]. */
 export function cartesianQPoints(bands: PhononBands): Float64Array {
-  const b = reciprocalLatticeCrystallographic(bands.structure.lattice).basis.data;
-  const { qpoints, nqpts } = bands;
-  const out = new Float64Array(nqpts * 3);
-  for (let q = 0; q < nqpts; q++) {
-    const [x, y, z] = [qpoints[3 * q], qpoints[3 * q + 1], qpoints[3 * q + 2]];
-    for (let j = 0; j < 3; j++) {
-      out[3 * q + j] = x * b[j] + y * b[3 + j] + z * b[6 + j];
-    }
-  }
-  return out;
+  const b = reciprocalLatticeCrystallographic(bands.structure.lattice).basis;
+  return mul(createMatrix(bands.nqpts, 3, bands.qpoints), b).data;
 }
 
 /**

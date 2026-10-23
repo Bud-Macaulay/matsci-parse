@@ -4,6 +4,11 @@ import { connectBands } from "../../phonon/operations/connectBands";
 import { labelCorners } from "../../phonon/operations/labels";
 import { fromPW, alatFromPW } from "../pw";
 import { LengthUnitSystem } from "../../units/length";
+import { LineReader } from "../helpers";
+import { createMatrix } from "../../matrix/matrix";
+import { mul } from "../../matrix/operations/mul";
+import { scale } from "../../matrix/operations/scale";
+import { transpose } from "../../matrix/operations/transpose";
 
 /*
  * Readers for Quantum ESPRESSO phonon dispersions: the `flvec` file written
@@ -28,68 +33,100 @@ export interface MatdynModes {
 const Q_LINE = /^\s*q\s*=\s*(\S+)\s+(\S+)\s+(\S+)/;
 const FREQ_LINE = /^\s*(?:freq|omega)\s*\(\s*(\d+)\s*\)\s*=.*?=\s*(\S+)\s*\[cm-1\]/;
 
-/** Parse a matdyn.x modes file (`flvec`, e.g. matdyn.modes). */
-export function parseMatdynModes(text: string): MatdynModes {
-  const lines = text.split("\n");
-  const qStarts: number[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (Q_LINE.test(lines[i])) qStarts.push(i);
-  }
-  if (qStarts.length === 0) {
-    throw new Error("No 'q =' lines found: not a matdyn.x modes file?");
-  }
+/** A real number, fixed-point or with an E or Fortran D exponent. */
+const NUM = String.raw`([+-]?(?:\d+\.?\d*|\.\d+)(?:[eEdD][+-]?\d+)?)`;
+/** One complex component, re im, optionally in its own parentheses. */
+const PAIR = String.raw`\(?\s*${NUM}\s+${NUM}\s*\)?`;
+/** An eigenvector row: the x, y, z components of one site, `( re im re im re im )`. */
+const EIGENVECTOR_ROW = new RegExp(String.raw`^\s*${PAIR}\s+${PAIR}\s+${PAIR}\s*$`);
 
-  // Size the arrays from the first block: modes are numbered 1..nmodes.
+/**
+ * Parse a matdyn.x modes file (`flvec`, e.g. matdyn.modes).
+ *
+ * Reads line by line with a {@link LineReader} rather than splitting the
+ * text, so a large file is never duplicated as an array of lines.
+ */
+export function parseMatdynModes(text: string): MatdynModes {
+  // First pass: count q-points, and size the modes from the first block
+  // (modes are numbered 1..nmodes).
+  let nqpts = 0;
   let nmodes = 0;
-  const firstEnd = qStarts[1] ?? lines.length;
-  for (let i = qStarts[0]; i < firstEnd; i++) {
-    const m = FREQ_LINE.exec(lines[i]);
-    if (m) nmodes = Math.max(nmodes, +m[1]);
+  const scan = new LineReader(text);
+  let line: string | null;
+  while ((line = scan.next()) !== null) {
+    if (Q_LINE.test(line)) {
+      if (++nqpts > 1) break;
+    } else if (nqpts === 1) {
+      const m = FREQ_LINE.exec(line);
+      if (m) nmodes = Math.max(nmodes, +m[1]);
+    }
+  }
+  while ((line = scan.next()) !== null) {
+    if (Q_LINE.test(line)) nqpts++;
+  }
+  if (nqpts === 0) {
+    throw new Error("No 'q =' lines found: not a matdyn.x modes file?");
   }
   if (nmodes === 0 || nmodes % 3 !== 0) {
     throw new Error(`Invalid number of modes (${nmodes}) in matdyn.x modes file`);
   }
   const nsites = nmodes / 3;
-  const nqpts = qStarts.length;
 
   const qpoints = new Float64Array(nqpts * 3);
   const frequencies = new Float64Array(nqpts * nmodes);
   const eigenvectors = new Float64Array(nqpts * nmodes * nmodes * 2);
 
-  for (let q = 0; q < nqpts; q++) {
-    let i = qStarts[q];
-    const qm = Q_LINE.exec(lines[i])!;
-    for (let j = 0; j < 3; j++) qpoints[3 * q + j] = parseNumber(qm[j + 1], i);
+  const r = new LineReader(text);
+  let q = -1;
+  let mode = nmodes;
+  while ((line = r.next()) !== null) {
+    const qm = Q_LINE.exec(line);
+    if (qm) {
+      checkModeCount(q, mode, nmodes);
+      q++;
+      mode = 0;
+      for (let j = 0; j < 3; j++) qpoints[3 * q + j] = parseNumber(qm[j + 1], r.count);
+      continue;
+    }
+    if (mode === nmodes) continue;
+    const fm = FREQ_LINE.exec(line);
+    if (!fm) continue;
 
-    const end = qStarts[q + 1] ?? lines.length;
-    let mode = 0;
-    for (i++; i < end && mode < nmodes; i++) {
-      const fm = FREQ_LINE.exec(lines[i]);
-      if (!fm) continue;
-      frequencies[q * nmodes + mode] = parseNumber(fm[2], i);
-      let o = (q * nmodes + mode) * nmodes * 2;
-      for (let s = 0; s < nsites; s++) {
-        const line = lines[++i];
-        const values = line?.replace(/[()]/g, " ").trim().split(/\s+/) ?? [];
-        if (values.length !== 6) {
-          throw new Error(`Line ${i + 1}: expected 6 numbers in eigenvector row, got '${line}'`);
-        }
-        for (const v of values) eigenvectors[o++] = parseNumber(v, i);
+    frequencies[q * nmodes + mode] = parseNumber(fm[2], r.count);
+    let o = (q * nmodes + mode) * nmodes * 2;
+    for (let s = 0; s < nsites; s++) {
+      const row = r.next();
+      const match = row === null ? null : EIGENVECTOR_ROW.exec(row);
+      if (!match) {
+        throw new Error(`Line ${r.count}: expected 6 numbers in eigenvector row, got '${row}'`);
       }
-      mode++;
+      for (let j = 0; j < 6; j++) eigenvectors[o++] = parseNumber(match[j + 1], r.count);
     }
-    if (mode !== nmodes) {
-      throw new Error(`q-point ${q + 1}: expected ${nmodes} modes, found ${mode}`);
-    }
+    mode++;
   }
+  checkModeCount(q, mode, nmodes);
 
   return { nqpts, nmodes, qpoints, frequencies, eigenvectors };
 }
 
+function checkModeCount(q: number, mode: number, nmodes: number): void {
+  if (q >= 0 && mode !== nmodes) {
+    throw new Error(`q-point ${q + 1}: expected ${nmodes} modes, found ${mode}`);
+  }
+}
+
+/**
+ * Parse a number, accepting Fortran D exponents (1.0D-03). matdyn.x writes
+ * fixed-point numbers, so the D replacement is only a fallback for when
+ * plain parsing fails.
+ *
+ * @param line - 1-based line number, for the error message.
+ */
 function parseNumber(s: string, line: number): number {
-  const x = Number(s.replace(/[dD]/, "e"));
-  if (!Number.isFinite(x)) {
-    throw new Error(`Line ${line + 1}: cannot parse number '${s}'`);
+  let x = Number(s);
+  if (Number.isNaN(x)) x = Number(s.replace(/[dD]/, "e"));
+  if (!Number.isFinite(x) || s.trim() === "") {
+    throw new Error(`Line ${line}: cannot parse number '${s}'`);
   }
   return x;
 }
@@ -116,16 +153,11 @@ export function fromMatdynModes(
   }
 
   // Cartesian (2π/alat) → fractional: q_frac_j = q_cart · a_j / (2π), and
-  // the 2π cancels against the file's units, leaving a division by alat.
+  // the 2π cancels against the file's units, leaving a division by alat:
+  // Q_frac = Q_cart · Aᵀ / alat.
   const alatAng = opts.alat * BOHR_TO_ANG;
-  const a = structure.lattice.basis.data;
-  const qpoints = new Float64Array(modes.qpoints.length);
-  for (let q = 0; q < modes.nqpts; q++) {
-    const [x, y, z] = modes.qpoints.subarray(3 * q, 3 * q + 3);
-    for (let j = 0; j < 3; j++) {
-      qpoints[3 * q + j] = (x * a[3 * j] + y * a[3 * j + 1] + z * a[3 * j + 2]) / alatAng;
-    }
-  }
+  const qCart = createMatrix(modes.nqpts, 3, modes.qpoints);
+  const qpoints = scale(mul(qCart, transpose(structure.lattice.basis)), 1 / alatAng).data;
 
   return createPhononBands({
     structure,

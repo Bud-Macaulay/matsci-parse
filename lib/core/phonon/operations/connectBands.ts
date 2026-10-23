@@ -19,6 +19,10 @@ const KEEP_BIAS = 1e-9;
  * greedy best-overlap matching, which can commit early to a pick that
  * forces a poor one later.
  *
+ * When every mode's best match is strict and no two share one, that
+ * matching is the unique optimum and the solver is skipped: along smooth
+ * stretches of the path it only runs at q-points with crossings.
+ *
  * Squared overlaps are the projection weights of one basis onto the other:
  * for orthonormal eigenvectors each row and column of the weight matrix sums
  * to 1, so the score is the total weight carried along the matched branches.
@@ -53,8 +57,11 @@ export function connectBands(
   const vecOut = new Float64Array(eigenvectors.length);
 
   // order[n] = raw mode index at the current q-point that band n maps to
-  let order = Array.from({ length: nmodes }, (_, i) => i);
-  // cost[i * nmodes + j] = -|⟨prev_i | cur_j⟩|², minimised by the assignment
+  const order = Int32Array.from({ length: nmodes }, (_, i) => i);
+  // best[i] = cheapest column of row i, when strict; taken[j] = column j is someone's best
+  const best = new Int32Array(nmodes);
+  const taken = new Uint8Array(nmodes);
+  // overlap costs (see overlapCosts), minimised by the assignment
   const cost = new Float64Array(nmodes * nmodes);
   // mass-scaled, normalized vectors of the previous and current q-point
   let prevVecs = new Float64Array(qSize);
@@ -63,26 +70,28 @@ export function connectBands(
   for (let q = 0; q < nqpts; q++) {
     normalizedModes(eigenvectors, q * qSize, nmodes, scale, curVecs);
     if (q > 0 && !breaks.has(q - 1)) {
+      overlapCosts(prevVecs, curVecs, nmodes, cost);
+      let obvious = true;
+      taken.fill(0);
       for (let i = 0; i < nmodes; i++) {
+        let bestCost = Infinity;
+        let tied = false;
         for (let j = 0; j < nmodes; j++) {
-          let re = 0;
-          let im = 0;
-          const a = i * vecSize;
-          const b = j * vecSize;
-          for (let c = 0; c < vecSize; c += 2) {
-            const ar = prevVecs[a + c];
-            const ai = prevVecs[a + c + 1];
-            const br = curVecs[b + c];
-            const bi = curVecs[b + c + 1];
-            re += ar * br + ai * bi;
-            im += ar * bi - ai * br;
+          const c = cost[i * nmodes + j];
+          if (c < bestCost) {
+            bestCost = c;
+            best[i] = j;
+            tied = false;
+          } else if (c === bestCost) {
+            tied = true;
           }
-          cost[i * nmodes + j] = -(re * re + im * im) - (i === j ? KEEP_BIAS : 0);
         }
+        if (tied || taken[best[i]]) obvious = false;
+        taken[best[i]] = 1;
       }
       // connection[i] = raw index at q matched to raw index i at q - 1
-      const connection = linearAssignment(cost, nmodes);
-      order = order.map((raw) => connection[raw]);
+      const connection = obvious ? best : linearAssignment(cost, nmodes);
+      for (let n = 0; n < nmodes; n++) order[n] = connection[order[n]];
     }
     [prevVecs, curVecs] = [curVecs, prevVecs];
 
@@ -95,6 +104,55 @@ export function connectBands(
   }
 
   return { ...bands, frequencies: freqOut, eigenvectors: vecOut };
+}
+
+/**
+ * cost[i * nmodes + j] = -|⟨prev_i | cur_j⟩|², less {@link KEEP_BIAS} on the
+ * diagonal. Two columns are computed per pass so each loaded component of
+ * prev_i is used twice; each sum is still accumulated in component order.
+ */
+function overlapCosts(prev: Float64Array, cur: Float64Array, nmodes: number, cost: Float64Array): void {
+  const vecSize = nmodes * 2;
+  for (let i = 0; i < nmodes; i++) {
+    const a = i * vecSize;
+    let j = 0;
+    for (; j + 1 < nmodes; j += 2) {
+      const b0 = j * vecSize;
+      const b1 = b0 + vecSize;
+      let re0 = 0;
+      let im0 = 0;
+      let re1 = 0;
+      let im1 = 0;
+      for (let c = 0; c < vecSize; c += 2) {
+        const ar = prev[a + c];
+        const ai = prev[a + c + 1];
+        const br0 = cur[b0 + c];
+        const bi0 = cur[b0 + c + 1];
+        const br1 = cur[b1 + c];
+        const bi1 = cur[b1 + c + 1];
+        re0 += ar * br0 + ai * bi0;
+        im0 += ar * bi0 - ai * br0;
+        re1 += ar * br1 + ai * bi1;
+        im1 += ar * bi1 - ai * br1;
+      }
+      cost[i * nmodes + j] = -(re0 * re0 + im0 * im0) - (i === j ? KEEP_BIAS : 0);
+      cost[i * nmodes + j + 1] = -(re1 * re1 + im1 * im1) - (i === j + 1 ? KEEP_BIAS : 0);
+    }
+    for (; j < nmodes; j++) {
+      const b = j * vecSize;
+      let re = 0;
+      let im = 0;
+      for (let c = 0; c < vecSize; c += 2) {
+        const ar = prev[a + c];
+        const ai = prev[a + c + 1];
+        const br = cur[b + c];
+        const bi = cur[b + c + 1];
+        re += ar * br + ai * bi;
+        im += ar * bi - ai * br;
+      }
+      cost[i * nmodes + j] = -(re * re + im * im) - (i === j ? KEEP_BIAS : 0);
+    }
+  }
 }
 
 /**

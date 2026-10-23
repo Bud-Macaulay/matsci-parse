@@ -33,6 +33,23 @@ describe("parseMatdynModes", () => {
     const truncated = aluminumModes.slice(0, aluminumModes.lastIndexOf("freq"));
     expect(() => parseMatdynModes(truncated)).toThrow(/expected 3 modes/);
   });
+
+  it("reads Fortran D exponents in eigenvector rows", () => {
+    const m = parseMatdynModes(aluminumModes.replace("0.730098   0.000000", "7.30098D-01 0.0d0"));
+    expect(m.eigenvectors[0]).toBe(0.730098);
+    expect(m.eigenvectors[1]).toBe(0);
+  });
+
+  it("rejects malformed eigenvector rows", () => {
+    const row = "(  0.730098   0.000000     0.680828   0.000000     0.058569   0.000000   )";
+    for (const bad of [
+      "(  0.730098   0.000000     0.680828   0.000000     0.058569   )", // 5 numbers
+      "(  0.730098   0.000000     0.680828   0.000000     0.058569   0.0   1.0 )", // 7 numbers
+      "(  ********   0.000000     0.680828   0.000000     0.058569   0.000000   )", // overflow
+    ]) {
+      expect(() => parseMatdynModes(aluminumModes.replace(row, bad))).toThrow(/Line 6: expected 6 numbers/);
+    }
+  });
 });
 
 describe("fromQEPhonon", () => {
@@ -139,5 +156,12 @@ describe("PhononVis JSON", () => {
 
   it("rejects documents missing required fields", () => {
     expect(() => fromPhononVis({ ...toPhononVis(bands), vectors: undefined } as never)).toThrow(/vectors/);
+    const vis = toPhononVis(bands);
+    const missingMode = vis.vectors.map((modes, q) => (q === 1 ? modes.slice(1) : modes));
+    expect(() => fromPhononVis({ ...vis, vectors: missingMode })).toThrow(/eigenvector components/);
+    const ragged = vis.vectors.map((modes, q) => (q === 1 ? [1, ...modes.slice(1)] : modes));
+    expect(() => fromPhononVis({ ...vis, vectors: ragged as never })).toThrow(/eigenvector components/);
+    const shortQ = vis.qpoints.map((p, q) => (q === 0 ? p.slice(1) : p));
+    expect(() => fromPhononVis({ ...vis, qpoints: shortQ })).toThrow(/multiple of 3/);
   });
 });

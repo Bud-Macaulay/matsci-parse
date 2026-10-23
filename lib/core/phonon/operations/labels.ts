@@ -3,10 +3,17 @@ import { cartesianQPoints } from "./path";
 import { getPath, type GetPathOptions } from "../../structure/operations/symmetry/brilliounzone/seekpath";
 import { getSymmetry } from "../../structure/operations/symmetry/spglib";
 import { reciprocalLatticeCrystallographic } from "../../lattice/reciprocalLatticeCrystallographic";
-import { fromRows, toRows } from "../../matrix/matrix";
+import { metricTensor } from "../../lattice/metricTensor";
+import { createMatrix, fromRows, type Matrix } from "../../matrix/matrix";
 import { mul } from "../../matrix/operations/mul";
+import { sub } from "../../matrix/operations/sub";
+import { normInf } from "../../matrix/operations/norms";
 import { transpose } from "../../matrix/operations/transpose";
 import { inverse3x3 } from "../../matrix/operations/inverse/inverse3x3";
+import { cross } from "../../matrix/operations/vector/cross";
+import { dot } from "../../matrix/operations/vector/dot";
+import { norm } from "../../matrix/operations/vector/norm";
+import { vecMul } from "../../matrix/operations/vector/vecMul";
 
 /** sin(angle) below which three consecutive q-points count as collinear. */
 const COLLINEAR_SIN = 0.05;
@@ -78,22 +85,23 @@ export async function labelHighSymmetryPoints(
   const labelled = new Map<number, string>();
   if (prim) {
     // fractional (input reciprocal) → fractional (primitive reciprocal):
-    // k_j = q · (b_i · p_j)
-    const b = toRows(reciprocalLatticeCrystallographic(bands.structure.lattice).basis);
-    const t = b.map((bi) => prim.map((pj) => bi[0] * pj[0] + bi[1] * pj[1] + bi[2] * pj[2]));
-    const rotations = fractionalRotations(bands, symmetry.calculationResults.operations);
+    // k = q · T with T = B · Pᵀ (rows: input reciprocal / primitive vectors)
+    const b = reciprocalLatticeCrystallographic(bands.structure.lattice).basis;
+    const t = mul(b, transpose(prim));
+    // each rotation W (acting on row vectors q · W) composed with T
+    const transforms = fractionalRotations(bands, symmetry.calculationResults.operations).map(
+      (w) => mul(w, t),
+    );
     const points = Object.entries(path.point_coords);
 
     for (let q = 0; q < bands.nqpts; q++) {
-      const qf = [0, 1, 2].map((j) => bands.qpoints[3 * q + j]);
+      const qf = bands.qpoints.subarray(3 * q, 3 * q + 3);
+      // the images of q are the same for every candidate point
+      const images = transforms.map((wt) => vecMul(qf, wt));
       const match = points.find(([, p]) =>
-        rotations.some((w) => {
-          const k = rowTimes(rowTimes(qf, w), t);
-          return (
-            equivalentModG(k, p, tolerance) ||
-            equivalentModG(k.map((x) => -x), p, tolerance)
-          );
-        }),
+        images.some(
+          (k) => equivalentModG(k, p, tolerance, 1) || equivalentModG(k, p, tolerance, -1),
+        ),
       );
       if (match) labelled.set(q, match[0] === "GAMMA" ? "Γ" : match[0]);
     }
@@ -110,30 +118,18 @@ export async function labelHighSymmetryPoints(
 function fractionalRotations(
   bands: PhononBands,
   operations: readonly { rotation: readonly number[] }[],
-): number[][][] {
-  const a = toRows(bands.structure.lattice.basis);
-  const g = a.map((ai) => a.map((aj) => ai[0] * aj[0] + ai[1] * aj[1] + ai[2] * aj[2]));
-  const preservesMetric = (w: number[][]) =>
-    [0, 1, 2].every((i) =>
-      [0, 1, 2].every((j) => {
-        let x = 0;
-        for (let k = 0; k < 3; k++) for (let l = 0; l < 3; l++) x += w[k][i] * g[k][l] * w[l][j];
-        return Math.abs(x - g[i][j]) < 1e-3 * (Math.abs(g[i][j]) + 1);
-      }),
-    );
+): Matrix[] {
+  const g = metricTensor(bands.structure.lattice);
+  const tol = 1e-3 * (normInf(g) + 1);
+  const preservesMetric = (w: Matrix) => normInf(sub(mul(transpose(w), mul(g, w)), g)) < tol;
 
-  const seen = new Map<string, number[][]>();
-  for (const { rotation: r } of operations) {
-    const rowMajor = [0, 1, 2].map((i) => [r[3 * i], r[3 * i + 1], r[3 * i + 2]]);
-    const colMajor = [0, 1, 2].map((i) => [r[i], r[3 + i], r[6 + i]]);
-    const w = preservesMetric(rowMajor) ? rowMajor : colMajor;
-    seen.set(w.flat().join(","), w);
+  const seen = new Map<string, Matrix>();
+  for (const { rotation } of operations) {
+    const rowMajor = createMatrix(3, 3, rotation);
+    const w = preservesMetric(rowMajor) ? rowMajor : transpose(rowMajor);
+    seen.set(w.data.join(","), w);
   }
   return [...seen.values()];
-}
-
-function rowTimes(v: number[], m: number[][]): number[] {
-  return [0, 1, 2].map((j) => v[0] * m[0][j] + v[1] * m[1][j] + v[2] * m[2][j]);
 }
 
 function sortedLabels(map: Map<number, string>): QPointLabel[] {
@@ -147,23 +143,20 @@ function samePoint(qpoints: Float64Array, a: number, b: number): boolean {
 }
 
 function collinear(cart: Float64Array, a: number, b: number, c: number): boolean {
-  const u = [0, 1, 2].map((j) => cart[3 * b + j] - cart[3 * a + j]);
-  const v = [0, 1, 2].map((j) => cart[3 * c + j] - cart[3 * b + j]);
-  const cross = Math.hypot(
-    u[1] * v[2] - u[2] * v[1],
-    u[2] * v[0] - u[0] * v[2],
-    u[0] * v[1] - u[1] * v[0],
-  );
-  const dot = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-  const norms = Math.hypot(...u) * Math.hypot(...v);
+  const step = (from: number, to: number) =>
+    cart.subarray(3 * to, 3 * to + 3).map((x, j) => x - cart[3 * from + j]);
+  const u = step(a, b);
+  const v = step(b, c);
+  const norms = norm(u) * norm(v);
   // a zero-length step or a reversal (dot ≤ 0) is a corner: the path
   // doubles back, e.g. a jump X → R right after a segment R → X
-  return norms > 0 && dot > 0 && cross <= COLLINEAR_SIN * norms;
+  return norms > 0 && dot(u, v) > 0 && norm(cross(u, v)) <= COLLINEAR_SIN * norms;
 }
 
-function equivalentModG(k: number[], p: readonly number[], tol: number): boolean {
+/** Whether `sign` · k equals p up to a reciprocal lattice vector (−1: time reversal). */
+function equivalentModG(k: Float64Array, p: readonly number[], tol: number, sign: 1 | -1): boolean {
   return k.every((x, j) => {
-    const d = x - p[j];
+    const d = sign * x - p[j];
     return Math.abs(d - Math.round(d)) < tol;
   });
 }
@@ -180,10 +173,10 @@ function primitiveInInputFrame(
   bands: PhononBands,
   primitive: number[][],
   rotation: number[][],
-): number[][] | null {
+): Matrix | null {
   const p = mul(fromRows(primitive), transpose(fromRows(rotation)));
   // N = A_input · P⁻¹ must be an integer matrix
   const n = mul(bands.structure.lattice.basis, inverse3x3(p));
   const err = Math.max(...Array.from(n.data, (x) => Math.abs(x - Math.round(x))));
-  return err < 1e-2 ? toRows(p) : null;
+  return err < 1e-2 ? p : null;
 }

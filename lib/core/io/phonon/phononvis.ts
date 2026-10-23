@@ -139,13 +139,48 @@ export function fromPhononVis(input: PhononVisData | string): PhononBands {
     }
   }
 
+  const nqpts = data.qpoints.length;
+  const nmodes = 3 * structure.sites.length;
   return createPhononBands({
     structure,
-    qpoints: data.qpoints.flat(),
-    frequencies: data.eigenvalues.flat(),
-    eigenvectors: data.vectors.flat(4),
+    qpoints: flatten(data.qpoints, 1, nqpts * 3),
+    frequencies: flatten(data.eigenvalues, 1, nqpts * nmodes),
+    eigenvectors: flatten(data.vectors, 4, nqpts * nmodes * nmodes * 2),
     labels,
   });
+}
+
+/**
+ * Flatten `depth` levels of nested arrays into a Float64Array of the
+ * expected `size`, written in place rather than through `Array.flat`
+ * (which for the eigenvectors builds a JS array of millions of numbers).
+ * On a size mismatch returns the plain flattened array instead, so that
+ * {@link createPhononBands} reports the shape error.
+ */
+function flatten(nested: unknown[], depth: number, size: number): ArrayLike<number> {
+  const out = new Float64Array(size);
+  let n = 0;
+  let ragged = false;
+  // innermost level written inline: for the eigenvectors a call per
+  // [re, im] pair would dominate
+  const fill = (a: unknown, d: number): void => {
+    if (!Array.isArray(a)) {
+      ragged = true;
+      return;
+    }
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i];
+      if (d > 0) {
+        fill(x, d - 1);
+      } else if (Array.isArray(x)) {
+        for (let j = 0; j < x.length; j++, n++) if (n < size) out[n] = x[j];
+      } else {
+        ragged = true;
+      }
+    }
+  };
+  fill(nested, depth - 1);
+  return n === size && !ragged ? out : (nested.flat(depth) as ArrayLike<number>);
 }
 
 /**

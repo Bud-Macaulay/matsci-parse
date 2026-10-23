@@ -10,6 +10,7 @@ import {
 import { qpointDistances } from "../../phonon/operations/path";
 import { FrequencyUnitSystem } from "../../units/frequency";
 import { LengthUnitSystem } from "../../units/length";
+import { LineReader } from "../helpers";
 
 /*
  * phonopy's band structure output, `band.yaml` (written by `phonopy` with a
@@ -73,7 +74,10 @@ const QUOTED = /'((?:[^']|'')*)'|"((?:[^"\\]|\\.)*)"/g;
 
 /** Parse a phonopy band.yaml into its raw contents. */
 export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
-  const lines = text.split("\n");
+  // Read line by line rather than splitting: band.yaml with eigenvectors
+  // runs to hundreds of MB. Error messages use 0-based `r.count - 1`.
+  const r = new LineReader(text);
+  let raw: string | null;
 
   // ---- header: top-level keys up to `phonon:` ----
   let nqpts = -1;
@@ -88,15 +92,19 @@ export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
   const masses: number[] = [];
 
   let key = "";
-  let i = 0;
-  for (; i < lines.length; i++) {
-    const line = lines[i].trimEnd();
+  let foundPhonon = false;
+  while ((raw = r.next()) !== null) {
+    const i = r.count - 1;
+    const line = raw.trimEnd();
     if (line === "" || line.startsWith("#")) continue;
     const top = TOP_KEY.exec(line);
     if (top) {
       key = top[1];
       const value = stripComment(top[2]);
-      if (key === "phonon") break;
+      if (key === "phonon") {
+        foundPhonon = true;
+        break;
+      }
       if (key === "nqpoint") nqpts = parseInteger(value, i);
       else if (key === "natom") natomsDeclared = parseInteger(value, i);
       else if (key === "calculator") calculator = value;
@@ -125,7 +133,7 @@ export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
       }
     }
   }
-  if (i === lines.length) {
+  if (!foundPhonon) {
     throw new Error("No 'phonon:' section found: not a phonopy band.yaml?");
   }
   if (lattice.length !== 9) {
@@ -141,13 +149,11 @@ export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
   if (masses.length !== natoms) masses.length = 0;
 
   // ---- phonon: one block per q-point ----
-  const qStarts: number[] = [];
-  for (let j = i + 1; j < lines.length; j++) {
-    if (lines[j].startsWith("- q-position:")) qStarts.push(j);
-  }
-  if (nqpts < 0) nqpts = qStarts.length;
-  if (qStarts.length !== nqpts) {
-    throw new Error(`band.yaml declares nqpoint: ${nqpts} but contains ${qStarts.length} q-points`);
+  // Sized up front by searching the text, so nothing is held per line.
+  const found = countOccurrences(text, "\n- q-position:");
+  if (nqpts < 0) nqpts = found;
+  if (found !== nqpts) {
+    throw new Error(`band.yaml declares nqpoint: ${nqpts} but contains ${found} q-points`);
   }
   if (segmentNqpts.length === 0) segmentNqpts.push(nqpts);
   if (segmentNqpts.reduce((a, b) => a + b, 0) !== nqpts) {
@@ -159,14 +165,7 @@ export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
 
   const nmodes = 3 * natoms;
   const rows = nmodes; // eigenvector rows ([re, im]) per mode
-  const firstEnd = qStarts[1] ?? lines.length;
-  let withEigenvectors = false;
-  for (let j = qStarts[0] ?? firstEnd; j < firstEnd; j++) {
-    if (lines[j].trimStart().startsWith("eigenvector:")) {
-      withEigenvectors = true;
-      break;
-    }
-  }
+  const withEigenvectors = /^\s*eigenvector:/m.test(text);
 
   const qpoints = new Float64Array(nqpts * 3);
   const distances = new Float64Array(nqpts);
@@ -174,49 +173,63 @@ export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
   const eigenvectors = withEigenvectors ? new Float64Array(nqpts * nmodes * nmodes * 2) : null;
   const qpointLabels: QPointLabel[] = [];
 
-  for (let q = 0; q < nqpts; q++) {
-    const start = qStarts[q];
-    const end = qStarts[q + 1] ?? lines.length;
-    qpoints.set(parseVector(lines[start], 3, start), 3 * q);
-    let mode = -1;
-    let row = rows;
-    for (let j = start + 1; j < end; j++) {
-      const t = lines[j].trimStart();
-      if (t.startsWith("- [")) {
-        if (!eigenvectors || mode < 0 || row >= rows) {
-          throw new Error(`Line ${j + 1}: unexpected eigenvector row`);
-        }
-        const o = ((q * nmodes + mode) * rows + row) * 2;
-        const a = t.indexOf("[");
-        const c = t.indexOf(",", a);
-        const b = t.indexOf("]", c);
-        if (c < 0 || b < 0) throw new Error(`Line ${j + 1}: expected [re, im], got '${t}'`);
-        eigenvectors[o] = parseNumber(t.slice(a + 1, c), j);
-        eigenvectors[o + 1] = parseNumber(t.slice(c + 1, b), j);
-        row++;
-      } else if (t.startsWith("frequency:")) {
-        if (eigenvectors && mode >= 0 && row !== rows) {
-          throw new Error(`q-point ${q + 1}, mode ${mode + 1}: expected ${rows} eigenvector rows, got ${row}`);
-        }
-        mode++;
-        if (mode >= nmodes) {
-          throw new Error(`q-point ${q + 1}: more than ${nmodes} modes`);
-        }
-        frequencies[q * nmodes + mode] = parseNumber(t.slice(10), j);
-        row = 0;
-      } else if (t.startsWith("distance:")) {
-        distances[q] = parseNumber(t.slice(9), j);
-      } else if (t.startsWith("label:")) {
-        qpointLabels.push({ index: q, label: unquoteAll(t)[0] ?? t.slice(6).trim() });
-      }
-    }
+  let q = -1;
+  let mode = nmodes - 1;
+  let row = rows;
+  const finishQPoint = () => {
+    if (q < 0) return;
     if (mode !== nmodes - 1) {
       throw new Error(`q-point ${q + 1}: expected ${nmodes} modes, found ${mode + 1}`);
     }
     if (eigenvectors && row !== rows) {
       throw new Error(`q-point ${q + 1}, mode ${nmodes}: expected ${rows} eigenvector rows, got ${row}`);
     }
+  };
+
+  while ((raw = r.next()) !== null) {
+    const j = r.count - 1;
+    if (raw.startsWith("- q-position:")) {
+      finishQPoint();
+      q++;
+      qpoints.set(parseVector(raw, 3, j), 3 * q);
+      mode = -1;
+      row = rows;
+      continue;
+    }
+    if (q < 0) continue;
+    // match on the indented content without allocating a trimmed copy:
+    // eigenvector rows are nearly all of the file
+    let k = 0;
+    while (raw.charCodeAt(k) === 32) k++;
+    if (raw.startsWith("- [", k)) {
+      if (!eigenvectors || mode < 0 || row >= rows) {
+        throw new Error(`Line ${j + 1}: unexpected eigenvector row`);
+      }
+      const o = ((q * nmodes + mode) * rows + row) * 2;
+      const c = raw.indexOf(",", k);
+      const b = raw.indexOf("]", c);
+      if (c < 0 || b < 0) throw new Error(`Line ${j + 1}: expected [re, im], got '${raw.trim()}'`);
+      eigenvectors[o] = parseNumber(raw.slice(k + 3, c), j);
+      eigenvectors[o + 1] = parseNumber(raw.slice(c + 1, b), j);
+      row++;
+    } else if (raw.startsWith("frequency:", k)) {
+      if (eigenvectors && mode >= 0 && row !== rows) {
+        throw new Error(`q-point ${q + 1}, mode ${mode + 1}: expected ${rows} eigenvector rows, got ${row}`);
+      }
+      mode++;
+      if (mode >= nmodes) {
+        throw new Error(`q-point ${q + 1}: more than ${nmodes} modes`);
+      }
+      frequencies[q * nmodes + mode] = parseNumber(raw.slice(k + 10), j);
+      row = 0;
+    } else if (raw.startsWith("distance:", k)) {
+      distances[q] = parseNumber(raw.slice(k + 9), j);
+    } else if (raw.startsWith("label:", k)) {
+      const t = raw.slice(k);
+      qpointLabels.push({ index: q, label: unquoteAll(t)[0] ?? t.slice(6).trim() });
+    }
   }
+  finishQPoint();
 
   return {
     nqpts,
@@ -415,27 +428,31 @@ export function toPhonopyBandYaml(
   });
   out.push("", "phonon:");
 
+  // each q-point block is joined as it is finished, so at most one block's
+  // lines are alive at a time instead of millions for the whole file
   const e = bands.eigenvectors;
   for (const [first, last] of segments) {
     for (let q = first; q <= last; q++) {
+      const block: string[] = [];
       const o = 3 * q;
-      out.push(`- q-position: [ ${f(bands.qpoints[o], 12, 7)}, ${f(bands.qpoints[o + 1], 12, 7)}, ${f(bands.qpoints[o + 2], 12, 7)} ]`);
-      out.push(`  distance: ${f(distances[q], 12, 7)}`);
-      out.push("  band:");
+      block.push(`- q-position: [ ${f(bands.qpoints[o], 12, 7)}, ${f(bands.qpoints[o + 1], 12, 7)}, ${f(bands.qpoints[o + 2], 12, 7)} ]`);
+      block.push(`  distance: ${f(distances[q], 12, 7)}`);
+      block.push("  band:");
       for (let m = 0; m < nmodes; m++) {
-        out.push(`  - # ${m + 1}`);
-        out.push(`    frequency: ${f(bands.frequencies[q * nmodes + m] / THZ_TO_CM, 15, 10)}`);
+        block.push(`  - # ${m + 1}`);
+        block.push(`    frequency: ${f(bands.frequencies[q * nmodes + m] / THZ_TO_CM, 15, 10)}`);
         if (!withEigenvectors) continue;
-        out.push("    eigenvector:");
+        block.push("    eigenvector:");
         let p = (q * nmodes + m) * nmodes * 2;
         for (let s = 0; s < nsites; s++) {
-          out.push(`    - # atom ${s + 1}`);
+          block.push(`    - # atom ${s + 1}`);
           for (let k = 0; k < 3; k++, p += 2) {
-            out.push(`      - [ ${f(e[p], 17, 14)}, ${f(e[p + 1], 17, 14)} ]`);
+            block.push(`      - [ ${f(e[p], 17, 14)}, ${f(e[p + 1], 17, 14)} ]`);
           }
         }
       }
-      out.push("");
+      block.push("");
+      out.push(block.join("\n"));
     }
   }
   // every q-point block ends with a blank line, as in phonopy
@@ -486,6 +503,12 @@ function unquoteAll(s: string): string[] {
   return [...s.matchAll(QUOTED)].map((m) =>
     m[1] !== undefined ? m[1].replace(/''/g, "'") : m[2].replace(/\\(.)/g, "$1"),
   );
+}
+
+function countOccurrences(text: string, needle: string): number {
+  let n = 0;
+  for (let i = text.indexOf(needle); i >= 0; i = text.indexOf(needle, i + needle.length)) n++;
+  return n;
 }
 
 function stripComment(s: string): string {

@@ -51,7 +51,13 @@ export interface PhononBands {
 /** One complex Cartesian vector: [[re, im], [re, im], [re, im]]. */
 export type ComplexVec3 = [[number, number], [number, number], [number, number]];
 
-/** Create a PhononBands, validating array sizes against the structure. */
+/**
+ * Create a PhononBands, validating array sizes against the structure.
+ *
+ * Float64Array inputs are used as-is, not copied (the eigenvectors alone
+ * can be hundreds of MB): the bands take ownership, so don't modify them
+ * afterwards. Other array-likes are copied into new Float64Arrays.
+ */
 export function createPhononBands(params: {
   structure: Structure;
   qpoints: Float64Array | ArrayLike<number>;
@@ -60,9 +66,9 @@ export function createPhononBands(params: {
   labels?: readonly QPointLabel[];
 }): PhononBands {
   const { structure } = params;
-  const qpoints = Float64Array.from(params.qpoints);
-  const frequencies = Float64Array.from(params.frequencies);
-  const eigenvectors = Float64Array.from(params.eigenvectors);
+  const qpoints = asFloat64Array(params.qpoints);
+  const frequencies = asFloat64Array(params.frequencies);
+  const eigenvectors = asFloat64Array(params.eigenvectors);
 
   const nsites = structure.sites.length;
   const nmodes = 3 * nsites;
@@ -89,6 +95,10 @@ export function createPhononBands(params: {
   }
 
   return { structure, nqpts, nmodes, qpoints, frequencies, eigenvectors, labels };
+}
+
+function asFloat64Array(a: Float64Array | ArrayLike<number>): Float64Array {
+  return a instanceof Float64Array ? a : Float64Array.from(a);
 }
 
 /** Fractional coordinates of q-point `q`. */

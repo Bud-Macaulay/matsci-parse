@@ -55,6 +55,15 @@ describe("createPhononBands", () => {
     expect(Array.from(bandFrequencies(bands, 2))).toEqual([3, 6]);
     expect(modeEigenvector(bands, 1, 0)).toEqual([[[18, 19], [20, 21], [22, 23]]]);
   });
+
+  it("takes Float64Arrays without copying and copies other array-likes", () => {
+    const eigenvectors = new Float64Array(18);
+    const frequencies = [1, 2, 3];
+    const bands = createPhononBands({ structure: cubic, qpoints: [0, 0, 0], frequencies, eigenvectors });
+    expect(bands.eigenvectors).toBe(eigenvectors);
+    expect(bands.frequencies).toBeInstanceOf(Float64Array);
+    expect(Array.from(bands.frequencies)).toEqual(frequencies);
+  });
 });
 
 describe("path geometry", () => {
