@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { fromCHGCAR } from "@/core/io/chgcar";
+import type { VolumetricData } from "@/core/volumetric";
+import { getVoxel } from "@/core/volumetric/operations/spatial/getVoxel";
+import { sampleNearest } from "@/core/volumetric/operations/spatial/sampleNearest";
 import { microSpinCHGCAR, noSpinCHGCAR } from "../../helpers/bulkFiles/chgcar";
 import { expectArrayClose } from "../../helpers/closeUtils";
 
@@ -78,4 +81,39 @@ describe("CHGCAR parser", () => {
       expect(result.volumetric.data.length).toBe(8);
     });
   });
+
+  describe("non-cubic grid", () => {
+    // 2 × 3 × 4 grid in a unit cube; each value is its own file position,
+    // which VASP writes a-index fastest: value = ia + 2·ib + 6·ic
+    const text = `non-cubic
+1.0
+1 0 0
+0 1 0
+0 0 1
+Li
+1
+Direct
+0 0 0
+
+2 3 4
+${Array.from({ length: 24 }, (_, i) => i).join(" ")}
+`;
+    const vol = fromCHGCAR(text).volumetric as VolumetricData;
+    // undo the 1 / (N · V) scaling (V = 1 Å³)
+    const at = (ia: number, ib: number, ic: number) => getVoxel(vol, ia, ib, ic)[0] * 24;
+
+    it("lists the shape slowest axis first, [ngz, ngy, ngx]", () => {
+      expect(vol.shape).toEqual([4, 3, 2]);
+      expect(vol.metadata?.sourceGrid).toEqual([2, 3, 4]);
+    });
+
+    it("indexes voxels as (a, b, c)", () => {
+      expect(at(1, 0, 0)).toBeCloseTo(1, 12);
+      expect(at(0, 1, 0)).toBeCloseTo(2, 12);
+      expect(at(0, 0, 1)).toBeCloseTo(6, 12);
+      expect(at(1, 2, 3)).toBeCloseTo(23, 12);
+      expect(sampleNearest(vol, 1, 2, 3, 0) * 24).toBeCloseTo(23, 12);
+    });
+  });
 });
+

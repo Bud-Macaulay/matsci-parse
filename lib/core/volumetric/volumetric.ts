@@ -4,6 +4,12 @@ import { identity } from "../matrix";
 /** Scalar or multi-channel volumetric grid data. */
 export interface VolumetricData {
   readonly data: Float64Array;
+  /**
+   * Grid dimensions [D, H, W], slowest axis first: voxel (x, y, z) has
+   * x ∈ [0, W) fastest and z ∈ [0, D) slowest. For data on a cell, x runs
+   * along the first lattice vector and z along the third, so a VASP grid
+   * NGX × NGY × NGZ has shape [NGZ, NGY, NGX].
+   */
   readonly shape: [number, number, number];
   readonly channels: number;
   readonly basis?: Matrix;

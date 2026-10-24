@@ -187,7 +187,9 @@ function createVolumetricDataFromCHGCAR(
 
   // Create volumetric data using the existing createVolumetricData function
   return createVolumetricData({
-    shape: [ngx, ngy, ngz],
+    // VASP writes the a-index fastest: as VolumetricData's [D, H, W]
+    // (W fastest) that is [ngz, ngy, ngx], with no reordering
+    shape: [ngz, ngy, ngx],
     channels: 1,
     data: new Float64Array(scaledData),
     basis: basis,
