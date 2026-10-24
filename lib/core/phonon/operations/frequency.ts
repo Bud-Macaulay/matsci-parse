@@ -1,4 +1,4 @@
-import type { PhononBands } from "../phonon";
+import type { PhononModes } from "../phonon";
 import { FrequencyUnitSystem, type FrequencyUnits } from "../../units/frequency";
 
 /** Factor from cm⁻¹ to `unit`, resolved once; throws on an unknown unit. */
@@ -11,14 +11,14 @@ function factorFromCm(unit: FrequencyUnits | string): number {
 /**
  * All frequencies converted from cm⁻¹ to `unit`, same [nqpts × nmodes]
  * layout. Imaginary (negative) modes keep their sign. Returns a new array;
- * `bands` is not modified.
+ * `modes` is not modified.
  */
 export function convertFrequencies(
-  bands: PhononBands,
+  modes: PhononModes,
   unit: FrequencyUnits | string,
 ): Float64Array {
   const f = factorFromCm(unit);
-  return bands.frequencies.map((v) => v * f);
+  return modes.frequencies.map((v) => v * f);
 }
 
 /**
@@ -27,10 +27,10 @@ export function convertFrequencies(
  * Throws on bands with no frequencies.
  */
 export function frequencyRange(
-  bands: PhononBands,
+  modes: PhononModes,
   opts: { unit?: FrequencyUnits } = {},
 ): { min: number; max: number } {
-  const { frequencies } = bands;
+  const { frequencies } = modes;
   if (frequencies.length === 0) throw new Error("Bands have no frequencies");
   let min = Infinity;
   let max = -Infinity;

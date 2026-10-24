@@ -8,6 +8,8 @@ import {
   type QPointLabel,
 } from "../../phonon/phonon";
 import { qpointDistances } from "../../phonon/operations/path";
+import { createSampledPath, type PathSegment } from "../../kpoints/sampled";
+import { labelPath } from "../../kpoints/path";
 import { FrequencyUnitSystem } from "../../units/frequency";
 import { LengthUnitSystem } from "../../units/length";
 import { LineReader } from "../helpers";
@@ -261,18 +263,13 @@ export function parsePhonopyBandYaml(text: string): PhonopyBandYaml {
  * - Frequencies: THz → cm⁻¹.
  * - Eigenvectors: phonopy writes the eigenvectors of the dynamical matrix,
  *   i.e. mass-weighted (displacement u ∝ e / √m), normalized over the cell,
- *   unlike matdyn.x's displacement patterns. They are stored as written.
- *   Without eigenvectors in the file (EIGENVECTORS not set) they are all
- *   zero, so frequencies can still be plotted; check
- *   {@link parsePhonopyBandYaml}'s `eigenvectors` for null to tell.
- * - Labels: segment end labels become q-point labels; the duplicated
- *   q-point joining two connected segments carries the same label twice
- *   (no break), while a jump gives two different labels (a break). Without
- *   any labels, segment ends get generic "Q_n" labels shared by visits to
- *   the same q-point, so path breaks are kept. LaTeX labels ("$\Gamma$",
- *   "$\mathrm{X}$") and GAMMA are converted to plain text / "Γ".
- *   A segment sampled by only its two end points (BAND_POINTS = 2) has
- *   two consecutive different labels, which PhononBands reads as a break.
+ *   unlike matdyn.x's displacement patterns. They are stored as written,
+ *   or null without eigenvectors in the file (EIGENVECTORS not set).
+ * - Path: the file's segments, with their end labels. The duplicated
+ *   q-point joining two connected segments is a joint, while a jump to a
+ *   different q-point is a break. Without any labels, segment ends get
+ *   generic "Q_n" labels shared by visits to the same q-point. LaTeX labels
+ *   ("$\Gamma$", "$\mathrm{X}$") and GAMMA are converted to plain text / "Γ".
  *
  * Modes keep the file's order (ascending frequency unless phonopy ran with
  * BAND_CONNECTION); see `connectBands` to follow branches.
@@ -297,24 +294,29 @@ export function fromPhonopyBandYaml(
     })),
   };
 
-  const nmodes = 3 * raw.natoms;
+  const segments = fileSegments(raw);
   return createPhononBands({
     structure,
-    qpoints: raw.qpoints,
+    qpoints: labelPath(createSampledPath(raw.qpoints, segments), fileLabels(raw, segments)),
     frequencies: raw.frequencies.map((f) => f * THZ_TO_CM),
-    eigenvectors: raw.eigenvectors ?? new Float64Array(raw.nqpts * nmodes * nmodes * 2),
-    labels: pathLabels(raw),
+    eigenvectors: raw.eigenvectors,
   });
 }
 
-/** q-point labels from segment label pairs, legacy per-q labels, or q-point identity. */
-function pathLabels(raw: PhonopyBandYaml): QPointLabel[] {
-  const ends: [number, number][] = [];
+/** The file's path segments, skipping empty ones. */
+function fileSegments(raw: PhonopyBandYaml): PathSegment[] {
+  const segments: PathSegment[] = [];
   let start = 0;
   for (const n of raw.segmentNqpts) {
-    if (n > 0) ends.push([start, start + n - 1]);
+    if (n > 0) segments.push({ start, end: start + n - 1 });
     start += n;
   }
+  return segments;
+}
+
+/** q-point labels from segment label pairs, legacy per-q labels, or q-point identity. */
+function fileLabels(raw: PhonopyBandYaml, segments: PathSegment[]): QPointLabel[] {
+  const ends = segments.map(({ start, end }) => [start, end]);
 
   const labelled = new Map<number, string>();
   if (raw.segmentLabels) {
@@ -326,8 +328,8 @@ function pathLabels(raw: PhonopyBandYaml): QPointLabel[] {
   } else if (raw.qpointLabels.length > 0) {
     for (const { index, label } of raw.qpointLabels) labelled.set(index, label);
   } else if (ends.length > 1) {
-    // No labels: name segment ends by q-point, so a jump (different
-    // q-points) still reads as a break and a joint (same q-point) does not.
+    // No labels: name segment ends by q-point, so plots get a tick at
+    // each end and revisits of a q-point share its name.
     const named: { q: number; label: string }[] = [];
     for (const index of ends.flat()) {
       const known = named.find(({ q }) => sameQPoint(raw.qpoints, q, index));
@@ -371,19 +373,17 @@ function normalizeLabel(label: string): string {
  * writes (frequencies in THz, lattice in Å, no comment block), readable by
  * phonopy-bandplot and other band.yaml consumers.
  *
- * The path is split into segments at labelled q-points: a labelled pair of
- * consecutive q-points (a joint or a break) ends one segment and starts the
- * next, and a single labelled q-point inside the path is written twice, as
- * end and start of two segments, as phonopy does. Unlabelled segment ends
- * get an empty label when other ends are labelled. `distance` follows
- * phonopy's definition (crystallographic Å⁻¹, constant across segment
- * boundaries).
+ * Each segment of the path is written as a phonopy segment, so a corner
+ * shared by two segments is written twice, as end and start, as phonopy
+ * does. Unlabelled segment ends get an empty label when other ends are
+ * labelled. `distance` follows phonopy's definition (crystallographic Å⁻¹,
+ * constant across segment boundaries).
  *
  * Site masses come from `properties.mass` (as set by
  * {@link fromPhonopyBandYaml}), then the species, then the periodic table.
  *
  * @param opts.eigenvectors - Write eigenvectors; defaults to true unless
- *   they are all zero (e.g. read from a file without them).
+ *   there are none or they are all zero.
  */
 export function toPhonopyBandYaml(
   bands: PhononBands,
@@ -391,21 +391,23 @@ export function toPhonopyBandYaml(
 ): string {
   const { structure, nmodes } = bands;
   const nsites = structure.sites.length;
-  const withEigenvectors = opts.eigenvectors ?? bands.eigenvectors.some((x) => x !== 0);
-  const segments = pathSegments(bands);
-  const labels = new Map(bands.labels.map((l) => [l.index, l.label]));
-  const anyLabels = segments.some(([a, b]) => labels.has(a) || labels.has(b));
+  const withEigenvectors = opts.eigenvectors ?? (bands.eigenvectors?.some((x) => x !== 0) ?? false);
+  if (withEigenvectors && !bands.eigenvectors) {
+    throw new Error("Cannot write eigenvectors: the bands have none");
+  }
+  const { segments } = bands.qpoints;
+  const anyLabels = segments.some(({ from, to }) => from !== undefined || to !== undefined);
   const distances = qpointDistances(bands);
 
   const out: string[] = [];
-  out.push(`nqpoint: ${String(segments.reduce((n, [a, b]) => n + b - a + 1, 0)).padEnd(7)}`);
+  out.push(`nqpoint: ${String(segments.reduce((n, s) => n + s.end - s.start + 1, 0)).padEnd(7)}`);
   out.push(`npath: ${String(segments.length).padEnd(7)}`);
   out.push("segment_nqpoint:");
-  for (const [a, b] of segments) out.push(`- ${b - a + 1}`);
+  for (const { start, end } of segments) out.push(`- ${end - start + 1}`);
   if (anyLabels) {
     out.push("labels:");
-    for (const [a, b] of segments) {
-      out.push(`- [ ${quote(labels.get(a) ?? "")}, ${quote(labels.get(b) ?? "")} ]`);
+    for (const { from, to } of segments) {
+      out.push(`- [ ${quote(from ?? "")}, ${quote(to ?? "")} ]`);
     }
   }
   out.push("reciprocal_lattice:");
@@ -430,18 +432,19 @@ export function toPhonopyBandYaml(
 
   // each q-point block is joined as it is finished, so at most one block's
   // lines are alive at a time instead of millions for the whole file
-  const e = bands.eigenvectors;
-  for (const [first, last] of segments) {
-    for (let q = first; q <= last; q++) {
+  const e = withEigenvectors ? bands.eigenvectors : null;
+  const qs = bands.qpoints.coords;
+  for (const { start, end } of segments) {
+    for (let q = start; q <= end; q++) {
       const block: string[] = [];
       const o = 3 * q;
-      block.push(`- q-position: [ ${f(bands.qpoints[o], 12, 7)}, ${f(bands.qpoints[o + 1], 12, 7)}, ${f(bands.qpoints[o + 2], 12, 7)} ]`);
+      block.push(`- q-position: [ ${f(qs[o], 12, 7)}, ${f(qs[o + 1], 12, 7)}, ${f(qs[o + 2], 12, 7)} ]`);
       block.push(`  distance: ${f(distances[q], 12, 7)}`);
       block.push("  band:");
       for (let m = 0; m < nmodes; m++) {
         block.push(`  - # ${m + 1}`);
         block.push(`    frequency: ${f(bands.frequencies[q * nmodes + m] / THZ_TO_CM, 15, 10)}`);
-        if (!withEigenvectors) continue;
+        if (!e) continue;
         block.push("    eigenvector:");
         let p = (q * nmodes + m) * nmodes * 2;
         for (let s = 0; s < nsites; s++) {
@@ -457,33 +460,6 @@ export function toPhonopyBandYaml(
   }
   // every q-point block ends with a blank line, as in phonopy
   return out.join("\n") + "\n";
-}
-
-/**
- * [first, last] q-point index of each path segment for band.yaml: split at
- * labelled q-points, see {@link toPhonopyBandYaml}.
- */
-function pathSegments(bands: PhononBands): [number, number][] {
-  const { nqpts } = bands;
-  if (nqpts === 0) return [];
-  const labelled = new Set(bands.labels.map((l) => l.index));
-  const segments: [number, number][] = [];
-  let start = 0;
-  for (let q = 1; q < nqpts - 1; q++) {
-    if (!labelled.has(q)) continue;
-    if (labelled.has(q + 1)) {
-      // joint or break: q ends this segment, q + 1 starts the next
-      segments.push([start, q]);
-      start = q + 1;
-      q++;
-    } else if (q > start) {
-      // a corner: shared by both segments
-      segments.push([start, q]);
-      start = q;
-    }
-  }
-  segments.push([start, nqpts - 1]);
-  return segments;
 }
 
 function sameQPoint(qpoints: Float64Array, a: number, b: number): boolean {

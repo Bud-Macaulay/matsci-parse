@@ -7,3 +7,6 @@ export type {
   Vec3,
   GridShape,
 } from "./kpoints";
+export * from "./sampled";
+export * from "./path";
+export * from "./labelling";

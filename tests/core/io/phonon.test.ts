@@ -9,7 +9,7 @@ import {
   toPhononVis,
 } from "@/core/io/phonon";
 import { alatFromPW, fromPW } from "@/core/io/pw";
-import { modeEigenvector, qpoint } from "@/core/phonon";
+import { labelQPoints, modeEigenvector, qpoint, qpointLabels } from "@/core/phonon";
 import { aluminumModes, aluminumPw, bnModes, bnPw } from "./teststrings/phonon";
 
 describe("parseMatdynModes", () => {
@@ -112,9 +112,9 @@ describe("fromQEPhonon", () => {
 
   it("labels path corners generically unless labels are given", () => {
     const auto = fromQEPhonon({ pwInput: aluminumPw, matdynModes: aluminumModes });
-    expect(auto.labels.map((l) => l.label)).toEqual(["Q_1", "Q_2", "Q_3", "Q_4"]);
+    expect(qpointLabels(auto).map((l) => l.label)).toEqual(["Q_1", "Q_2", "Q_3", "Q_4"]);
     const labels = [{ index: 0, label: "Γ" }, { index: 3, label: "L" }];
-    expect(fromQEPhonon({ pwInput: aluminumPw, matdynModes: aluminumModes, labels }).labels).toEqual(labels);
+    expect(qpointLabels(fromQEPhonon({ pwInput: aluminumPw, matdynModes: aluminumModes, labels }))).toEqual(labels);
   });
 });
 
@@ -140,16 +140,16 @@ describe("PhononVis JSON", () => {
   });
 
   it("round-trips, including path breaks", () => {
-    const broken = { ...bands, labels: [{ index: 1, label: "A" }, { index: 2, label: "B" }] };
+    const broken = labelQPoints(bands, [{ index: 1, label: "A" }, { index: 2, label: "B" }]);
     const vis = toPhononVis(broken);
     expect(vis.highsym_qpts).toEqual([[1, "A|B"]]);
     expect(vis.distances[2]).toBe(vis.distances[1]);
 
     const back = fromPhononVis(JSON.stringify(vis));
-    expect(back.labels).toEqual(broken.labels);
+    expect(qpointLabels(back)).toEqual(qpointLabels(broken));
     // the writer normalizes -0 to 0, as phonon-web-tools does
     const unsigned = (a: Float64Array) => Array.from(a, (x) => x + 0);
-    expect(unsigned(back.eigenvectors)).toEqual(unsigned(bands.eigenvectors));
+    expect(unsigned(back.eigenvectors!)).toEqual(unsigned(bands.eigenvectors!));
     expect(unsigned(back.frequencies)).toEqual(unsigned(bands.frequencies));
     expect(toPhononVis(back)).toEqual(vis);
   });

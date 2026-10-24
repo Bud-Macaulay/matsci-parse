@@ -26,7 +26,8 @@ const KEEP_BIAS = 1e-9;
  * Squared overlaps are the projection weights of one basis onto the other:
  * for orthonormal eigenvectors each row and column of the weight matrix sums
  * to 1, so the score is the total weight carried along the matched branches.
- * Ordering is kept as-is across path breaks, where overlaps are meaningless.
+ * Ordering is kept as-is across path breaks, where overlaps are meaningless,
+ * and everywhere for bands without eigenvectors.
  *
  * @param opts.masses - Site masses (amu, see {@link siteMasses}), for bands
  *   whose vectors are displacement patterns u_s = e_s / √M_s (QE
@@ -40,6 +41,8 @@ export function connectBands(
   opts: { masses?: ArrayLike<number> } = {},
 ): PhononBands {
   const { nqpts, nmodes, frequencies, eigenvectors } = bands;
+  // nothing to follow branches by: keep the file's order
+  if (!eigenvectors) return { ...bands };
   const vecSize = nmodes * 2; // complex components per mode
   const qSize = nmodes * vecSize;
   const breaks = new Set(pathBreaks(bands));

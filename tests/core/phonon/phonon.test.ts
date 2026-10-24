@@ -11,9 +11,11 @@ import {
   modeEigenvector,
   pathBreaks,
   qpointDistances,
+  qpointLabels,
   type PhononBands,
   type QPointLabel,
 } from "@/core/phonon";
+import { createSampledPath } from "@/core/kpoints";
 import { fromPW } from "@/core/io/pw";
 import { createLattice } from "@/core/lattice";
 import { aluminumPw, bnPw } from "../io/teststrings/phonon";
@@ -98,7 +100,7 @@ describe("path geometry", () => {
     // corners: Γ(0) X(4) M(8) Γ(12) then the jump back to X at 13 (end)
     expect(cornerQPoints(onPath(cubic, qs))).toEqual([[0, 12], [4, 13], [8]]);
     const labelled = labelCorners(onPath(cubic, qs, [{ index: 4, label: "X" }]));
-    expect(labelled.labels).toEqual([
+    expect(qpointLabels(labelled)).toEqual([
       { index: 0, label: "Q_1" },
       { index: 4, label: "X" },
       { index: 8, label: "Q_2" },
@@ -181,11 +183,14 @@ describe("connectBands", () => {
     const ez = [0, 0, 0, 0, 1, 0];
     const bands = createPhononBands({
       structure: cubic,
-      qpoints: [0, 0, 0, 0.5, 0, 0],
+      qpoints: createSampledPath([0, 0, 0, 0.5, 0, 0], [
+        { start: 0, end: 0, from: "A", to: "A" },
+        { start: 1, end: 1, from: "B", to: "B" },
+      ]),
       frequencies: [1, 2, 3, 1, 2, 3],
       eigenvectors: [ex, ey, ez, ey, ex, ez].flat(),
-      labels: [{ index: 0, label: "A" }, { index: 1, label: "B" }],
     });
+    expect(pathBreaks(bands)).toEqual([0]);
     expect(connectBands(bands).frequencies).toEqual(bands.frequencies);
   });
 
@@ -248,7 +253,7 @@ describe("labelHighSymmetryPoints", () => {
     const K = [1 / 3, 1 / 3, 0];
     const qs = [...segment(G, M, 5), ...segment(M, K, 5), ...segment(K, G, 5), G];
     const bands = await labelHighSymmetryPoints(onPath(bn, qs));
-    expect(bands.labels).toEqual([
+    expect(qpointLabels(bands)).toEqual([
       { index: 0, label: "Γ" },
       { index: 5, label: "M" },
       { index: 10, label: "K" },
@@ -261,6 +266,6 @@ describe("labelHighSymmetryPoints", () => {
     // QE fcc basis: X = (1/2, 0, 1/2), L = (1/2, 1/2, 1/2), Γ + G = (1, 1, 1)
     const qs = [[0, 0, 0], [0.5, 0, 0.5], [1, 1, 1], [0.5, 0.5, 0.5]];
     const bands = await labelHighSymmetryPoints(onPath(al, qs));
-    expect(bands.labels.map((l) => l.label)).toEqual(["Γ", "X", "Γ", "L"]);
+    expect(qpointLabels(bands).map((l) => l.label)).toEqual(["Γ", "X", "Γ", "L"]);
   });
 });

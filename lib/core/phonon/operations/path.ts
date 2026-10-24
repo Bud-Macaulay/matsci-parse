@@ -1,47 +1,21 @@
-import type { PhononBands, QPointLabel } from "../phonon";
-import { reciprocalLatticeCrystallographic } from "../../lattice/reciprocalLatticeCrystallographic";
-import { createMatrix } from "../../matrix/matrix";
-import { mul } from "../../matrix/operations/mul";
+import type { PhononBands, PhononModes } from "../phonon";
+import { cartesianKPoints, pathBreaks as kpathBreaks, pathDistances } from "../../kpoints/path";
 
-/**
- * Collapse path discontinuities in a label list: two consecutive q-points
- * with different labels ("C" at 35, "C_2" at 36) become one tick "C|C_2" at
- * the first index, and that index is reported as a break. Consecutive
- * q-points with the same label keep a single entry.
+/*
+ * Path geometry of phonon band structures: wrappers over the sampled-path
+ * operations in `lib/core/kpoints/path.ts`.
  */
-export function mergeLabels(labels: readonly QPointLabel[]): {
-  labels: QPointLabel[];
-  breaks: number[];
-} {
-  const merged: QPointLabel[] = [];
-  const breaks: number[] = [];
-  for (let i = 0; i < labels.length; i++) {
-    const cur = labels[i];
-    const next = labels[i + 1];
-    if (next && next.index === cur.index + 1) {
-      if (next.label !== cur.label) {
-        merged.push({ index: cur.index, label: `${cur.label}|${next.label}` });
-        breaks.push(cur.index);
-      } else {
-        merged.push(cur);
-      }
-      i++;
-    } else {
-      merged.push(cur);
-    }
-  }
-  return { labels: merged, breaks };
-}
+
+export { mergeLabels } from "../../kpoints/path";
 
 /** Indices i where the path jumps from q-point i to i + 1. */
 export function pathBreaks(bands: PhononBands): number[] {
-  return mergeLabels(bands.labels).breaks;
+  return kpathBreaks(bands.qpoints);
 }
 
 /** Cartesian q-points (Å⁻¹, crystallographic: no 2π), [nqpts × 3]. */
-export function cartesianQPoints(bands: PhononBands): Float64Array {
-  const b = reciprocalLatticeCrystallographic(bands.structure.lattice).basis;
-  return mul(createMatrix(bands.nqpts, 3, bands.qpoints), b).data;
+export function cartesianQPoints(modes: PhononModes): Float64Array {
+  return cartesianKPoints(modes.qpoints, modes.structure.lattice);
 }
 
 /**
@@ -50,18 +24,5 @@ export function cartesianQPoints(bands: PhononBands): Float64Array {
  * does not advance, so the two sides of the jump share an x position.
  */
 export function qpointDistances(bands: PhononBands): Float64Array {
-  const cart = cartesianQPoints(bands);
-  const breaks = new Set(pathBreaks(bands));
-  const out = new Float64Array(bands.nqpts);
-  for (let q = 1; q < bands.nqpts; q++) {
-    const step = breaks.has(q - 1)
-      ? 0
-      : Math.hypot(
-          cart[3 * q] - cart[3 * q - 3],
-          cart[3 * q + 1] - cart[3 * q - 2],
-          cart[3 * q + 2] - cart[3 * q - 1],
-        );
-    out[q] = out[q - 1] + step;
-  }
-  return out;
+  return pathDistances(bands.qpoints, bands.structure.lattice);
 }

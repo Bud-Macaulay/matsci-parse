@@ -1,10 +1,13 @@
 /**
- * First-class phonon band structure data model.
+ * First-class phonon data model.
  *
- * A phonon dispersion sampled along a q-point path: the structure, the
- * q-points, and for every q-point the frequency and eigenvector of each mode.
- * Code-specific formats (QE matdyn.modes, the PhononVis JSON, ...) are handled
- * by adapters in `lib/core/io/phonon/` that convert into / out of this type.
+ * Phonon modes sampled at a set of q-points: the structure, the q-points,
+ * and for every q-point the frequency and eigenvector of each mode. The
+ * q-points are a {@link SampledKPoints}: along a path (a band structure,
+ * {@link PhononBands}), on a full grid, or an unstructured list (a single
+ * q-point, an irreducible mesh). Code-specific formats (QE matdyn.modes,
+ * the PhononVis JSON, ...) are handled by adapters in `lib/core/io/phonon/`
+ * that convert into / out of these types.
  *
  * Bulk numeric data lives in flat, row-major Float64Arrays rather than nested
  * arrays: a large dispersion is three allocations instead of millions of
@@ -17,84 +20,108 @@
 import type { Structure } from "../structure/structure";
 import type { Site } from "../site/site";
 import { getElement } from "../data/periodictable/atomicData";
+import {
+  isSampledKPoints,
+  kpointCoord,
+  type KPointLabel,
+  type SampledKPoints,
+  type SampledPath,
+} from "../kpoints/sampled";
+import { labelPath, pathLabels, samplePath } from "../kpoints/path";
 
 /** A named q-point on the path, e.g. `{ index: 0, label: "Γ" }`. */
-export interface QPointLabel {
-  readonly index: number;
-  readonly label: string;
-}
+export type QPointLabel = KPointLabel;
 
-/** A phonon band structure along a q-point path. */
-export interface PhononBands {
+/** Phonon modes at a set of q-points. */
+export interface PhononModes<Q extends SampledKPoints = SampledKPoints> {
   readonly structure: Structure;
   readonly nqpts: number;
   /** Number of modes per q-point: 3 × number of sites. */
   readonly nmodes: number;
-  /** [nqpts × 3]: fractional reciprocal coordinates of each q-point. */
-  readonly qpoints: Float64Array;
+  /** The q-points and how they are organised (path, grid or list). */
+  readonly qpoints: Q;
   /** [nqpts × nmodes]: mode frequencies in cm⁻¹. */
   readonly frequencies: Float64Array;
   /**
    * [nqpts × nmodes × nsites × 3 × 2]: complex Cartesian components
-   * (re, im) of each mode, as written by the source code. For QE
-   * matdyn.modes these are mass-scaled displacement patterns.
+   * (re, im) of each mode, as written by the source code, or null when the
+   * source has none. For QE matdyn.modes these are mass-scaled
+   * displacement patterns.
    */
-  readonly eigenvectors: Float64Array;
-  /**
-   * Labelled q-points, sorted by index. Two consecutive indices with
-   * different labels mark a discontinuity in the path (e.g. "C" at 35 and
-   * "C_2" at 36: the path jumps between them).
-   */
-  readonly labels: readonly QPointLabel[];
+  readonly eigenvectors: Float64Array | null;
 }
+
+/**
+ * A phonon band structure: modes along a q-point path. Labels and path
+ * breaks are those of the path (see {@link qpointLabels}).
+ */
+export type PhononBands = PhononModes<SampledPath>;
 
 /** One complex Cartesian vector: [[re, im], [re, im], [re, im]]. */
 export type ComplexVec3 = [[number, number], [number, number], [number, number]];
 
+/** Whether the modes are sampled along a path. */
+export function isPhononBands(modes: PhononModes): modes is PhononBands {
+  return modes.qpoints.kind === "path";
+}
+
 /**
- * Create a PhononBands, validating array sizes against the structure.
+ * Create PhononModes, validating array sizes against the structure.
  *
  * Float64Array inputs are used as-is, not copied (the eigenvectors alone
- * can be hundreds of MB): the bands take ownership, so don't modify them
+ * can be hundreds of MB): the modes take ownership, so don't modify them
  * afterwards. Other array-likes are copied into new Float64Arrays.
  */
-export function createPhononBands(params: {
+export function createPhononModes<Q extends SampledKPoints>(params: {
   structure: Structure;
-  qpoints: Float64Array | ArrayLike<number>;
+  qpoints: Q;
   frequencies: Float64Array | ArrayLike<number>;
-  eigenvectors: Float64Array | ArrayLike<number>;
-  labels?: readonly QPointLabel[];
-}): PhononBands {
-  const { structure } = params;
-  const qpoints = asFloat64Array(params.qpoints);
+  eigenvectors?: Float64Array | ArrayLike<number> | null;
+}): PhononModes<Q> {
+  const { structure, qpoints } = params;
   const frequencies = asFloat64Array(params.frequencies);
-  const eigenvectors = asFloat64Array(params.eigenvectors);
+  const eigenvectors = params.eigenvectors == null ? null : asFloat64Array(params.eigenvectors);
 
   const nsites = structure.sites.length;
   const nmodes = 3 * nsites;
-  if (qpoints.length % 3 !== 0) {
-    throw new Error("qpoints length must be a multiple of 3");
-  }
-  const nqpts = qpoints.length / 3;
+  const nqpts = qpoints.nkpts;
   if (frequencies.length !== nqpts * nmodes) {
     throw new Error(
       `Expected ${nqpts * nmodes} frequencies (${nqpts} q-points × ${nmodes} modes), got ${frequencies.length}`,
     );
   }
-  if (eigenvectors.length !== nqpts * nmodes * nmodes * 2) {
+  if (eigenvectors && eigenvectors.length !== nqpts * nmodes * nmodes * 2) {
     throw new Error(
       `Expected ${nqpts * nmodes * nmodes * 2} eigenvector components, got ${eigenvectors.length}`,
     );
   }
 
-  const labels = [...(params.labels ?? [])].sort((a, b) => a.index - b.index);
-  for (const { index } of labels) {
-    if (!Number.isInteger(index) || index < 0 || index >= nqpts) {
-      throw new Error(`Label index ${index} out of range [0, ${nqpts})`);
-    }
-  }
+  return { structure, nqpts, nmodes, qpoints, frequencies, eigenvectors };
+}
 
-  return { structure, nqpts, nmodes, qpoints, frequencies, eigenvectors, labels };
+/**
+ * Create PhononBands from a sampled path, or from bare q-point coordinates
+ * ([nqpts × 3], fractional) and optional labels. Labels split the path as
+ * {@link labelPath} describes: a labelled point is a corner, and two
+ * labelled points in a row with different positions are a break (e.g.
+ * "C" at 35, "C_2" at 36). See {@link createPhononModes}.
+ */
+export function createPhononBands(params: {
+  structure: Structure;
+  qpoints: SampledPath | Float64Array | ArrayLike<number>;
+  labels?: readonly QPointLabel[];
+  frequencies: Float64Array | ArrayLike<number>;
+  eigenvectors?: Float64Array | ArrayLike<number> | null;
+}): PhononBands {
+  const { qpoints, labels } = params;
+  let path: SampledPath;
+  if (isSampledKPoints(qpoints)) {
+    if (qpoints.kind !== "path") throw new Error(`PhononBands need a q-point path, got a ${qpoints.kind}`);
+    path = labels ? labelPath(qpoints, labels) : qpoints;
+  } else {
+    path = samplePath(asFloat64Array(qpoints), labels);
+  }
+  return createPhononModes({ ...params, qpoints: path });
 }
 
 function asFloat64Array(a: Float64Array | ArrayLike<number>): Float64Array {
@@ -102,32 +129,46 @@ function asFloat64Array(a: Float64Array | ArrayLike<number>): Float64Array {
 }
 
 /** Fractional coordinates of q-point `q`. */
-export function qpoint(bands: PhononBands, q: number): [number, number, number] {
-  const o = 3 * q;
-  return [bands.qpoints[o], bands.qpoints[o + 1], bands.qpoints[o + 2]];
+export function qpoint(modes: PhononModes, q: number): [number, number, number] {
+  return kpointCoord(modes.qpoints, q);
 }
 
-/** Frequencies of one band (mode index `mode`) along the whole path. */
-export function bandFrequencies(bands: PhononBands, mode: number): Float64Array {
-  const out = new Float64Array(bands.nqpts);
-  for (let q = 0; q < bands.nqpts; q++) {
-    out[q] = bands.frequencies[q * bands.nmodes + mode];
+/** Labelled q-points of a band structure, sorted by index. */
+export function qpointLabels(bands: PhononBands): QPointLabel[] {
+  return pathLabels(bands.qpoints);
+}
+
+/**
+ * The bands with their q-point labels replaced, splitting the path at
+ * them (see {@link labelPath}). Does not modify `bands`.
+ */
+export function labelQPoints(bands: PhononBands, labels: Iterable<QPointLabel>): PhononBands {
+  return { ...bands, qpoints: labelPath(bands.qpoints, labels) };
+}
+
+/** Frequencies of one band (mode index `mode`) at every q-point. */
+export function bandFrequencies(modes: PhononModes, mode: number): Float64Array {
+  const out = new Float64Array(modes.nqpts);
+  for (let q = 0; q < modes.nqpts; q++) {
+    out[q] = modes.frequencies[q * modes.nmodes + mode];
   }
   return out;
 }
 
 /**
  * Eigenvector of one mode at one q-point, as a zero-copy view of length
- * nsites × 3 × 2 laid out [site][xyz][re, im].
+ * nsites × 3 × 2 laid out [site][xyz][re, im]. Throws if the modes have
+ * no eigenvectors.
  */
 export function modeEigenvectorView(
-  bands: PhononBands,
+  modes: PhononModes,
   q: number,
   mode: number,
 ): Float64Array {
-  const size = bands.nmodes * 2;
-  const start = (q * bands.nmodes + mode) * size;
-  return bands.eigenvectors.subarray(start, start + size);
+  if (!modes.eigenvectors) throw new Error("These phonon modes have no eigenvectors");
+  const size = modes.nmodes * 2;
+  const start = (q * modes.nmodes + mode) * size;
+  return modes.eigenvectors.subarray(start, start + size);
 }
 
 /**
@@ -135,11 +176,11 @@ export function modeEigenvectorView(
  * Cartesian vector per site (the shape viewers such as WEAS consume).
  */
 export function modeEigenvector(
-  bands: PhononBands,
+  modes: PhononModes,
   q: number,
   mode: number,
 ): ComplexVec3[] {
-  const v = modeEigenvectorView(bands, q, mode);
+  const v = modeEigenvectorView(modes, q, mode);
   const out: ComplexVec3[] = [];
   for (let o = 0; o < v.length; o += 6) {
     out.push([

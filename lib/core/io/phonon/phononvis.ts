@@ -4,6 +4,7 @@ import { hillFormula } from "../../structure/properties/formula";
 import { SymbolToAtomicNumber } from "../../data/periodictable/atomicData";
 import {
   createPhononBands,
+  qpointLabels,
   type PhononBands,
   type QPointLabel,
 } from "../../phonon/phonon";
@@ -65,6 +66,8 @@ export function toPhononVis(
   const eigenvalues: number[][] = [];
   const vectors: number[][][][][] = [];
   const vecSize = nmodes * 2;
+  // the format requires eigenvectors: write zeros when there are none
+  const e = bands.eigenvectors ?? new Float64Array(nqpts * nmodes * vecSize);
   for (let q = 0; q < nqpts; q++) {
     eigenvalues.push(Array.from(bands.frequencies.subarray(q * nmodes, (q + 1) * nmodes), tidy));
     const modes: number[][][][] = [];
@@ -73,7 +76,6 @@ export function toPhononVis(
       const sites: number[][][] = [];
       for (let s = 0; s < nsites; s++) {
         const p = o + 6 * s;
-        const e = bands.eigenvectors;
         sites.push([
           [tidy(e[p]), tidy(e[p + 1])],
           [tidy(e[p + 2]), tidy(e[p + 3])],
@@ -101,9 +103,9 @@ export function toPhononVis(
     atom_pos_car: structure.sites.map((s) => Array.from(cartesian(structure.lattice, s), tidy)),
     atom_pos_red: structure.sites.map((s) => Array.from(s.frac, tidy)),
     highsym_qpts: mergeLabels(
-      bands.labels.map((l) => (l.label === "GAMMA" ? { ...l, label: "Γ" } : l)),
+      qpointLabels(bands).map((l) => (l.label === "GAMMA" ? { ...l, label: "Γ" } : l)),
     ).labels.map(({ index, label }) => [index, label]),
-    qpoints: [...Array(nqpts)].map((_, q) => Array.from(bands.qpoints.subarray(3 * q, 3 * q + 3), tidy)),
+    qpoints: [...Array(nqpts)].map((_, q) => Array.from(bands.qpoints.coords.subarray(3 * q, 3 * q + 3), tidy)),
     distances: Array.from(distances, tidy),
     eigenvalues,
     vectors,
@@ -188,12 +190,13 @@ function flatten(nested: unknown[], depth: number, size: number): ArrayLike<numb
  * vary in and 1 along the others.
  */
 function defaultRepetitions(bands: PhononBands): number[] {
+  const qs = bands.qpoints.coords;
   const varies = [0, 1, 2].map((j) => {
     let sum = 0;
-    for (let q = 0; q < bands.nqpts; q++) sum += bands.qpoints[3 * q + j];
+    for (let q = 0; q < bands.nqpts; q++) sum += qs[3 * q + j];
     const mean = sum / bands.nqpts;
     for (let q = 0; q < bands.nqpts; q++) {
-      if (Math.abs(bands.qpoints[3 * q + j] - mean) > 1e-5) return true;
+      if (Math.abs(qs[3 * q + j] - mean) > 1e-5) return true;
     }
     return false;
   });

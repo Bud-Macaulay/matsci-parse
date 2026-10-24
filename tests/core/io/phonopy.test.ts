@@ -12,6 +12,7 @@ import {
   pathBreaks,
   qpoint,
   qpointDistances,
+  qpointLabels,
   type PhononBands,
 } from "@/core/phonon";
 import { cuFCCPrimitive } from "../../fixtures/structures";
@@ -131,7 +132,7 @@ describe("fromPhonopyBandYaml", () => {
   });
 
   it("maps segment labels to joints and breaks", () => {
-    expect(bands.labels).toEqual([
+    expect(qpointLabels(bands)).toEqual([
       { index: 0, label: "Γ" },
       { index: 2, label: "X" },
       { index: 3, label: "X" },
@@ -142,23 +143,22 @@ describe("fromPhonopyBandYaml", () => {
     expect(pathBreaks(bands)).toEqual([5]);
   });
 
-  it("fills zero eigenvectors and converts LaTeX labels without them", () => {
+  it("has no eigenvectors and converts LaTeX labels without them", () => {
     const auto = fromPhonopyBandYaml(naclAuto);
-    expect(auto.eigenvectors.length).toBe(18 * 6 * 6 * 2);
-    expect(auto.eigenvectors.every((x) => x === 0)).toBe(true);
-    expect(auto.labels.map((l) => l.label).join(" ")).toBe("Γ X X U K Γ Γ L L W W X");
+    expect(auto.eigenvectors).toBeNull();
+    expect(qpointLabels(auto).map((l) => l.label).join(" ")).toBe("Γ X X U K Γ Γ L L W W X");
     expect(pathBreaks(auto)).toEqual([5]);
   });
 
   it("reads per-q-point labels of phonopy 1.x", () => {
     const legacy = fromPhonopyBandYaml(naclLegacy);
-    expect(legacy.labels.map((l) => l.label).join(" ")).toBe("Γ X X Y Y Γ Γ Z");
+    expect(qpointLabels(legacy).map((l) => l.label).join(" ")).toBe("Γ X X Y Y Γ Γ Z");
     expect(pathBreaks(legacy)).toEqual([]);
   });
 
   it("names segment ends by q-point when the file has no labels", () => {
     const unlabelled = fromPhonopyBandYaml(nacl.replace(/labels:\n(- \[.*\n)+/, ""));
-    expect(unlabelled.labels.map((l) => `${l.index}:${l.label}`)).toEqual([
+    expect(qpointLabels(unlabelled).map((l) => `${l.index}:${l.label}`)).toEqual([
       "0:Q_1", "2:Q_2", "3:Q_2", "5:Q_3", "6:Q_4", "8:Q_1",
     ]);
     expect(pathBreaks(unlabelled)).toEqual([5]);
@@ -225,7 +225,7 @@ describe("toPhonopyBandYaml", () => {
     const back = fromPhonopyBandYaml(text);
     expect(back.nqpts).toBe(6);
     expect(qpoint(back, 3)).toEqual([0.5, 0, 0.5]);
-    expect(back.labels.map((l) => `${l.index}:${l.label}`)).toEqual(["0:Γ", "2:X", "3:X", "5:L"]);
+    expect(qpointLabels(back).map((l) => `${l.index}:${l.label}`)).toEqual(["0:Γ", "2:X", "3:X", "5:L"]);
     expect(Array.from(qpointDistances(back))).toEqual(
       [0, 1, 2, 2, 3, 4].map((q) => expect.closeTo(qpointDistances(bands)[q], 7)),
     );
@@ -243,17 +243,19 @@ describe("toPhonopyBandYaml", () => {
     expect(text).toContain("npath: 1      \nsegment_nqpoint:\n- 2\nreciprocal_lattice:");
     expect(text).not.toContain("eigenvector");
     expect(toPhonopyBandYaml(bands, { eigenvectors: true })).toContain("    eigenvector:\n    - # atom 1\n");
-    expect(fromPhonopyBandYaml(text).labels).toEqual([]);
+    expect(qpointLabels(fromPhonopyBandYaml(text))).toEqual([]);
   });
 });
 
 function expectSameBands(actual: PhononBands, expected: PhononBands) {
   expect(actual.nqpts).toBe(expected.nqpts);
-  expect(actual.labels).toEqual(expected.labels);
+  expect(actual.qpoints.segments).toEqual(expected.qpoints.segments);
   expect(Array.from(actual.structure.lattice.basis.data)).toEqual(Array.from(expected.structure.lattice.basis.data));
   expect(actual.structure.sites).toEqual(expected.structure.sites);
-  expect(Array.from(actual.qpoints)).toEqual(Array.from(expected.qpoints));
-  expect(Array.from(actual.eigenvectors)).toEqual(Array.from(expected.eigenvectors));
+  expect(Array.from(actual.qpoints.coords)).toEqual(Array.from(expected.qpoints.coords));
+  expect(actual.eigenvectors && Array.from(actual.eigenvectors)).toEqual(
+    expected.eigenvectors && Array.from(expected.eigenvectors),
+  );
   // THz → cm⁻¹ → THz: equal to the 10 decimals written
   Array.from(actual.frequencies).forEach((x, k) =>
     expect(x / THZ).toBeCloseTo(expected.frequencies[k] / THZ, 10),
