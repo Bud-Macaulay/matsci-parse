@@ -69,6 +69,14 @@ export function isSampledKPoints(x: unknown): x is SampledKPoints {
   return typeof x === "object" && x !== null && "kind" in x && "coords" in x;
 }
 
+/** Fractional distance (per component) below which two k-points coincide. */
+export const SAME_KPOINT = 1e-6;
+
+/** Whether points `a` and `b` of `coords` ([n × 3], fractional) coincide. */
+export function sameKPoint(coords: Float64Array, a: number, b: number): boolean {
+  return [0, 1, 2].every((j) => Math.abs(coords[3 * a + j] - coords[3 * b + j]) < SAME_KPOINT);
+}
+
 /** Fractional coordinates of point `i`. */
 export function kpointCoord(s: SampledKPoints, i: number): [number, number, number] {
   const o = 3 * i;

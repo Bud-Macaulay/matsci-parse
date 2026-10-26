@@ -154,6 +154,16 @@ describe("PhononVis JSON", () => {
     expect(toPhononVis(back)).toEqual(vis);
   });
 
+  it("round-trips a break between equally labelled q-points", () => {
+    // q-points 1 and 2 differ, so labelling both "K" is a jump K → K'
+    const broken = labelQPoints(bands, [{ index: 1, label: "K" }, { index: 2, label: "K" }]);
+    const vis = toPhononVis(broken);
+    expect(vis.highsym_qpts).toEqual([[1, "K|K"]]);
+    expect(vis.distances[2]).toBe(vis.distances[1]);
+    expect(qpointLabels(fromPhononVis(vis))).toEqual(qpointLabels(broken));
+    expect(toPhononVis(fromPhononVis(vis)).distances).toEqual(vis.distances);
+  });
+
   it("rejects documents missing required fields", () => {
     expect(() => fromPhononVis({ ...toPhononVis(bands), vectors: undefined } as never)).toThrow(/vectors/);
     const vis = toPhononVis(bands);

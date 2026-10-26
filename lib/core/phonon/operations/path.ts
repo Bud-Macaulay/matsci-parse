@@ -1,12 +1,15 @@
-import type { PhononBands, PhononModes } from "../phonon";
-import { cartesianKPoints, pathBreaks as kpathBreaks, pathDistances } from "../../kpoints/path";
+import type { PhononBands, PhononModes, QPointLabel } from "../phonon";
+import { cartesianKPoints, pathBreaks as kpathBreaks, pathDistances, pathTicks } from "../../kpoints/path";
 
 /*
  * Path geometry of phonon band structures: wrappers over the sampled-path
  * operations in `lib/core/kpoints/path.ts`.
  */
 
-export { mergeLabels } from "../../kpoints/path";
+/** Plot ticks of a band structure: labels merged at segment boundaries, see {@link pathTicks}. */
+export function qpointTicks(bands: PhononBands): { labels: QPointLabel[]; breaks: number[] } {
+  return pathTicks(bands.qpoints);
+}
 
 /** Indices i where the path jumps from q-point i to i + 1. */
 export function pathBreaks(bands: PhononBands): number[] {

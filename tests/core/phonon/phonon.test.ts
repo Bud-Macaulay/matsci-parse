@@ -7,7 +7,7 @@ import {
   createPhononBands,
   labelCorners,
   labelHighSymmetryPoints,
-  mergeLabels,
+  qpointTicks,
   modeEigenvector,
   pathBreaks,
   qpointDistances,
@@ -69,17 +69,46 @@ describe("createPhononBands", () => {
 });
 
 describe("path geometry", () => {
-  it("merges adjacent differing labels into breaks", () => {
+  it("merges labels at segment boundaries into ticks", () => {
+    const G = [0, 0, 0];
+    const X = [0.5, 0, 0];
+    const R = [0.5, 0.5, 0.5];
+    const M = [0.5, 0.5, 0];
+    // Γ→X | R→M, M written twice (a joint), M→Γ
+    const qs = [...segment(G, X, 2), X, ...segment(R, M, 2), M, ...segment(M, G, 2), G];
     const labels = [
       { index: 0, label: "Γ" },
-      { index: 9, label: "X" },
-      { index: 10, label: "R" },
-      { index: 19, label: "M" },
-      { index: 20, label: "M" },
+      { index: 2, label: "X" },
+      { index: 3, label: "R" },
+      { index: 5, label: "M" },
+      { index: 6, label: "M" },
+      { index: 8, label: "Γ" },
     ];
-    expect(mergeLabels(labels)).toEqual({
-      labels: [{ index: 0, label: "Γ" }, { index: 9, label: "X|R" }, { index: 19, label: "M" }],
-      breaks: [9],
+    expect(qpointTicks(onPath(cubic, qs, labels))).toEqual({
+      labels: [
+        { index: 0, label: "Γ" },
+        { index: 2, label: "X|R" },
+        { index: 5, label: "M" },
+        { index: 8, label: "Γ" },
+      ],
+      breaks: [2],
+    });
+  });
+
+  it("keeps a jump between equally labelled points as a break", () => {
+    // Γ→X, then a jump to the equivalent X' = (0, 0.5, 0), also labelled X
+    const qs = [[0, 0, 0], [0.25, 0, 0], [0.5, 0, 0], [0, 0.5, 0], [0, 0.25, 0], [0, 0, 0]];
+    const labels = [
+      { index: 0, label: "Γ" },
+      { index: 2, label: "X" },
+      { index: 3, label: "X" },
+      { index: 5, label: "Γ" },
+    ];
+    const bands = onPath(cubic, qs, labels);
+    expect(pathBreaks(bands)).toEqual([2]);
+    expect(qpointTicks(bands)).toEqual({
+      labels: [{ index: 0, label: "Γ" }, { index: 2, label: "X|X" }, { index: 5, label: "Γ" }],
+      breaks: [2],
     });
   });
 

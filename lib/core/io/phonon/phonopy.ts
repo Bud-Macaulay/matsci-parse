@@ -8,7 +8,7 @@ import {
   type QPointLabel,
 } from "../../phonon/phonon";
 import { qpointDistances } from "../../phonon/operations/path";
-import { createSampledPath, type PathSegment } from "../../kpoints/sampled";
+import { createSampledPath, sameKPoint, type PathSegment } from "../../kpoints/sampled";
 import { labelPath } from "../../kpoints/path";
 import { FrequencyUnitSystem } from "../../units/frequency";
 import { LengthUnitSystem } from "../../units/length";
@@ -332,7 +332,7 @@ function fileLabels(raw: PhonopyBandYaml, segments: PathSegment[]): QPointLabel[
     // each end and revisits of a q-point share its name.
     const named: { q: number; label: string }[] = [];
     for (const index of ends.flat()) {
-      const known = named.find(({ q }) => sameQPoint(raw.qpoints, q, index));
+      const known = named.find(({ q }) => sameKPoint(raw.qpoints, q, index));
       const label = known?.label ?? `Q_${named.length + 1}`;
       if (!known) named.push({ q: index, label });
       labelled.set(index, label);
@@ -460,10 +460,6 @@ export function toPhonopyBandYaml(
   }
   // every q-point block ends with a blank line, as in phonopy
   return out.join("\n") + "\n";
-}
-
-function sameQPoint(qpoints: Float64Array, a: number, b: number): boolean {
-  return [0, 1, 2].every((j) => Math.abs(qpoints[3 * a + j] - qpoints[3 * b + j]) < 1e-6);
 }
 
 /** printf-style %w.df, keeping the sign of -0 as phonopy (numpy) does. */

@@ -2,6 +2,8 @@ import type { KPath, Vec3 } from "./kpoints";
 import {
   createSampledPath,
   kpointCoord,
+  sameKPoint,
+  SAME_KPOINT,
   type KPointLabel,
   type SampledKPoints,
   type SampledPath,
@@ -10,9 +12,6 @@ import type { Lattice } from "../lattice/lattice";
 import { reciprocalLatticeCrystallographic } from "../lattice/reciprocalLatticeCrystallographic";
 import { createMatrix } from "../matrix/matrix";
 import { mul } from "../matrix/operations/mul";
-
-/** Fractional distance below which two path points coincide. */
-const SAME_POINT = 1e-6;
 
 /**
  * A sampled path from its coordinates and labels: one segment through
@@ -89,39 +88,37 @@ export function pathBreaks(path: SampledPath): number[] {
   const { segments, coords } = path;
   for (let i = 1; i < segments.length; i++) {
     const end = segments[i - 1].end;
-    if (segments[i].start === end + 1 && !samePoint(coords, end, end + 1)) breaks.push(end);
+    if (segments[i].start === end + 1 && !sameKPoint(coords, end, end + 1)) breaks.push(end);
   }
   return breaks;
 }
 
 /**
- * Collapse path discontinuities in a label list: two consecutive points
- * with different labels ("C" at 35, "C_2" at 36) become one tick "C|C_2" at
- * the first index, and that index is reported as a break. Consecutive
- * points with the same label keep a single entry.
+ * The ticks of a band structure plot: one per labelled segment end, at its
+ * index. Where two segments meet, their labels share one tick at the first
+ * index: at a corner or joint (the same point) differing labels are joined
+ * as "A|B", and at a break (see {@link pathBreaks}) the two sides always
+ * are, "C|C_2" or "X|X" for a jump between equivalent points. Unlabelled
+ * ends get no tick.
  */
-export function mergeLabels(labels: readonly KPointLabel[]): {
-  labels: KPointLabel[];
-  breaks: number[];
-} {
-  const merged: KPointLabel[] = [];
-  const breaks: number[] = [];
-  for (let i = 0; i < labels.length; i++) {
-    const cur = labels[i];
-    const next = labels[i + 1];
-    if (next && next.index === cur.index + 1) {
-      if (next.label !== cur.label) {
-        merged.push({ index: cur.index, label: `${cur.label}|${next.label}` });
-        breaks.push(cur.index);
-      } else {
-        merged.push(cur);
-      }
-      i++;
-    } else {
-      merged.push(cur);
-    }
+export function pathTicks(path: SampledPath): { labels: KPointLabel[]; breaks: number[] } {
+  const { segments } = path;
+  const breaks = pathBreaks(path);
+  const labels: KPointLabel[] = [];
+  const tick = (index: number, names: (string | undefined)[]) => {
+    const defined = names.filter((n) => n !== undefined);
+    if (defined.length > 0) labels.push({ index, label: defined.join("|") });
+  };
+  if (segments.length === 0) return { labels, breaks };
+  const jumps = new Set(breaks);
+  tick(segments[0].start, [segments[0].from]);
+  for (let i = 1; i < segments.length; i++) {
+    const { end, to } = segments[i - 1];
+    const { from } = segments[i];
+    tick(end, jumps.has(end) || to !== from ? [to, from] : [to]);
   }
-  return { labels: merged, breaks };
+  tick(segments[segments.length - 1].end, [segments[segments.length - 1].to]);
+  return { labels, breaks };
 }
 
 /**
@@ -135,7 +132,7 @@ export function toKPath(path: SampledPath): KPath {
     if (label === undefined) throw new Error(`k-point ${index} ends a path segment but has no label`);
     const coord = kpointCoord(path, index);
     const known = points[label];
-    if (known && known.some((x, j) => Math.abs(x - coord[j]) > SAME_POINT)) {
+    if (known && known.some((x, j) => Math.abs(x - coord[j]) > SAME_KPOINT)) {
       throw new Error(`Label '${label}' names two different k-points`);
     }
     points[label] = coord;
@@ -171,8 +168,4 @@ export function pathDistances(path: SampledPath, lattice: Lattice): Float64Array
     out[q] = out[q - 1] + step;
   }
   return out;
-}
-
-function samePoint(coords: Float64Array, a: number, b: number): boolean {
-  return [0, 1, 2].every((j) => Math.abs(coords[3 * a + j] - coords[3 * b + j]) < SAME_POINT);
 }

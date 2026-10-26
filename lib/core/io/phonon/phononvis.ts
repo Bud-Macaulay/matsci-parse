@@ -4,11 +4,10 @@ import { hillFormula } from "../../structure/properties/formula";
 import { SymbolToAtomicNumber } from "../../data/periodictable/atomicData";
 import {
   createPhononBands,
-  qpointLabels,
   type PhononBands,
   type QPointLabel,
 } from "../../phonon/phonon";
-import { mergeLabels, qpointDistances } from "../../phonon/operations/path";
+import { qpointDistances, qpointTicks } from "../../phonon/operations/path";
 
 /*
  * The PhononVis JSON format read by mc-react-phonon-visualizer and written
@@ -102,9 +101,10 @@ export function toPhononVis(
     repetitions: opts.repetitions ?? defaultRepetitions(bands),
     atom_pos_car: structure.sites.map((s) => Array.from(cartesian(structure.lattice, s), tidy)),
     atom_pos_red: structure.sites.map((s) => Array.from(s.frac, tidy)),
-    highsym_qpts: mergeLabels(
-      qpointLabels(bands).map((l) => (l.label === "GAMMA" ? { ...l, label: "Γ" } : l)),
-    ).labels.map(({ index, label }) => [index, label]),
+    highsym_qpts: qpointTicks(bands).labels.map(({ index, label }) => [
+      index,
+      label.split("|").map((l) => (l === "GAMMA" ? "Γ" : l)).join("|"),
+    ]),
     qpoints: [...Array(nqpts)].map((_, q) => Array.from(bands.qpoints.coords.subarray(3 * q, 3 * q + 3), tidy)),
     distances: Array.from(distances, tidy),
     eigenvalues,

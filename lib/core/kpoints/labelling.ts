@@ -1,4 +1,4 @@
-import type { KPointLabel, SampledPath } from "./sampled";
+import { sameKPoint, type KPointLabel, type SampledPath } from "./sampled";
 import { cartesianKPoints, labelPath, pathLabels } from "./path";
 import type { Lattice } from "../lattice/lattice";
 import type { Structure } from "../structure/structure";
@@ -36,7 +36,7 @@ export function pathCorners(path: SampledPath, lattice: Lattice): number[][] {
   const cart = cartesianKPoints(path, lattice);
   const groups: number[][] = [];
   const add = (q: number) => {
-    const group = groups.find((g) => samePoint(coords, g[0], q));
+    const group = groups.find((g) => sameKPoint(coords, g[0], q));
     if (group) group.push(q);
     else groups.push([q]);
   };
@@ -151,10 +151,6 @@ function sortedLabels(map: Map<number, string>): KPointLabel[] {
   return [...map]
     .sort(([a], [b]) => a - b)
     .map(([index, label]) => ({ index, label }));
-}
-
-function samePoint(coords: Float64Array, a: number, b: number): boolean {
-  return [0, 1, 2].every((j) => Math.abs(coords[3 * a + j] - coords[3 * b + j]) < 1e-3);
 }
 
 function collinear(cart: Float64Array, a: number, b: number, c: number): boolean {
