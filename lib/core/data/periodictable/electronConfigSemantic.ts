@@ -64,7 +64,7 @@ export const electronConfigSemantics: Readonly<Record<string, string>> = {
   Xe: "[Kr] 4d10 5s2 5p6",
   Cs: "[Xe] 6s1",
   Ba: "[Xe] 6s2",
-  La: "[Xe] 5d16s2",
+  La: "[Xe] 5d1 6s2",
   Ce: "[Xe] 4f1 5d1 6s2",
   Pr: "[Xe] 4f3 6s2",
   Nd: "[Xe] 4f4 6s2",
