@@ -1,3 +1,4 @@
+import { AtomicNumberToSymbol } from "../data/periodictable/atomicData";
 import { createLattice } from "../lattice/lattice";
 import { inverse } from "../lattice/inverse";
 import { cartesian } from "../site/cartesian";
@@ -8,12 +9,21 @@ import { LineReader } from "./helpers";
 function nextSectionLine(r: LineReader, section: string): void {
   let line: string | null;
   while ((line = r.next()) !== null) {
-    if (line.trim().toUpperCase() === section) return;
+    // Animated XSF files number their sections, e.g. "PRIMVEC 1"
+    if (line.trim().split(/\s+/)[0].toUpperCase() === section) return;
   }
   throw new Error(`Missing ${section}`);
 }
 
-// TODO: support atomic numbers instead of symbols in primvec.
+/** Species symbol from a PRIMCOORD label, which can be a symbol or an atomic number. */
+function symbolFromLabel(label: string): string {
+  if (!/^\d+$/.test(label)) return label;
+  const symbol = AtomicNumberToSymbol.get(Number(label));
+  if (symbol === undefined) {
+    throw new Error(`Unknown atomic number ${label} in PRIMCOORD`);
+  }
+  return symbol;
+}
 
 /**
  * Parses an XSF (XCrySDen Structure Format) string into a Structure.
@@ -46,7 +56,7 @@ export function fromXSF(text: string): Structure {
   for (let i = 0; i < nAtoms; i++) {
     const tokens = r.nextTrimmed().split(/\s+/);
 
-    const symbol = tokens[0];
+    const symbol = symbolFromLabel(tokens[0]);
 
     const x = Number(tokens[1]);
     const y = Number(tokens[2]);
