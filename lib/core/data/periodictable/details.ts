@@ -54,7 +54,7 @@ export interface ElementDetails extends ElementInfo {
   ionizationEnergy: number | null;
   /** Electron affinity in eV, where known. */
   electronAffinity: number | null;
-  /** Van der Waals atomic radius in pm, where known. */
+  /** Van der Waals (Alvarez) atomic radius in pm, where known. */
   atomicRadius: number | null;
   /** Covalent radius in angstrom, where known. */
   covalentRadius: number | null;

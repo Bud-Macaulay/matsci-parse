@@ -128,7 +128,7 @@ describe("element details join", () => {
       abundance: 63000,
       ionizationEnergy: 7.902,
       electronAffinity: 0.163,
-      atomicRadius: 194,
+      atomicRadius: 244,
       covalentRadius: 1.52,
       density: 7.874,
       meltingPoint: 1811,
