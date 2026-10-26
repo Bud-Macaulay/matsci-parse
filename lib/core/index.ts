@@ -17,5 +17,6 @@ export * from "./units";
 
 export * from "./data";
 
-// for now matrix methods remain private.
+// Matrix methods are not part of the main API; they are available as an
+// opt-in entry point: `import { ... } from "matsci-parse/matrix"`.
 // export * from "./matrix";

@@ -25,6 +25,9 @@ export default defineConfig({
           __dirname,
           "lib/core/data/periodictable/index.ts",
         ),
+        // Opt-in entry for the matrix/vector library, which is not part of
+        // the main API (e.g. `import { rank } from "matsci-parse/matrix"`).
+        matrix: resolve(__dirname, "lib/core/matrix/index.ts"),
       },
       fileName: (format, entryName) =>
         entryName === "index" ? "index.js" : `${entryName}.js`,
