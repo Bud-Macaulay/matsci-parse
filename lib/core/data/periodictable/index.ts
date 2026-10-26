@@ -28,6 +28,7 @@ export * from "./ionizationEnergy";
 export * from "./electronAffinity";
 export * from "./atomicRadius";
 export * from "./covalentRadii";
+export * from "./vdwRadii";
 export * from "./density";
 export * from "./meltingPoint";
 export * from "./boilingPoint";
