@@ -18,3 +18,10 @@ export * from "./ase";
 export * from "./pymatgen";
 export * from "./vasprun";
 export * from "./vasp";
+
+export {
+  parseStructure,
+  type ParseStructureOptions,
+  type ParsedStructure,
+  type StructureFormat,
+} from "./parseStructure";

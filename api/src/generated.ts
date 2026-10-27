@@ -7,6 +7,7 @@ import {
   fromPymatgen,
   fromXSF,
   fromXYZ,
+  parseStructure,
   toCIF,
   toPOSCAR,
   toPymatgen,
@@ -31,6 +32,7 @@ export const functions: Record<string, (...args: any[]) => unknown> = {
   fromPymatgen,
   fromXSF,
   fromXYZ,
+  parseStructure,
   toCIF,
   toPOSCAR,
   toPymatgen,
@@ -1174,6 +1176,112 @@ export const types: Record<string, Desc> = {
       }
     ]
   },
+  "ParsedStructure": {
+    "k": "object",
+    "props": [
+      {
+        "name": "format",
+        "optional": false,
+        "type": {
+          "k": "union",
+          "of": [
+            {
+              "k": "literal",
+              "v": "cif"
+            },
+            {
+              "k": "literal",
+              "v": "pw"
+            },
+            {
+              "k": "literal",
+              "v": "poscar"
+            },
+            {
+              "k": "literal",
+              "v": "xsf"
+            },
+            {
+              "k": "literal",
+              "v": "xyz"
+            },
+            {
+              "k": "literal",
+              "v": "pdb"
+            },
+            {
+              "k": "literal",
+              "v": "gro"
+            },
+            {
+              "k": "literal",
+              "v": "json"
+            },
+            {
+              "k": "literal",
+              "v": "pymatgen"
+            },
+            {
+              "k": "literal",
+              "v": "ase"
+            },
+            {
+              "k": "literal",
+              "v": "optimade"
+            },
+            {
+              "k": "literal",
+              "v": "aiida"
+            }
+          ]
+        }
+      },
+      {
+        "name": "structure",
+        "optional": false,
+        "type": {
+          "k": "union",
+          "of": [
+            {
+              "k": "structure"
+            },
+            {
+              "k": "disordered"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "ParseStructureOptions": {
+    "k": "object",
+    "props": [
+      {
+        "name": "format",
+        "optional": true,
+        "doc": "The expected format, or a file extension (`\"vasp\"`, `\"in\"`, ...). Tried\nfirst; if it fails, the format is inferred instead.",
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "fileName",
+        "optional": true,
+        "doc": "File name; its extension (or a VASP name like `POSCAR`) is the next hint.",
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "strict",
+        "optional": true,
+        "doc": "Only try the hinted formats (`format`, else `fileName`'s), never ones\ninferred from the content. Default: false.",
+        "type": {
+          "k": "boolean"
+        }
+      }
+    ]
+  },
   "PymatgenLattice": {
     "k": "object",
     "props": [
@@ -1901,6 +2009,33 @@ export const endpoints: Endpoint[] = [
     ],
     "returns": {
       "k": "structure"
+    },
+    "async": false
+  },
+  {
+    "name": "parseStructure",
+    "tag": "io",
+    "doc": "Read a structure from file contents in any supported format, e.g. a file\na user uploaded.\n\nThe `format` hint is tried first, then the format implied by `fileName`,\nthen the formats the content looks like. The first that parses to at\nleast one atom with finite coordinates wins. Throws, listing every format\ntried and why it failed, if none does. With `strict`, only the hinted\nformat is tried.\n\nReturns a DisorderedStructure for CIF and pymatgen input with partial\noccupancies; narrow with `isDisordered`.",
+    "params": [
+      {
+        "name": "text",
+        "optional": false,
+        "type": {
+          "k": "string"
+        }
+      },
+      {
+        "name": "options",
+        "optional": true,
+        "type": {
+          "k": "ref",
+          "name": "ParseStructureOptions"
+        }
+      }
+    ],
+    "returns": {
+      "k": "ref",
+      "name": "ParsedStructure"
     },
     "async": false
   },
