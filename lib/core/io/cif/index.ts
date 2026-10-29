@@ -36,7 +36,10 @@ function isSymOpHeader(header: string): boolean {
   );
 }
 
-const EPS = 1e-3;
+/** Fractional coordinates this close to 0 or 1 are folded to 0. Only to
+ * absorb round-off: a larger value moves atoms (1e-3 of a 50 Å axis is
+ * 0.05 Å). */
+const EPS = 1e-6;
 
 /** Occupancies within this of 1 count as fully occupied. */
 const FULL_OCCU_TOL = 1e-3;
@@ -46,9 +49,11 @@ const FULL_OCCU_TOL = 1e-3;
 const OVERFILL_TOL = 1e-2;
 
 function posKey(species: string, frac: number[]): string {
+  // Duplicates are recognised to 1e-3: values that round to 1 are the same
+  // site as those that round to 0.
   const w = frac.map((v) => {
-    const c = wrapFrac(v, EPS);
-    return Math.round(c * 1000) / 1000;
+    const r = Math.round(wrapFrac(v, EPS) * 1000) / 1000;
+    return r === 1 ? 0 : r;
   });
 
   return `${species}:${w[0]},${w[1]},${w[2]}`;
