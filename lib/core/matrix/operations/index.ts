@@ -23,6 +23,7 @@ export * from "./sub";
 export * from "./trace";
 export * from "./transpose";
 
+export * from "./eigen";
 export * from "./inverse";
 export * from "./hermiteNormalForm";
 export * from "./latticePointsInSupercell";
