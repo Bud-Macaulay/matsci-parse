@@ -2,6 +2,9 @@ import { Matrix, clone } from "../matrix";
 
 import { EPSILON } from "../../math/constants";
 
+/// TODO: This currently fails on very small round-offs
+/// We should use row-swapping on largest pivot and fixed abs tolerance.
+
 /** Compute the rank of a matrix using Gaussian elimination.
  * @param m - Input matrix.
  * @returns The rank. */
