@@ -3,7 +3,12 @@
  *
  * Standalone and dependency-free: importing this module pulls in neither
  * the core table nor any other field. Null marks unknown values (unknown
- * symbols look up as undefined). Unit: angstrom. Values mirror mc-periodic-table's src/data (the source of truth).
+ * symbols look up as undefined). Unit: angstrom.
+ * The values are those of B. Cordero et al., "Covalent radii revisited",
+ * Dalton Trans. 2008, 2832 (doi:10.1039/B801115J), Table 2. For Mn, Fe and
+ * Co the paper gives low- and high-spin radii; this table uses the high-spin
+ * ones (Mn 1.61, Fe 1.52, Co 1.50; low-spin: 1.39, 1.32, 1.26, as used by
+ * ASE).
  */
 export const covalentRadii: Readonly<Record<string, number | null>> = {
   H: 0.31,
@@ -76,8 +81,8 @@ export const covalentRadii: Readonly<Record<string, number | null>> = {
   Er: 1.89,
   Tm: 1.9,
   Yb: 1.87,
-  Lu: 1.75,
-  Hf: 1.87,
+  Lu: 1.87,
+  Hf: 1.75,
   Ta: 1.7,
   W: 1.62,
   Re: 1.51,
