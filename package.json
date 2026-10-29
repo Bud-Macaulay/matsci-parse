@@ -1,6 +1,6 @@
 {
   "name": "matsci-parse",
-  "version": "0.18.13",
+  "version": "0.18.14",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
