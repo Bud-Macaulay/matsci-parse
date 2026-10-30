@@ -2,8 +2,8 @@ import { createLattice, Lattice } from "../lattice/lattice";
 import { inverse } from "../lattice/inverse";
 import { cartesian } from "../site";
 import { Site } from "../site/site";
-import { Structure } from "../structure/structure";
-import { LineReader } from "./helpers";
+import { MoleculeBox, Structure } from "../structure/structure";
+import { LineReader, moleculeBox } from "./helpers";
 
 type ExtendedXYZInfo = Record<string, string>;
 
@@ -28,10 +28,6 @@ function parseHeader(comment: string): ExtendedXYZInfo {
 }
 
 function parseLattice(info: ExtendedXYZInfo) {
-  if (!info.Lattice) {
-    throw new Error("Extended XYZ must contain Lattice");
-  }
-
   const v = info.Lattice.split(/\s+/).map(Number);
   if (v.length !== 9) throw new Error("Invalid Lattice");
 
@@ -58,7 +54,9 @@ function parseProperties(propStr: string): PropDef[] {
 }
 
 /**
- * Parses an extended XYZ string into a Structure.
+ * Parses an XYZ string into a Structure: extended XYZ, or plain XYZ without
+ * Lattice (a molecule), which is put in a box around its atoms, as fromPDB
+ * does without CRYST1; the structure's `moleculeBox` then says so.
  * @api
  */
 export function fromXYZ(text: string): Structure {
@@ -82,7 +80,6 @@ export function fromXYZ(text: string): Structure {
   if (comment === null) throw new Error("XYZ file is too short");
 
   const info = parseHeader(comment);
-  const lattice = parseLattice(info);
 
   const propDefs = info.Properties
     ? parseProperties(info.Properties)
@@ -91,11 +88,13 @@ export function fromXYZ(text: string): Structure {
         { name: "pos", type: "R", count: 3, offset: 1 },
       ];
 
-  const sites: Site[] = [];
+  const atoms: {
+    symbol: string;
+    position: [number, number, number];
+    props: Record<string, unknown>;
+  }[] = [];
 
   let hasSelective = false;
-
-  const invData = inverse(lattice).data;
 
   for (let i = 0; i < n; i++) {
     const atomLine = r.next();
@@ -141,6 +140,25 @@ export function fromXYZ(text: string): Structure {
     if (!symbol) throw new Error("Missing species in XYZ");
     if (!z && z !== 0) throw new Error("Invalid coordinates in XYZ");
 
+    atoms.push({ symbol, position: [x, y, z], props });
+  }
+
+  let lattice: Lattice;
+  let box: MoleculeBox | undefined;
+  let origin = [0, 0, 0];
+
+  if (info.Lattice) {
+    lattice = parseLattice(info);
+  } else {
+    if (atoms.length === 0) throw new Error("XYZ molecule without atoms");
+    ({ lattice, box } = moleculeBox(atoms.map((atom) => atom.position)));
+    origin = [...box.origin];
+  }
+
+  const invData = inverse(lattice).data;
+
+  const sites: Site[] = atoms.map(({ symbol, position, props }) => {
+    const [x, y, z] = position.map((p, k) => p - origin[k]);
     const site: Site = {
       species: { symbol },
       // inlined site conv for perf.
@@ -155,13 +173,14 @@ export function fromXYZ(text: string): Structure {
       site.properties = props;
     }
 
-    sites.push(site);
-  }
+    return site;
+  });
 
   return {
     lattice,
     sites,
     selectiveDynamics: hasSelective || undefined,
+    ...(box && { moleculeBox: box }),
   };
 }
 

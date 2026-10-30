@@ -1,11 +1,9 @@
-import { fromParameters } from "../lattice";
-import { createLattice } from "../lattice";
+import { fromParameters, Lattice } from "../lattice";
 import { cartesian } from "../site";
 import { fractional } from "../site/fractional";
 import { Site } from "../site/site";
-import { Structure } from "../structure/structure";
-
-const DEFAULT_PADDING = 10.0;
+import { MoleculeBox, Structure } from "../structure/structure";
+import { moleculeBox } from "./helpers";
 
 function parseCRYST1(line: string) {
   const a = Number(line.slice(6, 15));
@@ -113,11 +111,9 @@ export function fromPDB(text: string): Structure {
   const extentY = ymax - ymin;
   const extentZ = zmax - zmin;
 
-  let lattice = createLattice([1, 0, 0, 0, 1, 0, 0, 0, 1]);
-
-  let originX = xmin - DEFAULT_PADDING;
-  let originY = ymin - DEFAULT_PADDING;
-  let originZ = zmin - DEFAULT_PADDING;
+  let lattice: Lattice;
+  let box: MoleculeBox | undefined;
+  let [originX, originY, originZ] = [0, 0, 0];
 
   const useCrystal =
     crystal !== null &&
@@ -132,16 +128,9 @@ export function fromPDB(text: string): Structure {
       crystal.beta,
       crystal.gamma,
     );
-
-    originX = 0;
-    originY = 0;
-    originZ = 0;
   } else {
-    const a = Math.max(extentX + 2 * DEFAULT_PADDING, 1.0);
-    const b = Math.max(extentY + 2 * DEFAULT_PADDING, 1.0);
-    const c = Math.max(extentZ + 2 * DEFAULT_PADDING, 1.0);
-
-    lattice = createLattice([a, 0, 0, 0, b, 0, 0, 0, c]);
+    ({ lattice, box } = moleculeBox(atoms.map(({ x, y, z }) => [x, y, z])));
+    [originX, originY, originZ] = box.origin;
   }
 
   const sites: Site[] = atoms.map(({ symbol, x, y, z }) => ({
@@ -152,10 +141,7 @@ export function fromPDB(text: string): Structure {
     ),
   }));
 
-  return {
-    lattice,
-    sites,
-  };
+  return box ? { lattice, sites, moleculeBox: box } : { lattice, sites };
 }
 
 /** Serializes a Structure to a PDB string. */

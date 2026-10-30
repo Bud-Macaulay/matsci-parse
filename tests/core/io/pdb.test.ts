@@ -45,3 +45,24 @@ describe("PDB round-trip fixtures", () => {
     });
   }
 });
+
+describe("PDB without a usable CRYST1", () => {
+  it("sets moleculeBox (the box is not from the file)", () => {
+    // pdbExample has no CRYST1; pdbExample2 a 1 x 1 x 1 placeholder
+    for (const text of [fixtures.pdbExample, fixtures.pdbExample2]) {
+      expect(fromPDB(text).moleculeBox?.padding).toBe(10);
+    }
+  });
+
+  it("does not set it for a real cell", () => {
+    // pdbExample4's CRYST1 is smaller than its atoms and is not used either
+    const pdb = [
+      "CRYST1   10.000   10.000   10.000  90.00  90.00  90.00 P 1           1",
+      "ATOM      1  O   HOH A   1       1.000   1.000   1.000  1.00  0.00           O",
+      "ATOM      2  H   HOH A   1       1.960   1.000   1.000  1.00  0.00           H",
+      "END",
+    ].join("\n");
+
+    expect(fromPDB(pdb).moleculeBox).toBeUndefined();
+  });
+});
