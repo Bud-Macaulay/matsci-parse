@@ -1,32 +1,58 @@
 import type { KPath, KPoints, Vec3 } from "../../kpoints/kpoints";
 
 // ──────────────────────────────────────────────────────────────────────
-//  CRYSTAL D3 BAND format
+//  CRYSTAL D3 BAND format: properties keyword BAND of the CRYSTAL manual
+//  (CRYSTAL14 p. 198, CRYSTAL17: the same records)
 //  https://www.crystal.unito.it/Manuals/crystal17.pdf
 //
-//  Format (for a band-structure path), per the CRYSTAL manual and
-//  https://tutorials.crystalsolutions.eu (keyword BAND):
 //    BAND
-//    <title>
-//    <nseg> <ISHR> <totk> <first_band> <last_band> <write_unit25> <print>  !<comment>
-//    x1 y1 z1 x2 y2 z2   !Segment_name
-//    ...
+//    TITLE
+//    NLINE ISS NSUB INZB IFNB IPLO LPR66
+//    I1 I2 I3 J1 J2 J3        (NLINE records, if ISS > 0)
 //
-//  Header numbers:
-//    nseg        number of segments in the reciprocal-space path
-//    ISHR        shrinking factor; segment coordinates are multiples of 1/ISHR
-//    totk        total number of k points along the path
-//    first_band  first band to be saved
-//    last_band   last band to be saved
-//    write_unit25  if 1, write the bands on fortran unit 25
-//    print       printing options
+//    NLINE  number of lines (segments) in reciprocal space (max 20)
+//    ISS    shrinking factor in terms of which the segment ends are expressed
+//    NSUB   total number of k points along the path
+//    INZB   first band;  IFNB  last band
+//    IPLO   1: formatted output for plotting (fort.25)
+//    LPR66  != 0: printing of eigenvalues
 //
-//  Each segment line has 6 reciprocal-space coordinates (start, end)
-//  followed by an optional `!` comment indicating the segment label.
-//  The first header number is the number of segment lines.
+//  I1 I2 I3 (J1 J2 J3) are INTEGERS: the start (end) of the line is
+//  I1/ISS b1 + I2/ISS b2 + I3/ISS b3, with b1, b2, b3 the reciprocal lattice
+//  vectors. With ISS = 0 the lines are CRYSTAL's own point labels instead
+//  (e.g. "G X"), not read here: their coordinates depend on the Bravais
+//  lattice. A `!` comment after a line (e.g. "GAMMA -> X") names its ends.
 // ──────────────────────────────────────────────────────────────────────
 
 const BAND_HEADER = /^BAND\s*$/i;
+
+/** The most lines (segments) CRYSTAL's BAND reads (CRYSTAL14, 17 and 23
+ * manuals: "max 20"). Longer paths are still written, with a warning. */
+export const CRYSTAL_MAX_BAND_LINES = 20;
+
+/** Largest shrinking factor tried for exact segment ends. */
+const MAX_EXACT_SHRINK = 1000;
+/** Shrinking factor when a segment end is not a fraction with a denominator
+ * up to MAX_EXACT_SHRINK (e.g. seekpath points that depend on irrational
+ * cell ratios): the ends are then rounded to multiples of 1e-6, and the
+ * integers stay well within CRYSTAL's 32-bit range. */
+const FALLBACK_SHRINK = 1_000_000;
+/** INZB and IFNB, the first and last band to compute: for the user to set. */
+const BAND_PLACEHOLDERS = "<first_band> <last_band>";
+
+/** A coordinate within this of a multiple of 1/ISS is that multiple. */
+const EXACT_TOL = 1e-9;
+
+/** The smallest shrinking factor that writes every coordinate exactly as an
+ * integer in units of 1/ISS, or FALLBACK_SHRINK. */
+function shrinkingFactor(values: number[]): number {
+  for (let n = 1; n <= MAX_EXACT_SHRINK; n++) {
+    if (values.every((x) => Math.abs(x * n - Math.round(x * n)) <= EXACT_TOL * n)) {
+      return n;
+    }
+  }
+  return FALLBACK_SHRINK;
+}
 
 /** Default number of k-points interpolated per band-path segment. */
 const DEFAULT_POINTS_PER_SEGMENT = 40;
@@ -75,17 +101,21 @@ function parseVec6(line: string): [Vec3, Vec3] {
   ];
 }
 
-function formatVec6(start: Vec3, end: Vec3, comment: string): string {
+/** A segment line: the ends as integers in units of 1/shrink, and a comment. */
+function formatVec6(start: Vec3, end: Vec3, shrink: number, comment: string): string {
   const cmt = comment ? `   ${comment}` : "";
-  return `${start.join(" ")} ${end.join(" ")}${cmt}`;
+  // `${-0}` is "0"
+  const ints = [...start, ...end].map((x) => `${Math.round(x * shrink)}`);
+  return `${ints.join(" ")}${cmt}`;
 }
 
 /**
  * Parse a CRYSTAL D3 BAND input file into the canonical k-point representation.
  *
- * Segments are returned as a {@link KPath}.  Coordinates are in reciprocal
- * lattice units (2π/a); converting to fractional coordinates requires the
- * lattice.  The returned path stores the raw coordinates.
+ * Segments are returned as a {@link KPath}, with the segment ends in
+ * fractional reciprocal coordinates (the integers of the file divided by the
+ * shrinking factor ISS). Files with ISS = 0 (CRYSTAL's own point labels) are
+ * rejected.
  *
  * @param text The D3 BAND file content.
  */
@@ -110,15 +140,20 @@ export function fromCrystalD3(text: string): KPath {
   // Line 2: title (ignored for canonical representation)
   const _title = lines[1].trim();
 
-  // Line 3: header — first number is the number of segments
-  const headerNums = stripComment(lines[2])
+  // Line 3: NLINE ISS NSUB INZB IFNB IPLO LPR66 (only the first two are needed)
+  const [nks, shrink] = stripComment(lines[2])
     .split(/\s+/)
     .filter(Boolean)
+    .slice(0, 2)
     .map(Number);
-  if (headerNums.length < 1 || headerNums.some(Number.isNaN)) {
-    throw new Error("Invalid D3 BAND header line");
+  if (!Number.isInteger(nks) || !Number.isInteger(shrink) || shrink < 0) {
+    throw new Error("Invalid D3 BAND header line: expected NLINE and ISS");
   }
-  const nks = headerNums[0];
+  if (shrink === 0) {
+    throw new Error(
+      "D3 BAND with ISS = 0 (CRYSTAL point labels) is not supported: their coordinates depend on the Bravais lattice",
+    );
+  }
 
   if (lines.length < 3 + nks) {
     throw new Error(
@@ -154,7 +189,9 @@ export function fromCrystalD3(text: string): KPath {
 
   for (let i = 3; i < 3 + nks; i++) {
     const line = lines[i];
-    const [start, end] = parseVec6(line);
+    const [start, end] = parseVec6(line).map(
+      ([x, y, z]): Vec3 => [x / shrink, y / shrink, z / shrink],
+    );
     const comment = extractComment(line);
 
     // Parse comment like "GAMMA -> C" or "C_2 -> Y_2"
@@ -182,11 +219,20 @@ function vecApproxEqual(a: Vec3, b: Vec3): boolean {
 /**
  * Serialize canonical k-point data as a CRYSTAL D3 BAND input file.
  *
- * The path segments are written as start/end coordinate pairs with inline
- * segment name comments.  The header line follows the CRYSTAL BAND format:
- * segment count, shrinking factor 1 (fractional reciprocal coordinates),
- * the total number of k points (segments × points per segment), a
- * 1st-to-0th band range, unit-25 writing on, and no printing options.
+ * The segment ends are written as integers in units of 1/ISS, with ISS the
+ * smallest shrinking factor that writes them exactly (or 10^6, rounding them
+ * to 1e-6, for coordinates that are not simple fractions), each line with a
+ * `start -> end` comment. The header: the segment count, ISS, the total
+ * number of k points (segments × points per segment), placeholders for the
+ * first and last band to compute (INZB, IFNB: they depend on the calculation,
+ * e.g. 1 and a few bands above the highest occupied one), unit-25 writing on,
+ * and no printing options, then a comment naming the values. (CRYSTAL reads
+ * the numbers of a record and ignores the rest of its line.)
+ *
+ * A path of more than {@link CRYSTAL_MAX_BAND_LINES} segments (e.g. seekpath's
+ * without time reversal) is written all the same, with a warning, on the
+ * console and at the start of the title line (CRYSTAL reads its first 72
+ * characters).
  *
  * @param data             The canonical k-point data.  Must be a {@link KPath}.
  * @param title            Optional title line (defaults to empty).
@@ -203,8 +249,7 @@ export function toCrystalD3(
     throw new Error("toCrystalD3 only supports KPath data");
   }
 
-  const segmentLines: string[] = [];
-  for (const [startName, endName] of data.segments) {
+  const ends = data.segments.map(([startName, endName]) => {
     const start = data.points[startName];
     const end = data.points[endName];
     if (!start || !end) {
@@ -212,10 +257,20 @@ export function toCrystalD3(
         `KPath references unknown point '${startName}' or '${endName}'`,
       );
     }
-    segmentLines.push(formatVec6(start, end, `${startName} -> ${endName}`));
-  }
+    return { start, end, comment: `${startName} -> ${endName}` };
+  });
+  const shrink = shrinkingFactor(ends.flatMap(({ start, end }) => [...start, ...end]));
+  const segmentLines = ends.map(({ start, end, comment }) =>
+    formatVec6(start, end, shrink, comment),
+  );
 
   const nseg = data.segments.length;
+  let titleLine = title;
+  if (nseg > CRYSTAL_MAX_BAND_LINES) {
+    const warning = `WARNING: ${nseg} lines, CRYSTAL reads at most ${CRYSTAL_MAX_BAND_LINES}`;
+    console.warn(`toCrystalD3: ${warning}`);
+    titleLine = title ? `${warning}; ${title}` : warning;
+  }
   const density =
     pointsPerSegment !== undefined
       ? Math.max(1, Math.round(pointsPerSegment))
@@ -227,8 +282,10 @@ export function toCrystalD3(
   // is unverified.  nseg × points-per-segment matches the MgO tutorial
   // (4 segments → 60 total = 4 × 15) and mirrors the VASP/QE density semantics.
   const totalPoints = nseg * density;
-  // [nseg, ISHR=1, totk, first_band, last_band, write_unit25, print]
-  const header = `${nseg} 1 ${totalPoints} 1 0 1 0`;
+  // NLINE ISS NSUB INZB IFNB IPLO LPR66; the bands are the user's to set
+  const header =
+    `${nseg} ${shrink} ${totalPoints} ${BAND_PLACEHOLDERS} 1 0` +
+    "   ! NLINE ISS NSUB INZB IFNB IPLO LPR66: set INZB, IFNB, the first and last band";
 
-  return ["BAND", title, header, ...segmentLines].join("\n");
+  return ["BAND", titleLine, header, ...segmentLines].join("\n");
 }
