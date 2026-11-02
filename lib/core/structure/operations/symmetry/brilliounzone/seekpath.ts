@@ -9,6 +9,7 @@ import { determinant } from "@/core/matrix/operations/determinant";
 import { transpose } from "@/core/matrix/operations/transpose";
 import { vecMul } from "@/core/matrix/operations/vector/vecMul";
 import { createMatrix, fromRows, toRows } from "@/core/matrix/matrix";
+import { createLattice } from "@/core/lattice";
 import type { KPath } from "@/core/kpoints";
 
 import { transformAP, determineExtBravais, determineAP } from "./bravais";
@@ -367,6 +368,36 @@ export async function getExplicitKPath(
     explicit_kpoints_labels: explicit.kpoints_labels,
     explicit_kpoints_linearcoord: explicit.kpoints_linearcoord,
     explicit_segments: explicit.segments,
+  };
+}
+
+/**
+ * The primitive cell of a {@link getPath} / {@link getExplicitKPath} result as
+ * a Structure, e.g. the cell to write next to its k-points (they are in the
+ * reciprocal crystal coordinates of this cell, which seekpath standardises:
+ * in general another cell, centring or orientation than the input's).
+ *
+ * The result keeps seekpath's plain arrays, whose `primitive_types` number the
+ * elements of the input `structure` in order of first appearance (as the
+ * symmetry analysis does, see spglib.ts).
+ * @api
+ */
+export function primitiveStructure(
+  result: Pick<
+    SeekPathResult,
+    "primitive_lattice" | "primitive_positions" | "primitive_types"
+  >,
+  structure: Structure,
+): Structure {
+  const symbols = [
+    ...new Set(structure.sites.map((site) => site.species.symbol)),
+  ];
+  return {
+    lattice: createLattice(result.primitive_lattice.flat()),
+    sites: result.primitive_positions.map((frac, i) => ({
+      species: { symbol: symbols[result.primitive_types[i]] },
+      frac: new Float64Array(frac),
+    })),
   };
 }
 

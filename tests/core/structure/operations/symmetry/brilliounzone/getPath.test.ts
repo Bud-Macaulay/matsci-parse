@@ -8,6 +8,7 @@ import {
   getExplicitFromImplicit,
   getExplicitKPath,
   getPath,
+  primitiveStructure,
 } from "@/core/structure/operations/symmetry/brilliounzone/seekpath";
 
 const refs = JSON.parse(
@@ -323,5 +324,37 @@ describe("getExplicitFromImplicit", () => {
     // The joint point coordinate is at the shared index
     const joint = result.kpoints_labels[result.segments[1][0]];
     expect(joint).toBe("X");
+  });
+});
+
+describe("primitiveStructure", () => {
+  const counts = (symbols: string[]) => {
+    const c: Record<string, number> = {};
+    for (const s of symbols) c[s] = (c[s] ?? 0) + 1;
+    return c;
+  };
+
+  it.each(cases)("$key: the primitive cell, with the input's elements", async ({ poscar }) => {
+    const structure = fromPOSCAR(poscar);
+    const result = await getPath(structure);
+    const primitive = primitiveStructure(result, structure);
+
+    // (toEqual would tell 0 from -0)
+    const maxDiff = (a: number[], b: number[]) =>
+      Math.max(0, ...a.map((x, i) => Math.abs(x - b[i])));
+    expect(
+      maxDiff(Array.from(primitive.lattice.basis.data), result.primitive_lattice.flat()),
+    ).toBeLessThan(1e-12);
+    expect(
+      maxDiff(primitive.sites.flatMap((s) => Array.from(s.frac)), result.primitive_positions.flat()),
+    ).toBeLessThan(1e-12);
+    // The same composition, divided by the volume ratio
+    const ratio = result.volume_original_wrt_prim;
+    const input = counts(structure.sites.map((s) => s.species.symbol));
+    const prim = counts(primitive.sites.map((s) => s.species.symbol));
+    expect(Object.keys(prim).sort()).toEqual(Object.keys(input).sort());
+    for (const [symbol, n] of Object.entries(input)) {
+      expect(prim[symbol] * ratio).toBeCloseTo(n, 6);
+    }
   });
 });
