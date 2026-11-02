@@ -13,8 +13,9 @@ import {
   parseOperations,
   applyOperation,
 } from "./symmetryOperations";
-import { LineReader } from "../helpers";
+import { LineReader, moleculeBox } from "../helpers";
 import { wrapFrac } from "../../math/numeric";
+import { fractional } from "../../site/fractional";
 
 function cleanValue(value: string | undefined): number {
   if (value === undefined) return NaN;
@@ -85,6 +86,10 @@ function cleanSpeciesSymbol(raw: string | undefined): string {
  * DisorderedStructure (narrow with `isDisordered`). Occupancy is checked on
  * the asymmetric unit, before symmetry expansion, so fully occupied files
  * take the ordered path at negligible cost.
+ *
+ * A molecule (no cell, Cartesian `_atom_site_Cartn_x/y/z` positions only) is
+ * put in a box around its atoms, as fromXYZ and fromPDB do without a cell;
+ * the structure's `moleculeBox` then says so.
  * @api
  */
 export function fromCIF(text: string): Structure | DisorderedStructure {
@@ -191,13 +196,13 @@ export function fromCIF(text: string): Structure | DisorderedStructure {
 
     if (inLoop && potentialAtoms && !collectingAtoms) {
       // First data row of a candidate atom loop: only coordinate loops
-      // (with fractional columns) are collected; aniso/geom/etc. ignored.
-      const hasFract =
-        currentHeaders.some((h) => h.includes("fract_x")) ||
-        currentHeaders.some((h) => h.includes("fract_y")) ||
-        currentHeaders.some((h) => h.includes("fract_z"));
+      // (with fractional or Cartesian columns) are collected; aniso/geom/etc.
+      // ignored.
+      const hasCoordinates = currentHeaders.some((h) =>
+        /(fract|Cartn)_[xyz]/.test(h),
+      );
 
-      if (!hasFract || loopIsAniso) {
+      if (!hasCoordinates || loopIsAniso) {
         potentialAtoms = false;
       } else {
         potentialAtoms = false;
@@ -227,6 +232,12 @@ export function fromCIF(text: string): Structure | DisorderedStructure {
         symOpStrings.push(s);
       }
     }
+  }
+
+  const column = (name: string) => atomHeaders.findIndex((x) => x.includes(name));
+
+  if (column("fract_x") < 0 && column("Cartn_x") >= 0) {
+    return moleculeFromCartesian(atomRows, column, a > 0 || b > 0 || c > 0);
   }
 
   const lattice = fromParameters(a, b, c, alpha, beta, gamma);
@@ -319,6 +330,53 @@ export function fromCIF(text: string): Structure | DisorderedStructure {
 }
 
 /**
+ * A molecule from the rows of an atom loop with Cartesian positions only, in
+ * a box around its atoms (moleculeBox). With a cell, Cartesian positions
+ * would need the file's orthogonalisation convention: not read.
+ */
+function moleculeFromCartesian(
+  atomRows: string[][],
+  column: (name: string) => number,
+  hasCell: boolean,
+): Structure {
+  if (hasCell) {
+    throw new Error(
+      "fromCIF: Cartesian atom sites (_atom_site_Cartn_*) are only read without a cell",
+    );
+  }
+  const ix = column("Cartn_x");
+  const iy = column("Cartn_y");
+  const iz = column("Cartn_z");
+  const ispecies = column("type_symbol");
+  if (iy < 0 || iz < 0 || ispecies < 0) {
+    throw new Error("Missing required atom site columns");
+  }
+  if (atomRows.length === 0) throw new Error("fromCIF: molecule without atoms");
+
+  const maxCol = Math.max(ix, iy, iz, ispecies);
+  const atoms = atomRows.map((row) => {
+    if (row.length <= maxCol) {
+      throw new Error("Incomplete atom site data row");
+    }
+    return {
+      symbol: cleanSpeciesSymbol(row[ispecies]),
+      position: [cleanValue(row[ix]), cleanValue(row[iy]), cleanValue(row[iz])],
+    };
+  });
+
+  const { lattice, box } = moleculeBox(atoms.map((atom) => atom.position));
+  const sites = atoms.map(({ symbol, position }) => ({
+    species: { symbol },
+    frac: fractional(
+      lattice,
+      new Float64Array(position.map((x, k) => x - box.origin[k])),
+    ),
+  }));
+
+  return { lattice, sites, moleculeBox: box };
+}
+
+/**
  * Build a DisorderedStructure from a CIF asymmetric unit with partial
  * occupancies: rows sharing a position (e.g. Fe1 0.5 / Ni1 0.5) merge into
  * one disordered site, then each site is expanded by the symmetry
@@ -394,7 +452,10 @@ function disorderedFromAsymmetricUnit(
 }
 
 /**
- * Serializes a Structure to a CIF string.
+ * Serializes a Structure to a CIF string: the cell and fractional positions
+ * (matsci-parse is predominantly for crystals). A molecule read without a
+ * cell is written in its box (moleculeBox), its positions shifted by
+ * -moleculeBox.origin.
  * @api
  */
 export function toCIF(structure: Structure, precision = 6): string {
