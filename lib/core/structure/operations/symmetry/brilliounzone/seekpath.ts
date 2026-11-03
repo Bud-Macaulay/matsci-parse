@@ -73,6 +73,12 @@ export interface SeekPathResult {
   spacegroup_number: number;
   spacegroup_international: string;
   rotation_matrix: number[][];
+  /**
+   * The primitive cell (`primitive_lattice`, `primitive_positions`,
+   * `primitive_types`) as a Structure with the input's elements: the cell
+   * whose reciprocal crystal coordinates the k-points are in.
+   */
+  readonly primitive: Structure;
 }
 
 /**
@@ -252,6 +258,7 @@ export async function getPath(
     rotation_matrix: toRows(
       transpose(createMatrix(3, 3, calcResults.std_rotation_matrix)),
     ),
+    primitive: primitiveStructure(primitive, structure),
   };
 }
 
@@ -372,30 +379,26 @@ export async function getExplicitKPath(
 }
 
 /**
- * The primitive cell of a {@link getPath} / {@link getExplicitKPath} result as
- * a Structure, e.g. the cell to write next to its k-points (they are in the
+ * The primitive cell as a Structure (the `primitive` of a {@link getPath}
+ * result), e.g. the cell to write next to its k-points (they are in the
  * reciprocal crystal coordinates of this cell, which seekpath standardises:
  * in general another cell, centring or orientation than the input's).
  *
- * The result keeps seekpath's plain arrays, whose `primitive_types` number the
- * elements of the input `structure` in order of first appearance (as the
- * symmetry analysis does, see spglib.ts).
- * @api
+ * seekpath's plain arrays number the elements of the input `structure` in
+ * order of first appearance (`types`, as the symmetry analysis does, see
+ * spglib.ts).
  */
-export function primitiveStructure(
-  result: Pick<
-    SeekPathResult,
-    "primitive_lattice" | "primitive_positions" | "primitive_types"
-  >,
+function primitiveStructure(
+  primitive: { lattice: number[][]; positions: number[][]; types: number[] },
   structure: Structure,
 ): Structure {
   const symbols = [
     ...new Set(structure.sites.map((site) => site.species.symbol)),
   ];
   return {
-    lattice: createLattice(result.primitive_lattice.flat()),
-    sites: result.primitive_positions.map((frac, i) => ({
-      species: { symbol: symbols[result.primitive_types[i]] },
+    lattice: createLattice(primitive.lattice.flat()),
+    sites: primitive.positions.map((frac, i) => ({
+      species: { symbol: symbols[primitive.types[i]] },
       frac: new Float64Array(frac),
     })),
   };

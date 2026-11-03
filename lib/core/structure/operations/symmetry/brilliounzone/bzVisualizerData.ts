@@ -33,6 +33,8 @@ export interface BZVisualizerData {
   spacegroup_international: string;
   has_inversion_symmetry: boolean;
   augmented_path: boolean;
+  /** seekpath's primitive cell, the cell of the k-points (see getPath). */
+  primitive: Structure;
 }
 
 /**
@@ -77,5 +79,6 @@ export async function getBrillouinZoneData(
     spacegroup_international: res.spacegroup_international,
     has_inversion_symmetry: res.has_inversion_symmetry,
     augmented_path: res.augmented_path,
+    primitive: res.primitive,
   };
 }

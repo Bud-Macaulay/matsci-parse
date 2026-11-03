@@ -8,7 +8,6 @@ import {
   getExplicitFromImplicit,
   getExplicitKPath,
   getPath,
-  primitiveStructure,
 } from "@/core/structure/operations/symmetry/brilliounzone/seekpath";
 
 const refs = JSON.parse(
@@ -327,7 +326,7 @@ describe("getExplicitFromImplicit", () => {
   });
 });
 
-describe("primitiveStructure", () => {
+describe("getPath primitive", () => {
   const counts = (symbols: string[]) => {
     const c: Record<string, number> = {};
     for (const s of symbols) c[s] = (c[s] ?? 0) + 1;
@@ -337,7 +336,7 @@ describe("primitiveStructure", () => {
   it.each(cases)("$key: the primitive cell, with the input's elements", async ({ poscar }) => {
     const structure = fromPOSCAR(poscar);
     const result = await getPath(structure);
-    const primitive = primitiveStructure(result, structure);
+    const { primitive } = result;
 
     // (toEqual would tell 0 from -0)
     const maxDiff = (a: number[], b: number[]) =>
