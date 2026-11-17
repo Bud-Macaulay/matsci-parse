@@ -9,6 +9,9 @@ export default defineConfig({
     alias: {
       "@": resolve(__dirname, "../lib"),
       "matsci-parse": resolve(__dirname, "../lib/main.ts"),
+      // weas@materialscloud's package.json points at dist/index.es.js, but it
+      // ships dist/index.mjs
+      weas: resolve(__dirname, "node_modules/weas/dist/index.mjs"),
     },
   },
   optimizeDeps: {

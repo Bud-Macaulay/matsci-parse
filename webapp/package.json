@@ -14,12 +14,15 @@
     "@tanstack/react-hotkeys": "^0.9.1",
     "@tanstack/react-store": "^0.10.0",
     "brillouinzone-visualizer": "^0.4.4",
+    "dat.gui": "^0.7.9",
     "jszip": "^3.10.1",
     "matsci-parse": "^0.16.4",
     "mc-react-structure-visualizer": "^0.11.1",
     "rc-slider": "^11.1.9",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "three": "^0.169.0",
+    "weas": "github:superstar54/weas#materialscloud"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
