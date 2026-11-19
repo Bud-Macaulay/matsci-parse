@@ -82,7 +82,7 @@ export const actions = {
         if (zipEntry.dir) continue;
         try {
           const text = await zipEntry.async("text");
-          const { structure } = parseFileText(text);
+          const { structure } = parseFileText(text, name);
           const meta = {
             name: name.replace(/\.[^.]+$/, ""),
             source: "file",
@@ -106,7 +106,7 @@ export const actions = {
 
     let structure;
     try {
-      ({ structure } = parseFileText(text));
+      ({ structure } = parseFileText(text, file.name));
     } catch (err) {
       showToast(`${file.name}: ${err.message}`, "error");
       throw err;
