@@ -14,7 +14,7 @@ pnpm add matsci-parse
 
 | Module | What it does |
 |---|---|
-| **`io/`** | Parse/write CIF, VASP (POSCAR, CHGCAR), Quantum ESPRESSO (pw), XYZ, XSF, PDB, GRO, Gaussian cube, AiiDA, Optimade |
+| **`io/`** | Parse/write CIF, VASP (POSCAR, CHGCAR), Quantum ESPRESSO (pw), XYZ, XSF, FHI-aims (geometry.in), PDB, GRO, Gaussian cube, AiiDA, Optimade |
 | **`structure/`** | Create, query, and manipulate crystal structures — sites, species, supercells, canonicalization, hashing |
 | **`lattice/`** | Lattice creation (cubic, hexagonal, monoclinic, etc.), parameters, metric tensor, reciprocal space, volumes |
 | **`symmetry/`** | Space group data, Brillouin zone paths (seekpath), symmetry operations via moyo-wasm |

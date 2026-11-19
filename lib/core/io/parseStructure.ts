@@ -5,6 +5,7 @@ import { fromCIF } from "./cif";
 import { fromPOSCAR } from "./poscar";
 import { fromXSF } from "./xsf";
 import { fromXYZ } from "./xyz";
+import { fromAims } from "./aims";
 import { fromPW } from "./pw";
 import { fromPDB } from "./pdb";
 import { fromGRO } from "./gro";
@@ -23,6 +24,7 @@ const TEXT_READERS = {
   xyz: fromXYZ,
   pdb: fromPDB,
   gro: fromGRO,
+  aims: fromAims,
 };
 
 /** JSON formats, read from the parsed document. */
@@ -68,6 +70,8 @@ const ALIASES: Record<string, StructureFormat[]> = {
   extxyz: ["xyz"],
   pdb: ["pdb"],
   gro: ["gro"],
+  aims: ["aims"],
+  fhiaims: ["aims"],
   json: ["json"],
   pymatgen: ["pymatgen"],
   ase: ["ase"],
@@ -83,6 +87,7 @@ const ALIASES: Record<string, StructureFormat[]> = {
 function formatsFromFileName(fileName: string): StructureFormat[] {
   const base = fileName.split(/[\\/]/).pop() ?? "";
   if (/^(POSCAR|CONTCAR)/i.test(base)) return ["poscar"];
+  if (/^geometry\.in/i.test(base)) return ["aims"];
   const dot = base.lastIndexOf(".");
   const ext = dot > 0 ? base.slice(dot + 1).toLowerCase() : "";
   return ext === "json" ? [] : (ALIASES[ext] ?? []);
@@ -102,6 +107,7 @@ function formatsFromText(text: string): TextFormat[] {
   if (/^\s*data_/m.test(text) || /^\s*_(cell_length_a|atom_site_)/m.test(text)) formats.push("cif");
   if (/^\s*(PRIMVEC|PRIMCOORD)\b/m.test(text)) formats.push("xsf");
   if (/^(ATOM {2}|HETATM|CRYST1)/m.test(text)) formats.push("pdb");
+  if (/^\s*(atom|atom_frac)\s+\S+\s+\S+\s+\S+\s+[A-Z]/m.test(text)) formats.push("aims");
 
   const lines = text
     .split(/\r?\n/)

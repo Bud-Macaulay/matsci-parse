@@ -3,6 +3,7 @@ export * from "./poscar";
 export * from "./structuredata";
 export * from "./xsf";
 export * from "./xyz";
+export * from "./aims";
 export * from "./optimade";
 
 export * from "./gro";

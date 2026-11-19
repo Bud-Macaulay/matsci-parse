@@ -16,6 +16,7 @@ import { extendedXyz } from "./teststrings/xyz";
 import { siPw, testPw, ibravFcc } from "./teststrings/pw";
 import { pdbExample, pdbExample2 } from "./teststrings/pdb";
 import { gromacs, largeGromacs } from "./teststrings/gro";
+import { naclAims, siFracAims, waterAims } from "./teststrings/aims";
 
 const TEXT_FIXTURES: [string, StructureFormat, string][] = [
   ["rockSaltCif", "cif", rockSaltCif],
@@ -33,6 +34,9 @@ const TEXT_FIXTURES: [string, StructureFormat, string][] = [
   ["pdbExample2", "pdb", pdbExample2],
   ["gromacs", "gro", gromacs],
   ["largeGromacs", "gro", largeGromacs],
+  ["siFracAims", "aims", siFracAims],
+  ["naclAims", "aims", naclAims],
+  ["waterAims", "aims", waterAims],
 ];
 
 const EXTENSION: Record<string, string> = {
@@ -43,6 +47,7 @@ const EXTENSION: Record<string, string> = {
   pw: "in",
   pdb: "pdb",
   gro: "gro",
+  aims: "aims",
 };
 
 describe("parseStructure: text formats", () => {
@@ -68,6 +73,10 @@ describe("parseStructure: text formats", () => {
       expect(parseStructure(text, { format: wrong }).format).toBe(format);
     });
   }
+
+  it("reads FHI-aims geometry.in by its file name", () => {
+    expect(parseStructure(naclAims, { fileName: "run/geometry.in", strict: true }).format).toBe("aims");
+  });
 
   it("reads VASP file names without an extension", () => {
     const parsed = parseStructure(simplePoscar, { fileName: "dir/CONTCAR_relaxed", strict: true });
