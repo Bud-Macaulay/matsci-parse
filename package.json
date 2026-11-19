@@ -4,6 +4,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
+  "prepublishOnly": "npm run build",
   "files": [
     "dist"
   ],

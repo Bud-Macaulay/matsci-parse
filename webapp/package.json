@@ -17,7 +17,7 @@
     "brillouinzone-visualizer": "^0.4.4",
     "dat.gui": "^0.7.9",
     "jszip": "^3.10.1",
-    "matsci-parse": "^0.16.4",
+    "matsci-parse": "^0.18.25",
     "mc-react-structure-visualizer": "^0.11.1",
     "rc-slider": "^11.1.9",
     "react": "^19.2.4",
