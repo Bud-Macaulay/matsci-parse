@@ -1,0 +1,14 @@
+diff --git a/node_modules/mc-react-structure-visualizer/dist/main.js b/node_modules/mc-react-structure-visualizer/dist/main.js
+index 6d9e767..3c81a5c 100644
+--- a/node_modules/mc-react-structure-visualizer/dist/main.js
++++ b/node_modules/mc-react-structure-visualizer/dist/main.js
+@@ -12948,7 +12948,8 @@ const Visualizer3dmol = forwardRef(
+       try {
+         Lt.current = $3Dmol$1.createViewer(K.current, {
+           backgroundColor: "white",
+-          orthographic: !0
++          orthographic: !0,
++          upscale: !1 // patched: no 2x supersampling, laggy in large panes
+         }), V();
+       } catch (B) {
+         console.error(B), nt(
